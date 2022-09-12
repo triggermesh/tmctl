@@ -19,7 +19,6 @@ package runtime
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -28,13 +27,14 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/triggermesh/tmcli/pkg/docker"
-	tm "github.com/triggermesh/tmcli/pkg/triggermesh/env"
+	"github.com/triggermesh/tmcli/pkg/kubernetes"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/env"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/function"
 )
 
-func initializeAdapter(ctx context.Context, d docker.Client, k8sObject *unstructured.Unstructured, version string, secrets []string) (container, error) {
+func runAdapter(ctx context.Context, d docker.Client, k8sObject *kubernetes.Object, version string) (string, error) {
 	containerOptions := []docker.ContainerOption{
 		d.WithPort(adapterPort),
 	}
@@ -42,97 +42,64 @@ func initializeAdapter(ctx context.Context, d docker.Client, k8sObject *unstruct
 		d.WithHostPortBinding(adapterPort),
 	}
 
-	image := imageURI(k8sObject.GetKind(), version)
+	image := imageURI(k8sObject.Kind, version)
 	var err error
-	var file *os.File
-
-	buildEnv := true
 	var kenv []corev1.EnvVar
 
-	switch k8sObject.GetKind() {
+	var brkrfl *os.File
+
+	buildEnv := true
+	switch k8sObject.Kind {
 	case "Function":
-		if image, err = tm.FunctionRuntimeImage(k8sObject); err != nil {
-			return container{}, fmt.Errorf("cannot parse function image: %w", err)
+		if image, err = function.ImageName(k8sObject); err != nil {
+			return "", fmt.Errorf("cannot parse function image: %w", err)
 		}
 		image = fmt.Sprintf("%s:%s", image, version)
-
-		if file, err = ioutil.TempFile("", ""); err != nil {
-			return container{}, fmt.Errorf("cannot create temp file: %w", err)
+		file, err := createSharedFile(function.Code(k8sObject))
+		if err != nil {
+			return "", fmt.Errorf("writing function: %w", err)
 		}
-
-		if _, err := file.WriteString(tm.FunctionCode(k8sObject)); err != nil {
-			return container{}, fmt.Errorf("cannot write function code: %w", err)
-		}
-		bind := fmt.Sprintf("%s:/opt/source.%s", file.Name(), tm.FunctionFileExtension(k8sObject))
+		bind := fmt.Sprintf("%s:/opt/source.%s", file.Name(), function.FileExtension(k8sObject))
 		hostOptions = append(hostOptions, d.WithVolumeBind(bind))
 		containerOptions = append(containerOptions, d.WithEntrypoint("/opt/aws-custom-runtime"))
 	case "Broker":
 		image = "docker.io/tzununbekov/memory-broker"
 		buildEnv = false
+		brkrfl, err = createSharedFile("")
+		if err != nil {
+			return "", fmt.Errorf("writing function: %w", err)
+		}
+		bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", brkrfl.Name())
+		hostOptions = append(hostOptions, d.WithVolumeBind(bind))
 	}
 	containerOptions = append(containerOptions, d.WithImage(image))
 
 	if buildEnv {
-		kenv, err = adapterEnv(k8sObject, secrets)
+		kenv, err = env.BuildEnv(k8sObject)
 		if err != nil {
-			return container{}, fmt.Errorf("adapter environment: %w", err)
+			return "", fmt.Errorf("adapter environment: %w", err)
 		}
 		containerOptions = append(containerOptions, d.WithEnv(envsToString(kenv)))
 	}
 
 	log.Println("Checking adapter image", image)
 	if err := d.PullImage(ctx, image); err != nil {
-		return container{}, fmt.Errorf("cannot pull Docker image: %w", err)
+		return "", fmt.Errorf("cannot pull Docker image: %w", err)
 	}
 
-	log.Printf("Starting %q", k8sObject.GetName())
-	socket, err := d.RunAdapter(ctx, containerOptions, hostOptions, k8sObject.GetName())
+	log.Printf("Starting %q", k8sObject.Metadata.Name)
+	socket, err := d.StartContainer(ctx, containerOptions, hostOptions, k8sObject.Metadata.Name)
 	if err != nil {
-		return container{}, fmt.Errorf("cannot run Docker container: %w", err)
+		return "", fmt.Errorf("cannot run Docker container: %w", err)
 	}
-
-	// go func() {
-	// 	<-ctx.Done()
-	// 	if file != nil {
-	// 		os.Remove(file.Name())
-	// 	}
-	// 	if err := d.RemoveAdapter(context.Background(), id); err != nil {
-	// 		panic(fmt.Errorf("cannot remove Docker container: %w\nPlease remove container %q manually", err, id))
-	// 	}
-	// }()
 
 	waitForService(ctx, socket)
 
-	return container{
-		object: k8sObject,
-		socket: socket,
-	}, nil
-}
+	// if _, err := brkrfl.WriteString(brokerConfig); err != nil {
+	// panic(fmt.Errorf("cannot write file payload: %w", err))
+	// }
 
-func adapterEnv(object *unstructured.Unstructured, secrets []string) ([]corev1.EnvVar, error) {
-	kenv, err := tm.BuildEnv(object)
-	if err != nil {
-		return []corev1.EnvVar{}, fmt.Errorf("cannot build object environment: %w", err)
-	}
-
-	for k, v := range kenv {
-		if v.ValueFrom != nil {
-			provided := false
-			ref := fmt.Sprintf("%s/%s=", v.ValueFrom.SecretKeyRef.LocalObjectReference.Name, v.ValueFrom.SecretKeyRef.Key)
-			for _, secret := range secrets {
-				if strings.HasPrefix(secret, ref) {
-					provided = true
-					kenv[k].Value = secret[len(ref):]
-					kenv[k].ValueFrom = nil
-				}
-			}
-			if !provided {
-				fmt.Printf("Please provide the secret as a flag attribute: \"-s %s<secret value>\"\n", ref)
-				return []corev1.EnvVar{}, fmt.Errorf("secret is required")
-			}
-		}
-	}
-	return kenv, nil
+	return socket, nil
 }
 
 func waitForService(ctx context.Context, socket string) {
@@ -165,10 +132,19 @@ func imageURI(kind, version string) string {
 
 func envsToString(envs []corev1.EnvVar) []string {
 	var result []string
-
 	for _, env := range envs {
 		result = append(result, fmt.Sprintf("%s=%s", env.Name, env.Value))
 	}
-
 	return result
+}
+
+func createSharedFile(data string) (*os.File, error) {
+	file, err := os.CreateTemp("", "")
+	if err != nil {
+		return nil, fmt.Errorf("cannot create temp file: %w", err)
+	}
+	if _, err := file.WriteString(data); err != nil {
+		return nil, fmt.Errorf("cannot write file payload: %w", err)
+	}
+	return file, nil
 }

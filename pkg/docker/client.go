@@ -52,7 +52,7 @@ func (c Client) Logs(ctx context.Context, id string) (io.ReadCloser, error) {
 	return c.docker.ContainerLogs(ctx, id, options)
 }
 
-func (c Client) RemoveAdapter(ctx context.Context, name string) error {
+func (c Client) RemoveContainer(ctx context.Context, name string) error {
 	id, err := c.nameToID(ctx, name)
 	if err != nil {
 		return err
@@ -94,7 +94,7 @@ func (c Client) PullImage(ctx context.Context, image string) error {
 	return nil
 }
 
-func (c Client) RunAdapter(ctx context.Context, copts []ContainerOption, hopts []HostOption, name string) (string, error) {
+func (c Client) StartContainer(ctx context.Context, copts []ContainerOption, hopts []HostOption, name string) (string, error) {
 	cc := container.Config{}
 	for _, opt := range copts {
 		opt(&cc)

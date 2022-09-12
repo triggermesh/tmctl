@@ -38,10 +38,10 @@ type Manifest struct {
 }
 
 type Object struct {
-	APIVersion string      `yaml:"apiVersion"`
-	Kind       string      `yaml:"kind"`
-	Metadata   Metadata    `yaml:"metadata"`
-	Spec       interface{} `yaml:"spec"`
+	APIVersion string                 `yaml:"apiVersion"`
+	Kind       string                 `yaml:"kind"`
+	Metadata   Metadata               `yaml:"metadata"`
+	Spec       map[string]interface{} `yaml:"spec"`
 }
 
 type Metadata struct {

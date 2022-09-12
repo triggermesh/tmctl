@@ -17,6 +17,7 @@ limitations under the License.
 package stop
 
 import (
+	"context"
 	"fmt"
 	"path"
 
@@ -55,5 +56,5 @@ func NewCmd() *cobra.Command {
 
 func (o *StartOptions) stop(broker string) error {
 	manifest := path.Join(o.ConfigDir, broker, manifestFile)
-	return runtime.NewLocalSetup(manifest, "", []string{}).StopAll()
+	return runtime.NewLocalSetup(manifest, "", []string{}).StopAll(context.Background())
 }

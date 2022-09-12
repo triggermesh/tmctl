@@ -17,6 +17,7 @@ limitations under the License.
 package create
 
 import (
+	"context"
 	"fmt"
 	"path"
 
@@ -78,6 +79,7 @@ func (c *CreateOptions) Parse(args []string) (string, string, []string, error) {
 }
 
 func (o *CreateOptions) Create(resource, kind string, args []string) error {
+	ctx := context.Background()
 	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
 	var object *kubernetes.Object
 	var dirty bool
@@ -109,7 +111,7 @@ func (o *CreateOptions) Create(resource, kind string, args []string) error {
 		return fmt.Errorf("unsupported resource type %q", resource)
 	}
 
-	status, err := runtime.GetStatus(object)
+	status, err := runtime.GetStatus(ctx, object)
 	if err != nil {
 		return fmt.Errorf("cannot read container status: %w", err)
 	}
@@ -117,15 +119,15 @@ func (o *CreateOptions) Create(resource, kind string, args []string) error {
 	switch {
 	case status == "not found":
 		// create
-		if _, err := runtime.RunObject(object, []string{}, o.Version); err != nil {
+		if _, err := runtime.RunObject(ctx, object, o.Version); err != nil {
 			return fmt.Errorf("cannot start container: %w", err)
 		}
 	case dirty || status == "exited" || status == "dead":
 		// recreate
-		if err := runtime.StopObject(object); err != nil {
+		if err := runtime.StopObject(ctx, object); err != nil {
 			return fmt.Errorf("cannot stop container: %w", err)
 		}
-		if _, err := runtime.RunObject(object, []string{}, o.Version); err != nil {
+		if _, err := runtime.RunObject(ctx, object, o.Version); err != nil {
 			return fmt.Errorf("cannot start container: %w", err)
 		}
 	default:

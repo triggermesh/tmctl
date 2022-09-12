@@ -25,8 +25,6 @@ import (
 	"log"
 	"sync"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 )
@@ -47,11 +45,6 @@ type adapterLogEntry struct {
 	Message  string `json:"message"`
 }
 
-type container struct {
-	socket string
-	object *unstructured.Unstructured
-}
-
 type LocalSetup struct {
 	ManifestPath string
 	Version      string
@@ -66,7 +59,7 @@ func NewLocalSetup(manifestFile, version string, secrets []string) *LocalSetup {
 	}
 }
 
-func (l *LocalSetup) RunAll(restart bool) error {
+func (l *LocalSetup) RunAll(ctx context.Context, restart bool) error {
 	// _, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	// defer func() {
 	// 	cancel()
@@ -79,14 +72,14 @@ func (l *LocalSetup) RunAll(restart bool) error {
 		return fmt.Errorf("cannot parse manifest: %w", err)
 	}
 
-	components := make([]container, len(manifest.Objects))
+	components := make([]string, len(manifest.Objects))
 	var wg sync.WaitGroup
 
 	wg.Add(len(components))
 
 	for i, object := range manifest.Objects {
 		go func(i int, object kubernetes.Object) {
-			c, err := RunObject(&object, l.Secrets, l.Version)
+			c, err := RunObject(ctx, &object, l.Version)
 			if err != nil {
 				panic(fmt.Errorf("cannot create adapter: %v", err))
 			}
@@ -112,45 +105,41 @@ func (l *LocalSetup) RunAll(restart bool) error {
 	return nil
 }
 
-func (l *LocalSetup) StopAll() error {
+func (l *LocalSetup) StopAll(ctx context.Context) error {
 	manifest := kubernetes.NewManifest(l.ManifestPath)
 	if err := manifest.Read(); err != nil {
 		return fmt.Errorf("cannot parse manifest: %w", err)
 	}
 	for _, object := range manifest.Objects {
-		if err := StopObject(&object); err != nil {
+		if err := StopObject(ctx, &object); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func RunObject(object *kubernetes.Object, secrets []string, version string) (container, error) {
-	client, err := docker.NewClient()
-	if err != nil {
-		return container{}, fmt.Errorf("docker client: %w", err)
-	}
-	k8sObject, err := object.ToUnstructured()
-	if err != nil {
-		return container{}, fmt.Errorf("cannot translate YAML resource to K8s object: %w", err)
-	}
-	return initializeAdapter(context.Background(), client, k8sObject, version, secrets)
-}
-
-func StopObject(object *kubernetes.Object) error {
-	client, err := docker.NewClient()
-	if err != nil {
-		return fmt.Errorf("docker client: %w", err)
-	}
-	return client.RemoveAdapter(context.Background(), object.Metadata.Name)
-}
-
-func GetStatus(object *kubernetes.Object) (string, error) {
+func RunObject(ctx context.Context, object *kubernetes.Object, version string) (string, error) {
 	client, err := docker.NewClient()
 	if err != nil {
 		return "", fmt.Errorf("docker client: %w", err)
 	}
-	return client.Status(context.Background(), object.Metadata.Name)
+	return runAdapter(ctx, client, object, version)
+}
+
+func StopObject(ctx context.Context, object *kubernetes.Object) error {
+	client, err := docker.NewClient()
+	if err != nil {
+		return fmt.Errorf("docker client: %w", err)
+	}
+	return client.RemoveContainer(ctx, object.Metadata.Name)
+}
+
+func GetStatus(ctx context.Context, object *kubernetes.Object) (string, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return "", fmt.Errorf("docker client: %w", err)
+	}
+	return client.Status(ctx, object.Metadata.Name)
 }
 
 func listenLogs(output io.ReadCloser, component string, errs chan adapterLogEntry, verbose bool) {

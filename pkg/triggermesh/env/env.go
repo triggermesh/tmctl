@@ -19,22 +19,26 @@ package env
 import (
 	"fmt"
 
+	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func BuildEnv(object *unstructured.Unstructured) ([]corev1.EnvVar, error) {
-	switch object.GetAPIVersion() {
-	case "sources.triggermesh.io/v1alpha1":
-		return sources(object)
-	case "targets.triggermesh.io/v1alpha1":
-		return targets(object)
-	case "flow.triggermesh.io/v1alpha1":
-		return flow(object)
-	case "extensions.triggermesh.io/v1alpha1":
-		return extensions(object)
-	case "routing.triggermesh.io/v1alpha1":
-		return routing(object)
+func BuildEnv(object *kubernetes.Object) ([]corev1.EnvVar, error) {
+	o, err := object.ToUnstructured()
+	if err != nil {
+		return nil, fmt.Errorf("cannot convert object: %w", err)
 	}
-	return nil, fmt.Errorf("API group %q is not supported", object.GetKind())
+	switch o.GetAPIVersion() {
+	case "sources.triggermesh.io/v1alpha1":
+		return sources(o)
+	case "targets.triggermesh.io/v1alpha1":
+		return targets(o)
+	case "flow.triggermesh.io/v1alpha1":
+		return flow(o)
+	case "extensions.triggermesh.io/v1alpha1":
+		return extensions(o)
+	case "routing.triggermesh.io/v1alpha1":
+		return routing(o)
+	}
+	return nil, fmt.Errorf("API group %q is not supported", o.GetKind())
 }
