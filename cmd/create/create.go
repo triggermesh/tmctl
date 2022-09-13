@@ -17,16 +17,9 @@ limitations under the License.
 package create
 
 import (
-	"context"
 	"fmt"
-	"path"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-
-	"github.com/triggermesh/tmcli/pkg/kubernetes"
-	"github.com/triggermesh/tmcli/pkg/runtime"
-	"github.com/triggermesh/tmcli/pkg/triggermesh"
 )
 
 const manifestFile = "manifest.yaml"
@@ -41,98 +34,38 @@ type CreateOptions struct {
 func NewCmd() *cobra.Command {
 	o := &CreateOptions{}
 	createCmd := &cobra.Command{
-		Use:                "create <resource>",
-		Short:              "create TriggerMesh objects",
-		DisableFlagParsing: true,
-		SilenceErrors:      true,
-		SilenceUsage:       true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			o.ConfigBase = c
-			o.Context = viper.GetString("context")
-			o.Version = viper.GetString("triggermesh.version")
-			o.CRD = viper.GetString("triggermesh.servedCRD")
-			resource, kind, args, err := o.Parse(args)
-			if err != nil {
-				return err
-			}
-			if err := o.Create(resource, kind, args); err != nil {
-				return err
-			}
-			fmt.Println("Object created")
-			return nil
+		Use:   "create <resource>",
+		Short: "create TriggerMesh objects",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.HelpFunc()(cmd, args)
 		},
 	}
-	// createCmd.Flags().StringVarP(&o.Context, "broker", "b", "", "Connect components to this broker")
+	createCmd.AddCommand(o.NewBrokerCmd())
+	createCmd.AddCommand(o.NewSourceCmd())
+	createCmd.AddCommand(o.NewTargetCmd())
+	createCmd.AddCommand(o.NewTriggerCmd())
+
+	createCmd.Flags().StringVarP(&o.Context, "broker", "b", "", "Connect components to this broker")
 
 	return createCmd
 }
 
-func (c *CreateOptions) Parse(args []string) (string, string, []string, error) {
-	if l := len(args); l < 2 {
-		return "", "", []string{}, fmt.Errorf("expected at least 2 arguments, got %d", l)
+func parse(args []string) (string, []string, error) {
+	if l := len(args); l < 1 {
+		return "", []string{}, fmt.Errorf("expected at least 1 arguments, got %d", l)
 	}
-	return args[0], args[1], args[2:], nil
+	return args[0], args[1:], nil
 }
 
-func (o *CreateOptions) Create(resource, kind string, args []string) error {
-	ctx := context.Background()
-	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
-	var object *kubernetes.Object
-	var dirty bool
-	var err error
-
-	switch resource {
-	case "broker":
-		name := kind
-		manifest = path.Join(o.ConfigBase, name, manifestFile)
-		object, dirty, err = triggermesh.CreateBroker(name, manifest)
-		if err != nil {
-			return fmt.Errorf("broker creation error: %w", err)
-		}
-		viper.Set("context", object.Metadata.Name)
-		if err := viper.WriteConfig(); err != nil {
-			return err
-		}
-	case "source":
-		object, dirty, err = triggermesh.CreateSource(kind, o.Context, args, manifest, o.CRD)
-		if err != nil {
-			return fmt.Errorf("source creation error: %w", err)
-		}
-	case "target":
-		object, dirty, err = triggermesh.CreateTarget(kind, o.Context, args, manifest, o.CRD)
-		if err != nil {
-			return fmt.Errorf("target creation error: %w", err)
-		}
-	default:
-		return fmt.Errorf("unsupported resource type %q", resource)
-	}
-
-	status, err := runtime.GetStatus(ctx, object)
-	if err != nil {
-		return fmt.Errorf("cannot read container status: %w", err)
-	}
-
-	switch {
-	case status == "not found":
-		// create
-		if _, err := runtime.RunObject(ctx, object, o.Version); err != nil {
-			return fmt.Errorf("cannot start container: %w", err)
-		}
-	case dirty || status == "exited" || status == "dead":
-		// recreate
-		if err := runtime.StopObject(ctx, object); err != nil {
-			return fmt.Errorf("cannot stop container: %w", err)
-		}
-		if _, err := runtime.RunObject(ctx, object, o.Version); err != nil {
-			return fmt.Errorf("cannot start container: %w", err)
-		}
-	default:
-		fmt.Printf("Doing nothing because status is %q and dirty flag is %t\n", status, dirty)
-	}
-
-	return nil
-}
+// Function init:
+//    if image, err = function.ImageName(k8sObject); err != nil {
+//            return "", fmt.Errorf("cannot parse function image: %w", err)
+//    }
+//    image = fmt.Sprintf("%s:%s", image, version)
+//    file, err := createSharedFile(function.Code(k8sObject))
+//    if err != nil {
+//            return "", fmt.Errorf("writing function: %w", err)
+//    }
+//    bind := fmt.Sprintf("%s:/opt/source.%s", file.Name(), function.FileExtension(k8sObject))
+//    hostOptions = append(hostOptions, d.WithVolumeBind(bind))
+//    containerOptions = append(containerOptions, d.WithEntrypoint("/opt/aws-custom-runtime"))

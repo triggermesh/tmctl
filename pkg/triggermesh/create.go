@@ -26,9 +26,10 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
+	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 )
 
-func CreateBroker(name string, manifestFile string) (*kubernetes.Object, bool, error) {
+func CreateBroker(name, manifestFile string) (*kubernetes.Object, bool, error) {
 	// create config folder
 	if err := os.MkdirAll(path.Dir(manifestFile), os.ModePerm); err != nil {
 		return nil, false, fmt.Errorf("broker dir creation: %w", err)
@@ -67,7 +68,26 @@ func CreateBroker(name string, manifestFile string) (*kubernetes.Object, bool, e
 	return &broker, dirty, nil
 }
 
-func CreateSource(kind string, broker string, args []string, manifestFile, crdFile string) (*kubernetes.Object, bool, error) {
+func CreateTrigger(manifestFile, broker string) (*kubernetes.Object, bool, error) {
+	manifest := kubernetes.NewManifest(manifestFile)
+	if err := manifest.Read(); err != nil {
+		return nil, false, fmt.Errorf("unable to read the manifest: %w", err)
+	}
+
+	trigger := tmbroker.CreateTriggerObject("foo-trigger", "foo-events", "example.com", broker)
+	dirty, err := manifest.Add(trigger)
+	if err != nil {
+		return nil, false, fmt.Errorf("manifest update: %w", err)
+	}
+	if dirty {
+		if err := manifest.Write(); err != nil {
+			return nil, false, fmt.Errorf("manifest write operation: %w", err)
+		}
+	}
+	return &trigger, dirty, nil
+}
+
+func CreateSource(kind, broker string, args []string, manifestFile, crdFile string) (*kubernetes.Object, bool, error) {
 	manifest := kubernetes.NewManifest(manifestFile)
 	err := manifest.Read()
 	if err != nil {
@@ -96,7 +116,7 @@ func CreateSource(kind string, broker string, args []string, manifestFile, crdFi
 	return &source, dirty, nil
 }
 
-func CreateTarget(kind string, broker string, args []string, manifestFile, crdFile string) (*kubernetes.Object, bool, error) {
+func CreateTarget(kind, broker string, args []string, manifestFile, crdFile string) (*kubernetes.Object, bool, error) {
 	manifest := kubernetes.NewManifest(manifestFile)
 	err := manifest.Read()
 	if err != nil {

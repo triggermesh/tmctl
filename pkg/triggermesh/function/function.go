@@ -39,7 +39,11 @@ func ImageName(object *kubernetes.Object) (string, error) {
 }
 
 func Code(object *kubernetes.Object) string {
-	return object.Spec["code"].(string)
+	code, exists := object.Spec["code"]
+	if !exists {
+		return ""
+	}
+	return code.(string)
 }
 
 func Entrypoint(object *kubernetes.Object) string {

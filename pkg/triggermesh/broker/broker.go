@@ -37,24 +37,49 @@ const brokerConfig = `triggers:
       deadLetterURL: http://localhost:9090`
 
 type Configuration struct {
-	Triggers []struct {
-		Name    string `yaml:"name"`
-		Filters []struct {
-			Exact struct {
-				Type string `yaml:"type"`
-			} `yaml:"exact"`
-		} `yaml:"filters,omitempty"`
-		Targets []struct {
-			URL             string `yaml:"url"`
-			DeliveryOptions struct {
-				Retries       int    `yaml:"retries"`
-				BackoffDelay  string `yaml:"backoffDelay"`
-				BackoffPolicy string `yaml:"backoffPolicy"`
-			} `yaml:"deliveryOptions"`
-		} `yaml:"targets"`
-	} `yaml:"triggers"`
+	Triggers []Trigger `yaml:"triggers"`
+}
+
+type Filter struct {
+	Exact Exact `yaml:"exact"`
+}
+
+type Exact struct {
+	Type string `yaml:"type"`
+}
+
+type Target struct {
+	URL             string `yaml:"url"`
+	DeliveryOptions struct {
+		Retries       int    `yaml:"retries"`
+		BackoffDelay  string `yaml:"backoffDelay"`
+		BackoffPolicy string `yaml:"backoffPolicy"`
+	} `yaml:"deliveryOptions"`
+}
+
+type triggerK8s struct {
+	Name string
 }
 
 func NewConfiguration() *Configuration {
 	return &Configuration{}
+}
+
+func (c *Configuration) AddTrigger(name, targetURL, eventType string) {
+	trigger := Trigger{
+		Name: name,
+		Filters: []Filter{
+			{
+				Exact: Exact{
+					Type: eventType,
+				},
+			},
+		},
+		Targets: []Target{
+			{
+				URL: targetURL,
+			},
+		},
+	}
+	c.Triggers = append(c.Triggers, trigger)
 }

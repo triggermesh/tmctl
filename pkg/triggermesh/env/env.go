@@ -23,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func BuildEnv(object *kubernetes.Object) ([]corev1.EnvVar, error) {
+func Build(object *kubernetes.Object) ([]corev1.EnvVar, error) {
 	o, err := object.ToUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("cannot convert object: %w", err)

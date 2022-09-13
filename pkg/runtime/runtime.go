@@ -27,14 +27,11 @@ import (
 
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
+	"github.com/triggermesh/tmcli/pkg/triggermesh"
 )
 
 const (
-	// container registry to pull adapter images from
-	tmContainerRegistry = "gcr.io/triggermesh"
-	// port number where adapter service is serving connections
-	adapterPort = "8080/tcp"
-	// adapter connect retries
+	// adapter readiness check retries
 	connRetries = 10
 )
 
@@ -79,7 +76,7 @@ func (l *LocalSetup) RunAll(ctx context.Context, restart bool) error {
 
 	for i, object := range manifest.Objects {
 		go func(i int, object kubernetes.Object) {
-			c, err := RunObject(ctx, &object, l.Version)
+			c, err := runObject(ctx, &object, l.Version)
 			if err != nil {
 				panic(fmt.Errorf("cannot create adapter: %v", err))
 			}
@@ -111,22 +108,33 @@ func (l *LocalSetup) StopAll(ctx context.Context) error {
 		return fmt.Errorf("cannot parse manifest: %w", err)
 	}
 	for _, object := range manifest.Objects {
-		if err := StopObject(ctx, &object); err != nil {
+		if err := stopObject(ctx, &object); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func RunObject(ctx context.Context, object *kubernetes.Object, version string) (string, error) {
+func runObject(ctx context.Context, object *kubernetes.Object, version string) (string, error) {
 	client, err := docker.NewClient()
 	if err != nil {
 		return "", fmt.Errorf("docker client: %w", err)
 	}
-	return runAdapter(ctx, client, object, version)
+
+	image, err := triggermesh.AdapterImage(object, version)
+	if err != nil {
+		return "", fmt.Errorf("adapter image: %w", err)
+	}
+
+	co, ho, err := triggermesh.AdapterParams(object, image)
+	if err != nil {
+		return "", fmt.Errorf("adapter parameters: %w", err)
+	}
+
+	return runAdapter(ctx, client, object.Metadata.Name, image, co, ho)
 }
 
-func StopObject(ctx context.Context, object *kubernetes.Object) error {
+func stopObject(ctx context.Context, object *kubernetes.Object) error {
 	client, err := docker.NewClient()
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
@@ -134,7 +142,7 @@ func StopObject(ctx context.Context, object *kubernetes.Object) error {
 	return client.RemoveContainer(ctx, object.Metadata.Name)
 }
 
-func GetStatus(ctx context.Context, object *kubernetes.Object) (string, error) {
+func getStatus(ctx context.Context, object *kubernetes.Object) (string, error) {
 	client, err := docker.NewClient()
 	if err != nil {
 		return "", fmt.Errorf("docker client: %w", err)

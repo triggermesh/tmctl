@@ -26,19 +26,19 @@ import (
 type ContainerOption func(*container.Config)
 type HostOption func(*container.HostConfig)
 
-func (c *Client) WithImage(image string) ContainerOption {
+func WithImage(image string) ContainerOption {
 	return func(cc *container.Config) {
 		cc.Image = image
 	}
 }
 
-func (c *Client) WithEnv(env []string) ContainerOption {
+func WithEnv(env []string) ContainerOption {
 	return func(cc *container.Config) {
 		cc.Env = env
 	}
 }
 
-func (c *Client) WithPort(port nat.Port) ContainerOption {
+func WithPort(port nat.Port) ContainerOption {
 	return func(cc *container.Config) {
 		cc.ExposedPorts = nat.PortSet{
 			port: struct{}{},
@@ -46,19 +46,19 @@ func (c *Client) WithPort(port nat.Port) ContainerOption {
 	}
 }
 
-func (c *Client) WithEntrypoint(entrypoint string) ContainerOption {
+func WithEntrypoint(entrypoint string) ContainerOption {
 	return func(cc *container.Config) {
 		cc.Entrypoint = []string{entrypoint}
 	}
 }
 
-func (c *Client) WithVolumeBind(bind string) HostOption {
+func WithVolumeBind(bind string) HostOption {
 	return func(hc *container.HostConfig) {
 		hc.Binds = []string{bind}
 	}
 }
 
-func (c *Client) WithHostPortBinding(containerPort nat.Port) HostOption {
+func WithHostPortBinding(containerPort nat.Port) HostOption {
 	return func(hc *container.HostConfig) {
 		hc.PortBindings = nat.PortMap{
 			containerPort: []nat.PortBinding{
