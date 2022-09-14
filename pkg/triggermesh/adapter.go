@@ -19,10 +19,12 @@ package triggermesh
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/spf13/viper"
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/env"
@@ -63,18 +65,19 @@ func AdapterParams(object *kubernetes.Object, image string) ([]docker.ContainerO
 
 	switch object.Kind {
 	case "Broker":
-		filename, err := tempFile("")
-		if err != nil {
+		// get rid of viper here
+		configFile := path.Join("/Users/tzununbekov/.triggermesh/cli", object.Metadata.Name, "broker.conf")
+		if err := writeFile(configFile, []byte{}); err != nil {
 			return nil, nil, fmt.Errorf("writing configuration: %w", err)
 		}
-		bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", filename)
+		bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", configFile)
 		ho = append(ho, docker.WithVolumeBind(bind))
 	case "Function":
-		filename, err := tempFile(function.Code(object))
-		if err != nil {
+		configFile := path.Join("/Users/tzununbekov/.triggermesh/cli", viper.GetString("context"), object.Metadata.Name)
+		if err := writeFile(configFile, []byte(function.Code(object))); err != nil {
 			return nil, nil, fmt.Errorf("writing function: %w", err)
 		}
-		bind := fmt.Sprintf("%s:/opt/source.%s", filename, function.FileExtension(object))
+		bind := fmt.Sprintf("%s:/opt/source.%s", configFile, function.FileExtension(object))
 		ho = append(ho, docker.WithVolumeBind(bind))
 		co = append(co, docker.WithEntrypoint("/opt/aws-custom-runtime"))
 		// yikes
@@ -90,13 +93,11 @@ func AdapterParams(object *kubernetes.Object, image string) ([]docker.ContainerO
 	return co, ho, nil
 }
 
-func tempFile(data string) (string, error) {
-	file, err := os.CreateTemp("", "")
-	if err != nil {
-		return "", err
+func writeFile(filePath string, data []byte) error {
+	if err := os.MkdirAll(path.Dir(filePath), os.ModePerm); err != nil {
+		return err
 	}
-	_, err = file.WriteString(data)
-	return file.Name(), err
+	return os.WriteFile(filePath, data, os.ModePerm)
 }
 
 func envsToString(envs []corev1.EnvVar) []string {

@@ -28,13 +28,13 @@ import (
 )
 
 func Initialize(ctx context.Context, object *kubernetes.Object, version string, dirty bool) (*docker.Container, error) {
-	status, err := getStatus(ctx, object)
+	status, err := getStatus(ctx, object.Metadata.Name)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read container status: %w", err)
 	}
 
 	switch {
-	case status == "not found":
+	case status == "stopped":
 		// create
 		return runObject(ctx, object, version)
 	case dirty || status == "exited" || status == "dead":

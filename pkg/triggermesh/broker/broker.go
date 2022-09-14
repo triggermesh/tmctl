@@ -22,6 +22,8 @@ import (
 	"path"
 
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
+
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 )
 
@@ -88,6 +90,34 @@ func CreateBrokerObject(name, manifestFile string) (*kubernetes.Object, bool, er
 	return &broker, dirty, nil
 }
 
-func WriteBrokerConfiguration(path string, config Configuration) {
+func AddTarget(c *Configuration, triggerName, targetURL string) *Configuration {
+	for k, trigger := range c.Triggers {
+		if trigger.Name != triggerName {
+			continue
+		}
+		for _, target := range trigger.Targets {
+			if target.URL == targetURL {
+				return c
+			}
+		}
+		c.Triggers[k].Targets = append(c.Triggers[k].Targets, Target{URL: targetURL})
+	}
+	return c
+}
 
+func ReadConfigFile(path string) (Configuration, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Configuration{}, fmt.Errorf("read file: %w", err)
+	}
+	var config Configuration
+	return config, yaml.Unmarshal(data, &config)
+}
+
+func WriteConfigFile(filePath string, config *Configuration) error {
+	out, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("marshal broker configuration: %w", err)
+	}
+	return os.WriteFile(filePath, out, os.ModePerm)
 }

@@ -25,25 +25,25 @@ import (
 )
 
 func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
-	var eventType, target string
+	var eventType string
 	triggerCmd := &cobra.Command{
-		Use:   "trigger <event type> <target>",
+		Use:   "trigger <name> <event type>",
 		Short: "TriggerMesh trigger",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
-			return o.Trigger(eventType, target)
+			if len(args) < 1 {
+				return fmt.Errorf("trigger name is required")
+			}
+			return o.Trigger(args[0], eventType)
 		},
 	}
-
 	triggerCmd.Flags().StringVarP(&eventType, "eventType", "e", "", "Filter data based on the event type")
-	triggerCmd.Flags().StringVarP(&target, "target", "t", "", "Events target")
-
 	return triggerCmd
 }
 
-func (o *CreateOptions) Trigger(eventType, target string) error {
+func (o *CreateOptions) Trigger(name, eventType string) error {
 	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
-	_, err := triggermesh.CreateTrigger(manifest, o.Context, eventType, target)
+	_, err := triggermesh.CreateTrigger(name, manifest, o.Context, eventType)
 	if err != nil {
 		return fmt.Errorf("trigger creation: %w", err)
 	}

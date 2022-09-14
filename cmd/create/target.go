@@ -20,14 +20,16 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/triggermesh/tmcli/pkg/runtime"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 )
 
 func (o *CreateOptions) NewTargetCmd() *cobra.Command {
-	targetCmd := &cobra.Command{
+	return &cobra.Command{
 		Use:                "target <kind> <args>",
 		Short:              "TriggerMesh target",
 		DisableFlagParsing: true,
@@ -42,21 +44,72 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 			return o.Target(kind, args)
 		},
 	}
+}
 
-	return targetCmd
+func triggerFromArgs(args []string) (string, []string) {
+	var target string
+	for k := 0; k < len(args); k++ {
+		if strings.HasPrefix(args[k], "--trigger") {
+			if kv := strings.Split(args[k], "="); len(kv) == 2 {
+				target = kv[1]
+			} else if len(args) > k+1 && !strings.HasPrefix(args[k+1], "--") {
+				target = args[k+1]
+				k++
+			}
+			args = append(args[:k-1], args[k+1:]...)
+			break
+		}
+		k++
+	}
+	return target, args
 }
 
 func (o *CreateOptions) Target(kind string, args []string) error {
 	ctx := context.Background()
 	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
 
+	brokerConfFile := path.Join(o.ConfigBase, o.Context, "broker.conf")
+	brokerConfig, err := tmbroker.ReadConfigFile(brokerConfFile)
+	if err != nil {
+		return fmt.Errorf("broker config: %w", err)
+	}
+
+	triggerName, args := triggerFromArgs(args)
+
+	var trigger *tmbroker.Trigger
+	for _, t := range brokerConfig.Triggers {
+		if t.Name == triggerName {
+			trigger = &t
+			break
+		}
+	}
+	if trigger == nil {
+		return fmt.Errorf("trigger %q not found", triggerName)
+	}
+
 	object, dirty, err := triggermesh.CreateTarget(kind, o.Context, args, manifest, o.CRD)
 	if err != nil {
 		return fmt.Errorf("target creation: %w", err)
 	}
 
-	if _, err := runtime.Initialize(ctx, object, o.Version, dirty); err != nil {
+	container, err := runtime.Initialize(ctx, object, o.Version, dirty)
+	if err != nil {
 		return fmt.Errorf("container initialization: %w", err)
 	}
+
+	if container == nil {
+		return nil
+	}
+	var socket string
+	for _, bindings := range container.HC.PortBindings {
+		for _, binding := range bindings {
+			socket = fmt.Sprintf("http://%s:%s", binding.HostIP, binding.HostPort)
+		}
+	}
+	newConfig := tmbroker.AddTarget(&brokerConfig, triggerName, socket)
+	if err := tmbroker.WriteConfigFile(brokerConfFile, newConfig); err != nil {
+		return fmt.Errorf("broker config write: %w", err)
+	}
+	// triggers := tmbroker.TriggerObjectsFromBrokerConfig(*newConfig, o.Context)
 	return nil
 }

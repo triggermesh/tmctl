@@ -27,7 +27,7 @@ import (
 )
 
 func (o *CreateOptions) NewSourceCmd() *cobra.Command {
-	sourceCmd := &cobra.Command{
+	return &cobra.Command{
 		Use:                "source <kind> <args>",
 		Short:              "TriggerMesh source",
 		DisableFlagParsing: true,
@@ -42,15 +42,18 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 			return o.Source(kind, args)
 		},
 	}
-
-	return sourceCmd
 }
 
 func (o *CreateOptions) Source(kind string, args []string) error {
 	ctx := context.Background()
 	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
 
-	object, dirty, err := triggermesh.CreateSource(kind, o.Context, args, manifest, o.CRD)
+	socket, err := runtime.GetSocket(ctx, o.Context)
+	if err != nil {
+		return fmt.Errorf("broker socket: %w", err)
+	}
+
+	object, dirty, err := triggermesh.CreateSource(kind, o.Context, socket, args, manifest, o.CRD)
 	if err != nil {
 		return fmt.Errorf("source creation: %w", err)
 	}

@@ -28,7 +28,7 @@ import (
 )
 
 func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
-	brokerCmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "broker <name>",
 		Short: "TriggerMesh broker",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -39,8 +39,6 @@ func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 			return o.Broker(args[0])
 		},
 	}
-
-	return brokerCmd
 }
 
 func (o *CreateOptions) Broker(name string) error {

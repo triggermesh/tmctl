@@ -137,25 +137,7 @@ func (c Client) Inspect(ctx context.Context, name string) (types.ContainerJSON, 
 	if err != nil {
 		return types.ContainerJSON{}, err
 	}
-	if id == "" {
-		return types.ContainerJSON{}, nil
-	}
 	return c.docker.ContainerInspect(ctx, id)
-}
-
-func (c Client) Status(ctx context.Context, name string) (string, error) {
-	id, err := c.nameToID(ctx, name)
-	if err != nil {
-		return "", err
-	}
-	if id == "" {
-		return "not found", nil
-	}
-	data, err := c.docker.ContainerInspect(ctx, id)
-	if err != nil {
-		return "", err
-	}
-	return data.State.Status, nil
 }
 
 func openPort() int {

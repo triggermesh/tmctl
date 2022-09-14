@@ -17,12 +17,6 @@ limitations under the License.
 package broker
 
 import (
-	"fmt"
-	"os"
-	"reflect"
-
-	"gopkg.in/yaml.v3"
-
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 )
 
@@ -49,61 +43,34 @@ type Target struct {
 	} `yaml:"deliveryOptions,omitempty"`
 }
 
-func CreateTriggerObject(name, eventType, targetURL, broker string) kubernetes.Object {
-	return kubernetes.Object{
-		APIVersion: "eventing.triggermesh.io/v1alpha1",
-		Kind:       "Trigger",
-		Metadata: kubernetes.Metadata{
-			Name: name,
-			Labels: map[string]string{
-				"triggermesh.io/context": broker,
-			},
-		},
-		Spec: map[string]interface{}{
-			"filters": []Filter{
-				{Exact: Exact{Type: eventType}},
-			},
-			"targets": []Target{
-				{URL: targetURL},
-			},
-		},
-	}
-}
-
-func AppendTriggerToConfig(object kubernetes.Object, config Configuration) (Configuration, bool) {
-	filters, set := object.Spec["filters"]
-	if !set {
-		return Configuration{}, false
-	}
-	targets, set := object.Spec["targets"]
-	if !set {
-		return Configuration{}, false
-	}
-	t := Trigger{
-		Name:    object.Metadata.Name,
-		Filters: filters.([]Filter),
-		Targets: targets.([]Target),
-	}
-
-	for k, v := range config.Triggers {
-		if v.Name == t.Name {
-			if reflect.DeepEqual(config.Triggers[k], t) {
-				return config, false
-			}
-			config.Triggers[k] = t
-			return config, true
+func AppendTriggerToBroker(config Configuration, name, eventType string) Configuration {
+	for _, trigger := range config.Triggers {
+		if trigger.Name == name {
+			trigger.Filters[0].Exact.Type = eventType
+			return config
 		}
 	}
-	return Configuration{
-		Triggers: append(config.Triggers, t),
-	}, true
+	config.Triggers = append(config.Triggers, Trigger{Name: name, Filters: []Filter{{Exact: Exact{Type: eventType}}}})
+	return config
 }
 
-func ReadConfigFile(path string) (Configuration, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return Configuration{}, fmt.Errorf("read file: %w", err)
+func TriggerObjectsFromBrokerConfig(config Configuration, broker string) []kubernetes.Object {
+	var triggers []kubernetes.Object
+	for _, trigger := range config.Triggers {
+		triggers = append(triggers, kubernetes.Object{
+			APIVersion: "eventing.triggermesh.io/v1alpha1",
+			Kind:       "Trigger",
+			Metadata: kubernetes.Metadata{
+				Name: trigger.Name,
+				Labels: map[string]string{
+					"triggermesh.io/context": broker,
+				},
+			},
+			Spec: map[string]interface{}{
+				"filters": trigger.Filters,
+				"targets": trigger.Targets,
+			},
+		})
 	}
-	var config Configuration
-	return config, yaml.Unmarshal(data, &config)
+	return triggers
 }

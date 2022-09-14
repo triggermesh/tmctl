@@ -17,64 +17,50 @@ limitations under the License.
 package triggermesh
 
 import (
-	"context"
 	"fmt"
-	"os"
+	"path"
 	"strconv"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
-	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 )
 
-func CreateTrigger(manifestFile, broker, eventType, target string) (*kubernetes.Object, error) {
+func CreateTrigger(name, manifestFile, broker, eventType string) (*kubernetes.Object, error) {
 	manifest := kubernetes.NewManifest(manifestFile)
 	if err := manifest.Read(); err != nil {
 		return nil, fmt.Errorf("unable to read the manifest: %w", err)
 	}
-	trigger := tmbroker.CreateTriggerObject(broker+"-"+eventType, eventType, target, broker)
-	dirty, err := manifest.Add(trigger)
-	if err != nil {
-		return nil, fmt.Errorf("manifest update: %w", err)
-	}
-	if dirty {
-		if err := manifest.Write(); err != nil {
-			return nil, fmt.Errorf("manifest write operation: %w", err)
-		}
-	}
-	client, err := docker.NewClient()
-	if err != nil {
-		return nil, fmt.Errorf("docker client: %w", err)
-	}
-	jsn, err := client.Inspect(context.Background(), broker)
-	if err != nil {
-		return nil, fmt.Errorf("broker inspect: %w", err)
-	}
-	if len(jsn.Mounts) != 1 {
-		return nil, fmt.Errorf("broker config volume not found")
-	}
-	config, err := tmbroker.ReadConfigFile(jsn.Mounts[0].Source)
+	brokerConfFile := path.Join("/Users/tzununbekov/.triggermesh/cli", broker, "broker.conf")
+	config, err := tmbroker.ReadConfigFile(brokerConfFile)
 	if err != nil {
 		return nil, fmt.Errorf("broker config read: %w", err)
 	}
-	newConfig, dirty := tmbroker.AppendTriggerToConfig(trigger, config)
+	config = tmbroker.AppendTriggerToBroker(config, name, eventType)
+	triggers := tmbroker.TriggerObjectsFromBrokerConfig(config, broker)
+	var dirty bool
+	for _, trigger := range triggers {
+		newObject, err := manifest.Add(trigger)
+		if err != nil {
+			return nil, fmt.Errorf("adding trigger: %w", err)
+		}
+		if newObject {
+			dirty = true
+		}
+	}
 	if !dirty {
-		return &trigger, nil
+		return nil, nil
 	}
-	out, err := yaml.Marshal(newConfig)
-	if err != nil {
-		return nil, fmt.Errorf("broker config marshal: %w", err)
+	if err := manifest.Write(); err != nil {
+		return nil, fmt.Errorf("manifest write: %w", err)
 	}
-	if err := os.WriteFile(jsn.Mounts[0].Source, out, os.ModePerm); err != nil {
+	if err := tmbroker.WriteConfigFile(brokerConfFile, &config); err != nil {
 		return nil, fmt.Errorf("broker config write: %w", err)
 	}
-	return &trigger, nil
+	return nil, nil
 }
 
-func CreateSource(kind, broker string, args []string, manifestFile, crdFile string) (*kubernetes.Object, bool, error) {
+func CreateSource(kind, broker, socket string, args []string, manifestFile, crdFile string) (*kubernetes.Object, bool, error) {
 	manifest := kubernetes.NewManifest(manifestFile)
 	err := manifest.Read()
 	if err != nil {
@@ -83,7 +69,7 @@ func CreateSource(kind, broker string, args []string, manifestFile, crdFile stri
 
 	spec := argsToMap(args)
 	spec["sink"] = map[string]interface{}{
-		"uri": fmt.Sprintf("http://%s.user-namespace.svc.cluster.local", broker),
+		"uri": socket,
 	}
 
 	source, err := kubernetes.CreateObject(strings.ToLower(kind)+"source", broker+"-source", broker, crdFile, spec)
@@ -109,9 +95,7 @@ func CreateTarget(kind, broker string, args []string, manifestFile, crdFile stri
 	if err != nil {
 		return nil, false, fmt.Errorf("unable to read the manifest: %w", err)
 	}
-
 	spec := argsToMap(args)
-
 	target, err := kubernetes.CreateObject(strings.ToLower(kind)+"target", broker+"-target", broker, crdFile, spec)
 	if err != nil {
 		return nil, false, fmt.Errorf("spec processing: %w", err)

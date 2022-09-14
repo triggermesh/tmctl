@@ -138,12 +138,36 @@ func stopObject(ctx context.Context, object *kubernetes.Object) error {
 	return client.RemoveContainer(ctx, object.Metadata.Name)
 }
 
-func getStatus(ctx context.Context, object *kubernetes.Object) (string, error) {
+func getStatus(ctx context.Context, name string) (string, error) {
 	client, err := docker.NewClient()
 	if err != nil {
 		return "", fmt.Errorf("docker client: %w", err)
 	}
-	return client.Status(ctx, object.Metadata.Name)
+	jsn, err := client.Inspect(ctx, name)
+	if err != nil {
+		return "", fmt.Errorf("docker inspect: %w", err)
+	}
+	if jsn.ID == "" {
+		return "stopped", nil
+	}
+	return jsn.State.Status, nil
+}
+
+func GetSocket(ctx context.Context, name string) (string, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return "", fmt.Errorf("docker client: %w", err)
+	}
+	jsn, err := client.Inspect(ctx, name)
+	if err != nil {
+		return "", fmt.Errorf("docker inspect: %w", err)
+	}
+	for _, bindings := range jsn.HostConfig.PortBindings {
+		for _, binding := range bindings {
+			return fmt.Sprintf("http://%s:%s", binding.HostIP, binding.HostPort), nil
+		}
+	}
+	return "", nil
 }
 
 func listenLogs(output io.ReadCloser, component string, errs chan adapterLogEntry, verbose bool) {
