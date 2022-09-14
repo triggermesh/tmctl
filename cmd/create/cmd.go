@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const manifestFile = "manifest.yaml"
@@ -40,6 +41,7 @@ func NewCmd() *cobra.Command {
 			cmd.HelpFunc()(cmd, args)
 		},
 	}
+
 	createCmd.AddCommand(o.NewBrokerCmd())
 	createCmd.AddCommand(o.NewSourceCmd())
 	createCmd.AddCommand(o.NewTargetCmd())
@@ -50,22 +52,20 @@ func NewCmd() *cobra.Command {
 	return createCmd
 }
 
+func (o *CreateOptions) initializeOptions(cmd *cobra.Command) {
+	configBase, err := cmd.Flags().GetString("config")
+	if err != nil {
+		panic(err)
+	}
+	o.ConfigBase = configBase
+	o.Context = viper.GetString("context")
+	o.Version = viper.GetString("triggermesh.version")
+	o.CRD = viper.GetString("triggermesh.servedCRD")
+}
+
 func parse(args []string) (string, []string, error) {
 	if l := len(args); l < 1 {
 		return "", []string{}, fmt.Errorf("expected at least 1 arguments, got %d", l)
 	}
 	return args[0], args[1:], nil
 }
-
-// Function init:
-//    if image, err = function.ImageName(k8sObject); err != nil {
-//            return "", fmt.Errorf("cannot parse function image: %w", err)
-//    }
-//    image = fmt.Sprintf("%s:%s", image, version)
-//    file, err := createSharedFile(function.Code(k8sObject))
-//    if err != nil {
-//            return "", fmt.Errorf("writing function: %w", err)
-//    }
-//    bind := fmt.Sprintf("%s:/opt/source.%s", file.Name(), function.FileExtension(k8sObject))
-//    hostOptions = append(hostOptions, d.WithVolumeBind(bind))
-//    containerOptions = append(containerOptions, d.WithEntrypoint("/opt/aws-custom-runtime"))

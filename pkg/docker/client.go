@@ -38,6 +38,11 @@ type imagePullEvent struct {
 	} `json:"progressDetail"`
 }
 
+type Container struct {
+	HC container.HostConfig
+	CC container.Config
+}
+
 type Client struct {
 	docker *client.Client
 }
@@ -94,7 +99,7 @@ func (c Client) PullImage(ctx context.Context, image string) error {
 	return nil
 }
 
-func (c Client) StartContainer(ctx context.Context, copts []ContainerOption, hopts []HostOption, name string) (string, error) {
+func (c Client) StartContainer(ctx context.Context, copts []ContainerOption, hopts []HostOption, name string) (Container, error) {
 	cc := container.Config{}
 	for _, opt := range copts {
 		opt(&cc)
@@ -107,21 +112,35 @@ func (c Client) StartContainer(ctx context.Context, copts []ContainerOption, hop
 
 	resp, err := c.docker.ContainerCreate(ctx, &cc, &hc, nil, nil, name)
 	if err != nil {
-		return "", err
+		return Container{}, err
 	}
 
 	if err := c.docker.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		return "", err
+		return Container{}, err
 	}
 
-	var socket string
-	for _, bindings := range hc.PortBindings {
-		for _, binding := range bindings {
-			socket = fmt.Sprintf("%s:%s", binding.HostIP, binding.HostPort)
-		}
-	}
+	// var socket string
+	// for _, bindings := range hc.PortBindings {
+	// 	for _, binding := range bindings {
+	// 		socket = fmt.Sprintf("%s:%s", binding.HostIP, binding.HostPort)
+	// 	}
+	// }
 
-	return socket, nil
+	return Container{
+		HC: hc,
+		CC: cc,
+	}, nil
+}
+
+func (c Client) Inspect(ctx context.Context, name string) (types.ContainerJSON, error) {
+	id, err := c.nameToID(ctx, name)
+	if err != nil {
+		return types.ContainerJSON{}, err
+	}
+	if id == "" {
+		return types.ContainerJSON{}, nil
+	}
+	return c.docker.ContainerInspect(ctx, id)
 }
 
 func (c Client) Status(ctx context.Context, name string) (string, error) {
@@ -163,4 +182,13 @@ func (c Client) nameToID(ctx context.Context, name string) (string, error) {
 		}
 	}
 	return "", nil
+}
+
+func Socket(c Container) string {
+	for _, bindings := range c.HC.PortBindings {
+		for _, binding := range bindings {
+			return fmt.Sprintf("%s:%s", binding.HostIP, binding.HostPort)
+		}
+	}
+	return ""
 }

@@ -17,6 +17,12 @@ limitations under the License.
 package broker
 
 import (
+	"fmt"
+	"os"
+	"reflect"
+
+	"gopkg.in/yaml.v3"
+
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 )
 
@@ -26,20 +32,24 @@ type Trigger struct {
 	Targets []Target `yaml:"targets"`
 }
 
-func CreateTriggerObject(name, eventType, targetURL, broker string) kubernetes.Object {
-	filters := []Filter{
-		{
-			Exact: Exact{
-				Type: eventType,
-			},
-		},
-	}
-	targets := []Target{
-		{
-			URL: targetURL,
-		},
-	}
+type Filter struct {
+	Exact Exact `yaml:"exact"`
+}
 
+type Exact struct {
+	Type string `yaml:"type"`
+}
+
+type Target struct {
+	URL             string `yaml:"url"`
+	DeliveryOptions struct {
+		Retries       int    `yaml:"retries,omitempty"`
+		BackoffDelay  string `yaml:"backoffDelay,omitempty"`
+		BackoffPolicy string `yaml:"backoffPolicy,omitempty"`
+	} `yaml:"deliveryOptions,omitempty"`
+}
+
+func CreateTriggerObject(name, eventType, targetURL, broker string) kubernetes.Object {
 	return kubernetes.Object{
 		APIVersion: "eventing.triggermesh.io/v1alpha1",
 		Kind:       "Trigger",
@@ -50,8 +60,50 @@ func CreateTriggerObject(name, eventType, targetURL, broker string) kubernetes.O
 			},
 		},
 		Spec: map[string]interface{}{
-			"filters": filters,
-			"targets": targets,
+			"filters": []Filter{
+				{Exact: Exact{Type: eventType}},
+			},
+			"targets": []Target{
+				{URL: targetURL},
+			},
 		},
 	}
+}
+
+func AppendTriggerToConfig(object kubernetes.Object, config Configuration) (Configuration, bool) {
+	filters, set := object.Spec["filters"]
+	if !set {
+		return Configuration{}, false
+	}
+	targets, set := object.Spec["targets"]
+	if !set {
+		return Configuration{}, false
+	}
+	t := Trigger{
+		Name:    object.Metadata.Name,
+		Filters: filters.([]Filter),
+		Targets: targets.([]Target),
+	}
+
+	for k, v := range config.Triggers {
+		if v.Name == t.Name {
+			if reflect.DeepEqual(config.Triggers[k], t) {
+				return config, false
+			}
+			config.Triggers[k] = t
+			return config, true
+		}
+	}
+	return Configuration{
+		Triggers: append(config.Triggers, t),
+	}, true
+}
+
+func ReadConfigFile(path string) (Configuration, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Configuration{}, fmt.Errorf("read file: %w", err)
+	}
+	var config Configuration
+	return config, yaml.Unmarshal(data, &config)
 }

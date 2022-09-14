@@ -21,35 +21,31 @@ import (
 	"path"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 )
 
 func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
+	var eventType, target string
 	triggerCmd := &cobra.Command{
 		Use:   "trigger <event type> <target>",
 		Short: "TriggerMesh trigger",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			o.ConfigBase = c
-			o.Context = viper.GetString("context")
-			return o.Trigger(args)
+			o.initializeOptions(cmd)
+			return o.Trigger(eventType, target)
 		},
 	}
+
+	triggerCmd.Flags().StringVarP(&eventType, "eventType", "e", "", "Filter data based on the event type")
+	triggerCmd.Flags().StringVarP(&target, "target", "t", "", "Events target")
 
 	return triggerCmd
 }
 
-func (o *CreateOptions) Trigger(args []string) error {
+func (o *CreateOptions) Trigger(eventType, target string) error {
 	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
-
-	_, _, err := triggermesh.CreateTrigger(manifest, o.Context)
+	_, err := triggermesh.CreateTrigger(manifest, o.Context, eventType, target)
 	if err != nil {
 		return fmt.Errorf("trigger creation: %w", err)
 	}
-
 	return nil
 }

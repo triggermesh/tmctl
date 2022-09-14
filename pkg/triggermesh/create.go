@@ -17,74 +17,61 @@ limitations under the License.
 package triggermesh
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 
-	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 
+	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 )
 
-func CreateBroker(name, manifestFile string) (*kubernetes.Object, bool, error) {
-	// create config folder
-	if err := os.MkdirAll(path.Dir(manifestFile), os.ModePerm); err != nil {
-		return nil, false, fmt.Errorf("broker dir creation: %w", err)
-	}
-	// create empty manifest
-	if _, err := os.Stat(manifestFile); os.IsNotExist(err) {
-		if _, err := os.Create(manifestFile); err != nil {
-			return nil, false, fmt.Errorf("manifest file creation: %w", err)
-		}
-	} else if err != nil {
-		return nil, false, fmt.Errorf("manifest file access: %w", err)
-	}
-
-	broker := kubernetes.Object{
-		APIVersion: "eventing.triggermesh.io/v1alpha1",
-		Kind:       "Broker",
-		Metadata: kubernetes.Metadata{
-			Name: name,
-			Labels: map[string]string{
-				"triggermesh.io/context": name,
-			},
-		},
-		Spec: map[string]interface{}{"storage": viper.GetString("storage")},
-	}
-
-	manifest := kubernetes.NewManifest(manifestFile)
-	dirty, err := manifest.Add(broker)
-	if err != nil {
-		return nil, false, fmt.Errorf("manifest update: %w", err)
-	}
-	if dirty {
-		if err := manifest.Write(); err != nil {
-			return nil, false, fmt.Errorf("manifest write operation: %w", err)
-		}
-	}
-	return &broker, dirty, nil
-}
-
-func CreateTrigger(manifestFile, broker string) (*kubernetes.Object, bool, error) {
+func CreateTrigger(manifestFile, broker, eventType, target string) (*kubernetes.Object, error) {
 	manifest := kubernetes.NewManifest(manifestFile)
 	if err := manifest.Read(); err != nil {
-		return nil, false, fmt.Errorf("unable to read the manifest: %w", err)
+		return nil, fmt.Errorf("unable to read the manifest: %w", err)
 	}
-
-	trigger := tmbroker.CreateTriggerObject("foo-trigger", "foo-events", "example.com", broker)
+	trigger := tmbroker.CreateTriggerObject(broker+"-"+eventType, eventType, target, broker)
 	dirty, err := manifest.Add(trigger)
 	if err != nil {
-		return nil, false, fmt.Errorf("manifest update: %w", err)
+		return nil, fmt.Errorf("manifest update: %w", err)
 	}
 	if dirty {
 		if err := manifest.Write(); err != nil {
-			return nil, false, fmt.Errorf("manifest write operation: %w", err)
+			return nil, fmt.Errorf("manifest write operation: %w", err)
 		}
 	}
-	return &trigger, dirty, nil
+	client, err := docker.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("docker client: %w", err)
+	}
+	jsn, err := client.Inspect(context.Background(), broker)
+	if err != nil {
+		return nil, fmt.Errorf("broker inspect: %w", err)
+	}
+	if len(jsn.Mounts) != 1 {
+		return nil, fmt.Errorf("broker config volume not found")
+	}
+	config, err := tmbroker.ReadConfigFile(jsn.Mounts[0].Source)
+	if err != nil {
+		return nil, fmt.Errorf("broker config read: %w", err)
+	}
+	newConfig, dirty := tmbroker.AppendTriggerToConfig(trigger, config)
+	if !dirty {
+		return &trigger, nil
+	}
+	out, err := yaml.Marshal(newConfig)
+	if err != nil {
+		return nil, fmt.Errorf("broker config marshal: %w", err)
+	}
+	if err := os.WriteFile(jsn.Mounts[0].Source, out, os.ModePerm); err != nil {
+		return nil, fmt.Errorf("broker config write: %w", err)
+	}
+	return &trigger, nil
 }
 
 func CreateSource(kind, broker string, args []string, manifestFile, crdFile string) (*kubernetes.Object, bool, error) {

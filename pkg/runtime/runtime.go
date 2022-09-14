@@ -69,18 +69,14 @@ func (l *LocalSetup) RunAll(ctx context.Context, restart bool) error {
 		return fmt.Errorf("cannot parse manifest: %w", err)
 	}
 
-	components := make([]string, len(manifest.Objects))
 	var wg sync.WaitGroup
-
-	wg.Add(len(components))
+	wg.Add(len(manifest.Objects))
 
 	for i, object := range manifest.Objects {
 		go func(i int, object kubernetes.Object) {
-			c, err := runObject(ctx, &object, l.Version)
-			if err != nil {
+			if _, err := runObject(ctx, &object, l.Version); err != nil {
 				panic(fmt.Errorf("cannot create adapter: %v", err))
 			}
-			components[i] = c
 			wg.Done()
 		}(i, object)
 	}
@@ -115,20 +111,20 @@ func (l *LocalSetup) StopAll(ctx context.Context) error {
 	return nil
 }
 
-func runObject(ctx context.Context, object *kubernetes.Object, version string) (string, error) {
+func runObject(ctx context.Context, object *kubernetes.Object, version string) (*docker.Container, error) {
 	client, err := docker.NewClient()
 	if err != nil {
-		return "", fmt.Errorf("docker client: %w", err)
+		return nil, fmt.Errorf("docker client: %w", err)
 	}
 
 	image, err := triggermesh.AdapterImage(object, version)
 	if err != nil {
-		return "", fmt.Errorf("adapter image: %w", err)
+		return nil, fmt.Errorf("adapter image: %w", err)
 	}
 
 	co, ho, err := triggermesh.AdapterParams(object, image)
 	if err != nil {
-		return "", fmt.Errorf("adapter parameters: %w", err)
+		return nil, fmt.Errorf("adapter parameters: %w", err)
 	}
 
 	return runAdapter(ctx, client, object.Metadata.Name, image, co, ho)

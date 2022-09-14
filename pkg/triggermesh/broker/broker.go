@@ -16,6 +16,15 @@ limitations under the License.
 
 package broker
 
+import (
+	"fmt"
+	"os"
+	"path"
+
+	"github.com/spf13/viper"
+	"github.com/triggermesh/tmcli/pkg/kubernetes"
+)
+
 const brokerConfig = `triggers:
 - name: trigger1
   filters:
@@ -40,46 +49,45 @@ type Configuration struct {
 	Triggers []Trigger `yaml:"triggers"`
 }
 
-type Filter struct {
-	Exact Exact `yaml:"exact"`
-}
-
-type Exact struct {
-	Type string `yaml:"type"`
-}
-
-type Target struct {
-	URL             string `yaml:"url"`
-	DeliveryOptions struct {
-		Retries       int    `yaml:"retries"`
-		BackoffDelay  string `yaml:"backoffDelay"`
-		BackoffPolicy string `yaml:"backoffPolicy"`
-	} `yaml:"deliveryOptions"`
-}
-
-type triggerK8s struct {
-	Name string
-}
-
-func NewConfiguration() *Configuration {
-	return &Configuration{}
-}
-
-func (c *Configuration) AddTrigger(name, targetURL, eventType string) {
-	trigger := Trigger{
-		Name: name,
-		Filters: []Filter{
-			{
-				Exact: Exact{
-					Type: eventType,
-				},
-			},
-		},
-		Targets: []Target{
-			{
-				URL: targetURL,
-			},
-		},
+func CreateBrokerObject(name, manifestFile string) (*kubernetes.Object, bool, error) {
+	// create config folder
+	if err := os.MkdirAll(path.Dir(manifestFile), os.ModePerm); err != nil {
+		return nil, false, fmt.Errorf("broker dir creation: %w", err)
 	}
-	c.Triggers = append(c.Triggers, trigger)
+	// create empty manifest
+	if _, err := os.Stat(manifestFile); os.IsNotExist(err) {
+		if _, err := os.Create(manifestFile); err != nil {
+			return nil, false, fmt.Errorf("manifest file creation: %w", err)
+		}
+	} else if err != nil {
+		return nil, false, fmt.Errorf("manifest file access: %w", err)
+	}
+
+	broker := kubernetes.Object{
+		APIVersion: "eventing.triggermesh.io/v1alpha1",
+		Kind:       "Broker",
+		Metadata: kubernetes.Metadata{
+			Name: name,
+			Labels: map[string]string{
+				"triggermesh.io/context": name,
+			},
+		},
+		Spec: map[string]interface{}{"storage": viper.GetString("storage")},
+	}
+
+	manifest := kubernetes.NewManifest(manifestFile)
+	dirty, err := manifest.Add(broker)
+	if err != nil {
+		return nil, false, fmt.Errorf("manifest update: %w", err)
+	}
+	if dirty {
+		if err := manifest.Write(); err != nil {
+			return nil, false, fmt.Errorf("manifest write operation: %w", err)
+		}
+	}
+	return &broker, dirty, nil
+}
+
+func WriteBrokerConfiguration(path string, config Configuration) {
+
 }

@@ -22,7 +22,6 @@ import (
 	"path"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/triggermesh/tmcli/pkg/runtime"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 )
@@ -35,14 +34,7 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 		SilenceErrors:      true,
 		SilenceUsage:       true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			o.ConfigBase = c
-			o.Context = viper.GetString("context")
-			o.Version = viper.GetString("triggermesh.version")
-			o.CRD = viper.GetString("triggermesh.servedCRD")
+			o.initializeOptions(cmd)
 			kind, args, err := parse(args)
 			if err != nil {
 				return err
@@ -63,5 +55,8 @@ func (o *CreateOptions) Target(kind string, args []string) error {
 		return fmt.Errorf("target creation: %w", err)
 	}
 
-	return runtime.Initialize(ctx, object, o.Version, dirty)
+	if _, err := runtime.Initialize(ctx, object, o.Version, dirty); err != nil {
+		return fmt.Errorf("container initialization: %w", err)
+	}
+	return nil
 }

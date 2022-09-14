@@ -27,55 +27,46 @@ import (
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 )
 
-func Initialize(ctx context.Context, object *kubernetes.Object, version string, dirty bool) error {
+func Initialize(ctx context.Context, object *kubernetes.Object, version string, dirty bool) (*docker.Container, error) {
 	status, err := getStatus(ctx, object)
 	if err != nil {
-		return fmt.Errorf("cannot read container status: %w", err)
+		return nil, fmt.Errorf("cannot read container status: %w", err)
 	}
 
 	switch {
 	case status == "not found":
 		// create
-		if _, err := runObject(ctx, object, version); err != nil {
-			return fmt.Errorf("cannot start container: %w", err)
-		}
+		return runObject(ctx, object, version)
 	case dirty || status == "exited" || status == "dead":
 		// recreate
 		if err := stopObject(ctx, object); err != nil {
-			return fmt.Errorf("cannot stop container: %w", err)
+			return nil, fmt.Errorf("cannot stop container: %w", err)
 		}
-		if _, err := runObject(ctx, object, version); err != nil {
-			return fmt.Errorf("cannot start container: %w", err)
-		}
+		return runObject(ctx, object, version)
 	default:
-		fmt.Printf("Doing nothing because status is %q and dirty flag is %t\n", status, dirty)
+		// fmt.Printf("Doing nothing because status is %q and dirty flag is %t\n", status, dirty)
 	}
-	return nil
+	return nil, nil
 }
 
 func runAdapter(ctx context.Context, d docker.Client, name, image string,
-	containerOptions []docker.ContainerOption, hostOptions []docker.HostOption) (string, error) {
+	containerOptions []docker.ContainerOption, hostOptions []docker.HostOption) (*docker.Container, error) {
 
 	log.Println("Checking adapter image")
 	if err := d.PullImage(ctx, image); err != nil {
-		return "", fmt.Errorf("cannot pull Docker image: %w", err)
+		return nil, fmt.Errorf("cannot pull Docker image: %w", err)
 	}
 
 	log.Printf("Starting adapter")
-	socket, err := d.StartContainer(ctx, containerOptions, hostOptions, name)
+	container, err := d.StartContainer(ctx, containerOptions, hostOptions, name)
 	if err != nil {
-		return "", fmt.Errorf("cannot run Docker container: %w", err)
+		return nil, fmt.Errorf("cannot run Docker container: %w", err)
 	}
 
-	if err := waitForService(ctx, socket); err != nil {
-		return "", fmt.Errorf("adapter initialization: %w", err)
+	if err := waitForService(ctx, docker.Socket(container)); err != nil {
+		return nil, fmt.Errorf("adapter initialization: %w", err)
 	}
-
-	// if _, err := brkrfl.WriteString(brokerConfig); err != nil {
-	// panic(fmt.Errorf("cannot write file payload: %w", err))
-	// }
-
-	return socket, nil
+	return &container, nil
 }
 
 func waitForService(ctx context.Context, socket string) error {

@@ -59,10 +59,10 @@ func NewRootCommand() *cobra.Command {
 		},
 	}
 	// persistent flags
-	rootCmd.PersistentFlags().String("debug", "", "Enable debug output")
+	rootCmd.PersistentFlags().String("config", defaultConfigPath, "Config home dir")
 	rootCmd.PersistentFlags().String("context", "default", "Context")
 	rootCmd.PersistentFlags().String("version", "latest", "TriggerMesh components version")
-	rootCmd.PersistentFlags().String("config", defaultConfigPath, "Config home dir")
+	rootCmd.PersistentFlags().Bool("debug", false, "Enable debug output")
 
 	// bind config args
 	viper.BindPFlag("context", rootCmd.PersistentFlags().Lookup("context"))

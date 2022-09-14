@@ -17,7 +17,7 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 
 	"github.com/triggermesh/tmcli/cmd"
@@ -25,7 +25,7 @@ import (
 
 func main() {
 	if err := cmd.NewRootCommand().Execute(); err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		os.Exit(1)
 	}
 }

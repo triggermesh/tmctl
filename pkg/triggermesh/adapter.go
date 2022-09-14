@@ -63,18 +63,18 @@ func AdapterParams(object *kubernetes.Object, image string) ([]docker.ContainerO
 
 	switch object.Kind {
 	case "Broker":
-		file, err := tempFile("")
+		filename, err := tempFile("")
 		if err != nil {
-			return nil, nil, fmt.Errorf("writing function: %w", err)
+			return nil, nil, fmt.Errorf("writing configuration: %w", err)
 		}
-		bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", file.Name())
+		bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", filename)
 		ho = append(ho, docker.WithVolumeBind(bind))
 	case "Function":
-		file, err := tempFile(function.Code(object))
+		filename, err := tempFile(function.Code(object))
 		if err != nil {
 			return nil, nil, fmt.Errorf("writing function: %w", err)
 		}
-		bind := fmt.Sprintf("%s:/opt/source.%s", file.Name(), function.FileExtension(object))
+		bind := fmt.Sprintf("%s:/opt/source.%s", filename, function.FileExtension(object))
 		ho = append(ho, docker.WithVolumeBind(bind))
 		co = append(co, docker.WithEntrypoint("/opt/aws-custom-runtime"))
 		// yikes
@@ -90,15 +90,13 @@ func AdapterParams(object *kubernetes.Object, image string) ([]docker.ContainerO
 	return co, ho, nil
 }
 
-func tempFile(data string) (*os.File, error) {
+func tempFile(data string) (string, error) {
 	file, err := os.CreateTemp("", "")
 	if err != nil {
-		return nil, fmt.Errorf("cannot create temp file: %w", err)
+		return "", err
 	}
-	if _, err := file.WriteString(data); err != nil {
-		return nil, fmt.Errorf("cannot write file payload: %w", err)
-	}
-	return file, nil
+	_, err = file.WriteString(data)
+	return file.Name(), err
 }
 
 func envsToString(envs []corev1.EnvVar) []string {
@@ -108,3 +106,6 @@ func envsToString(envs []corev1.EnvVar) []string {
 	}
 	return result
 }
+
+// functiondir := path.Join(configBase, context, "config",
+// brokerdir := path.Join(configBase, context, "config",

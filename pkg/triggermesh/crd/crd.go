@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path"
@@ -88,7 +89,7 @@ func Fetch(configDir string) (string, error) {
 		}
 	}
 	url := strings.ReplaceAll(viper.GetString("triggermesh.crd"), "${VERSION}", version)
-	crdDir := path.Join(configDir, version)
+	crdDir := path.Join(configDir, "crd", version)
 	if err := os.MkdirAll(crdDir, os.ModePerm); err != nil {
 		return "", err
 	}
@@ -96,7 +97,7 @@ func Fetch(configDir string) (string, error) {
 	if _, err := os.Stat(crdFile); err == nil {
 		return crdFile, nil
 	}
-	fmt.Println("Fetching CRD")
+	log.Println("Fetching CRD")
 	out, err := os.Create(crdFile)
 	if err != nil {
 		return "", err
