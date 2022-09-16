@@ -145,7 +145,7 @@ func getStatus(ctx context.Context, name string) (string, error) {
 	}
 	jsn, err := client.Inspect(ctx, name)
 	if err != nil {
-		return "", fmt.Errorf("docker inspect: %w", err)
+		return "not found", nil
 	}
 	if jsn.ID == "" {
 		return "stopped", nil
@@ -160,11 +160,11 @@ func GetSocket(ctx context.Context, name string) (string, error) {
 	}
 	jsn, err := client.Inspect(ctx, name)
 	if err != nil {
-		return "", fmt.Errorf("docker inspect: %w", err)
+		return "not found", nil
 	}
 	for _, bindings := range jsn.HostConfig.PortBindings {
 		for _, binding := range bindings {
-			return fmt.Sprintf("http://%s:%s", binding.HostIP, binding.HostPort), nil
+			return fmt.Sprintf("http://host.docker.internal:%s", binding.HostPort), nil
 		}
 	}
 	return "", nil

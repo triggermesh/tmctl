@@ -142,13 +142,9 @@ func argsToMap(args []string) map[string]interface{} {
 			s[key] = value
 		} else {
 			nestedMap := argsToMap([]string{fmt.Sprintf("--%s=%v", strings.Join(keys[1:], "."), value)})
-			// Convert this logic to recursive function
 			if val, exists := s[keys[0]]; exists {
-				if vval, ok := val.(map[string]interface{}); ok {
-					for k, v := range nestedMap {
-						vval[k] = v
-					}
-					s[keys[0]] = vval
+				if _, ok := val.(map[string]interface{}); ok {
+					s[keys[0]] = mergeMaps(nestedMap, val.(map[string]interface{}))
 				} else {
 					s[keys[0]] = nestedMap
 				}
@@ -158,4 +154,23 @@ func argsToMap(args []string) map[string]interface{} {
 		}
 	}
 	return s
+}
+
+func mergeMaps(src, dst map[string]interface{}) map[string]interface{} {
+	for srcK, srcV := range src {
+		if _, exists := dst[srcK]; exists {
+			if _, ok := srcV.(map[string]interface{}); ok {
+				if _, ok := dst[srcK].(map[string]interface{}); ok {
+					dst[srcK] = mergeMaps(srcV.(map[string]interface{}), dst[srcK].(map[string]interface{}))
+				} else {
+					continue
+				}
+			} else {
+				dst[srcK] = srcV
+			}
+		} else {
+			dst[srcK] = srcV
+		}
+	}
+	return dst
 }

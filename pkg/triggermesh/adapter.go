@@ -61,6 +61,7 @@ func AdapterParams(object *kubernetes.Object, image string) ([]docker.ContainerO
 	}
 	ho := []docker.HostOption{
 		docker.WithHostPortBinding(adapterPort),
+		docker.WithExtraHost(),
 	}
 
 	switch object.Kind {
@@ -86,6 +87,15 @@ func AdapterParams(object *kubernetes.Object, image string) ([]docker.ContainerO
 		kenv, err := env.Build(object)
 		if err != nil {
 			return nil, nil, fmt.Errorf("adapter environment: %w", err)
+		}
+		sink, exists := object.Spec["sink"]
+		if exists {
+			if s, ok := sink.(map[string]interface{}); ok {
+				if sinkURI, set := s["uri"]; set {
+					kenv = append(kenv, corev1.EnvVar{Name: "K_SINK", Value: sinkURI.(string)})
+				}
+			}
+
 		}
 		co = append(co, docker.WithEnv(envsToString(kenv)))
 	}

@@ -103,7 +103,7 @@ func (o *CreateOptions) Target(kind string, args []string) error {
 	var socket string
 	for _, bindings := range container.HC.PortBindings {
 		for _, binding := range bindings {
-			socket = fmt.Sprintf("http://%s:%s", binding.HostIP, binding.HostPort)
+			socket = fmt.Sprintf("http://host.docker.internal:%s", binding.HostPort)
 		}
 	}
 	newConfig := tmbroker.AddTarget(&brokerConfig, triggerName, socket)

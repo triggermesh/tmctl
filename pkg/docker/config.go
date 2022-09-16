@@ -70,3 +70,9 @@ func WithHostPortBinding(containerPort nat.Port) HostOption {
 		}
 	}
 }
+
+func WithExtraHost() HostOption {
+	return func(hc *container.HostConfig) {
+		hc.ExtraHosts = []string{"host.docker.internal:host-gateway"}
+	}
+}

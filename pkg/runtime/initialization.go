@@ -34,7 +34,7 @@ func Initialize(ctx context.Context, object *kubernetes.Object, version string, 
 	}
 
 	switch {
-	case status == "stopped":
+	case status == "stopped" || status == "not found":
 		// create
 		return runObject(ctx, object, version)
 	case dirty || status == "exited" || status == "dead":

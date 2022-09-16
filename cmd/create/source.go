@@ -61,5 +61,6 @@ func (o *CreateOptions) Source(kind string, args []string) error {
 	if _, err := runtime.Initialize(ctx, object, o.Version, dirty); err != nil {
 		return fmt.Errorf("container initialization: %w", err)
 	}
+
 	return nil
 }
