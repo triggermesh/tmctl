@@ -62,10 +62,14 @@ func (c *Container) Logs(ctx context.Context, client *client.Client) (io.ReadClo
 }
 
 func (c *Container) Remove(ctx context.Context, client *client.Client) error {
-	c.ID = ""
-	c.runtimeContainerConfig = container.Config{}
-	c.runtimeHostConfig = container.HostConfig{}
-	return client.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{
+	// c.ID = ""
+	// c.runtimeContainerConfig = container.Config{}
+	// c.runtimeHostConfig = container.HostConfig{}
+	id, err := nameToID(ctx, c.Name, client)
+	if err != nil {
+		return err
+	}
+	return client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{
 		RemoveVolumes: true,
 		Force:         true,
 	})
@@ -178,7 +182,7 @@ func (c *Container) Socket() string {
 	return ""
 }
 
-func (c *Container) WaitForService(ctx context.Context) error {
+func (c *Container) Connect(ctx context.Context) error {
 	timer := time.NewTicker(time.Second)
 	till := time.Now().Add(connRetries * time.Second)
 	for {

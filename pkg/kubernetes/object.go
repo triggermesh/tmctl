@@ -104,13 +104,3 @@ func getObjectCRD(crdObject crd.CRD) (*openapi.Schema, string, error) {
 	}
 	return nil, "", fmt.Errorf("CRD schema not found")
 }
-
-// func (o *Object) ToUnstructured() (*unstructured.Unstructured, error) {
-// 	u := &unstructured.Unstructured{}
-
-// 	u.SetAPIVersion(o.APIVersion)
-// 	u.SetKind(o.Kind)
-// 	u.SetName(o.Metadata.Name)
-
-// 	return u, unstructured.SetNestedField(u.Object, o.Spec, "spec")
-// }

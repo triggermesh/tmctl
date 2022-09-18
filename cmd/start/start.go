@@ -126,7 +126,7 @@ func (o *StartOptions) start(broker string) error {
 				c = target.NewTarget(manifestFile, o.CRD, object.Kind, broker, o.Version, object.Spec)
 			}
 
-			_, err := triggermesh.Run(ctx, c)
+			_, err := triggermesh.Start(ctx, c, false)
 			if err != nil {
 				log.Printf("Starting container: %v", err)
 			}

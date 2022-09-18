@@ -53,11 +53,14 @@ func (o *CreateOptions) Broker(name string) error {
 		return fmt.Errorf("broker: %w", err)
 	}
 
-	container, err := triggermesh.Create(ctx, broker, manifest)
+	restart, err := triggermesh.Create(ctx, broker, manifest)
 	if err != nil {
 		return err
 	}
-	fmt.Println(container)
+
+	if _, err := triggermesh.Start(ctx, broker, restart); err != nil {
+		return err
+	}
 
 	viper.Set("context", broker.Name)
 	if err := viper.WriteConfig(); err != nil {

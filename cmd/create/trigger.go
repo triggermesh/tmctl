@@ -18,8 +18,11 @@ package create
 
 import (
 	"fmt"
+	"path"
 
 	"github.com/spf13/cobra"
+
+	"github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 )
 
 func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
@@ -40,10 +43,15 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 }
 
 func (o *CreateOptions) Trigger(name, eventType string) error {
-	// manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
-	// _, err := broker.CreateTrigger(name, manifest, o.Context, eventType)
-	// if err != nil {
-	// 	return fmt.Errorf("trigger creation: %w", err)
-	// }
+	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
+	trigger := broker.NewTrigger(name, manifest, o.Context, eventType)
+
+	if err := trigger.UpdateBrokerConfig(); err != nil {
+		return fmt.Errorf("broker config update: %w", err)
+	}
+
+	if err := trigger.UpdateManifest(); err != nil {
+		return fmt.Errorf("manifest update: %w", err)
+	}
 	return nil
 }

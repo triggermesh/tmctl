@@ -17,10 +17,15 @@ limitations under the License.
 package broker
 
 import (
+	"fmt"
+	"os"
 	"path"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
+	"github.com/triggermesh/tmcli/pkg/manifest"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -29,7 +34,6 @@ var _ triggermesh.Component = (*Trigger)(nil)
 
 type Trigger struct {
 	ManifestFile string
-	BrokerConfig string
 	Broker       string
 	Name         string
 
@@ -62,7 +66,7 @@ type Target struct {
 func (t *Trigger) AsUnstructured() (*unstructured.Unstructured, error) {
 	u := &unstructured.Unstructured{}
 	u.SetAPIVersion("eventing.triggermesh.io/v1alpha1")
-	u.SetKind("Broker")
+	u.SetKind("Trigger")
 	u.SetName(t.Name)
 	u.SetLabels(map[string]string{"context": t.Broker})
 	return u, unstructured.SetNestedField(u.Object, t.spec, "spec")
@@ -104,78 +108,97 @@ func (t *Trigger) GetImage() string {
 func NewTrigger(name, manifest, broker, eventType string) *Trigger {
 	return &Trigger{
 		ManifestFile: manifest,
-		BrokerConfig: path.Join(path.Dir(manifest), "broker.conf"),
-		Broker:       broker,
-		Name:         name,
+		// BrokerConfig: path.Join(path.Dir(manifest), "broker.conf"),
+		Broker: broker,
+		Name:   name,
 		spec: TriggerSpec{
+			Name: name,
 			Filters: []Filter{
 				{Exact{Type: eventType}},
-			}},
+			},
+		},
 	}
 }
 
-// func AppendTriggerToBroker(config Configuration, name, eventType string) Configuration {
-// 	for _, trigger := range config.Triggers {
-// 		if trigger.Name == name {
-// 			trigger.Filters[0].Exact.Type = eventType
-// 			return config
-// 		}
-// 	}
-// 	config.Triggers = append(config.Triggers, TriggerSpec{Name: name, Filters: []Filter{{Exact: Exact{Type: eventType}}}})
-// 	return config
-// }
+func (t *Trigger) SetTarget(socket string) {
+	t.spec.Targets = []Target{
+		{
+			URL: socket,
+		},
+	}
+}
 
-// func TriggerObjectsFromBrokerConfig(config Configuration, broker string) []kubernetes.Object {
-// 	var triggers []kubernetes.Object
-// 	for _, trigger := range config.Triggers {
-// 		triggers = append(triggers, kubernetes.Object{
-// 			APIVersion: "eventing.triggermesh.io/v1alpha1",
-// 			Kind:       "Trigger",
-// 			Metadata: kubernetes.Metadata{
-// 				Name: trigger.Name,
-// 				Labels: map[string]string{
-// 					"triggermesh.io/context": broker,
-// 				},
-// 			},
-// 			Spec: map[string]interface{}{
-// 				"filters": trigger.Filters,
-// 				"targets": trigger.Targets,
-// 			},
-// 		})
-// 	}
-// 	return triggers
-// }
+func (t *Trigger) SetFilter(eventType string) {
+	t.spec.Filters = []Filter{
+		{
+			Exact: Exact{eventType},
+		},
+	}
+}
 
-// func CreateTrigger(name, manifestFile, broker, eventType string) (*kubernetes.Object, error) {
-// 	manifest := manifest.New(manifestFile)
-// 	if err := manifest.Read(); err != nil {
-// 		return nil, fmt.Errorf("unable to read the manifest: %w", err)
-// 	}
-// 	brokerConfFile := path.Join("/Users/tzununbekov/.triggermesh/cli", broker, "broker.conf")
-// 	config, err := ReadConfigFile(brokerConfFile)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("broker config read: %w", err)
-// 	}
-// 	config = AppendTriggerToBroker(config, name, eventType)
-// 	triggers := TriggerObjectsFromBrokerConfig(config, broker)
-// 	var dirty bool
-// 	for _, trigger := range triggers {
-// 		newObject, err := manifest.Add(trigger)
-// 		if err != nil {
-// 			return nil, fmt.Errorf("adding trigger: %w", err)
-// 		}
-// 		if newObject {
-// 			dirty = true
-// 		}
-// 	}
-// 	if !dirty {
-// 		return nil, nil
-// 	}
-// 	if err := manifest.Write(); err != nil {
-// 		return nil, fmt.Errorf("manifest write: %w", err)
-// 	}
-// 	if err := WriteConfigFile(brokerConfFile, &config); err != nil {
-// 		return nil, fmt.Errorf("broker config write: %w", err)
-// 	}
-// 	return nil, nil
-// }
+func (t *Trigger) LookupTrigger() (TriggerSpec, error) {
+	configFile := path.Join(path.Dir(t.ManifestFile), "broker.conf")
+	configuration, err := readBrokerConfig(configFile)
+	if err != nil {
+		return TriggerSpec{}, fmt.Errorf("broker config: %w", err)
+	}
+	for _, trigger := range configuration.Triggers {
+		if trigger.Name == t.Name {
+			return trigger, nil
+		}
+	}
+	return TriggerSpec{}, fmt.Errorf("trigger %q not found", t.Name)
+}
+
+func (t *Trigger) UpdateBrokerConfig() error {
+	configFile := path.Join(path.Dir(t.ManifestFile), "broker.conf")
+	configuration, err := readBrokerConfig(configFile)
+	if err != nil {
+		return fmt.Errorf("broker config: %w", err)
+	}
+
+	var exists bool
+	for i, trigger := range configuration.Triggers {
+		if trigger.Name == t.Name {
+			configuration.Triggers[i].Filters = t.spec.Filters
+			configuration.Triggers[i].Targets = t.spec.Targets
+			exists = true
+		}
+	}
+	if !exists {
+		configuration.Triggers = append(configuration.Triggers, t.spec)
+	}
+	return writeBrokerConfig(configFile, &configuration)
+}
+
+func (t *Trigger) UpdateManifest() error {
+	m := manifest.New(t.ManifestFile)
+	if err := m.Read(); err != nil {
+		return fmt.Errorf("manifest read: %w", err)
+	}
+	o, err := t.AsK8sObject()
+	if err != nil {
+		return fmt.Errorf("trigger object: %w", err)
+	}
+	if _, err := m.Add(*o); err != nil {
+		return fmt.Errorf("adding trigger: %w", err)
+	}
+	return m.Write()
+}
+
+func readBrokerConfig(path string) (Configuration, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Configuration{}, fmt.Errorf("read file: %w", err)
+	}
+	var config Configuration
+	return config, yaml.Unmarshal(data, &config)
+}
+
+func writeBrokerConfig(path string, configuration *Configuration) error {
+	out, err := yaml.Marshal(configuration)
+	if err != nil {
+		return fmt.Errorf("marshal broker configuration: %w", err)
+	}
+	return os.WriteFile(path, out, os.ModePerm)
+}

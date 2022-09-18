@@ -49,7 +49,7 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 			o.ConfigDir = c
-			o.Context = broker
+			o.Context = broker + "-broker"
 			return o.Dump()
 		},
 	}

@@ -112,6 +112,3 @@ func envsToString(envs []corev1.EnvVar) []string {
 	}
 	return result
 }
-
-// functiondir := path.Join(configBase, context, "config",
-// brokerdir := path.Join(configBase, context, "config",

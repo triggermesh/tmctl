@@ -85,14 +85,6 @@ func (t *Target) GetImage() string {
 	return t.image
 }
 
-// func (t *Target) GetSpec() (map[string]interface{}, error) {
-// 	o, err := t.AsK8sObject()
-// 	if err != nil {
-// 		return nil, fmt.Errorf("creating object: %w", err)
-// 	}
-// 	return o.Spec, nil
-// }
-
 func NewTarget(manifest, crd string, kind, broker, version string, params interface{}) *Target {
 	var spec map[string]interface{}
 	switch p := params.(type) {
@@ -120,27 +112,3 @@ func NewTarget(manifest, crd string, kind, broker, version string, params interf
 		spec:         spec,
 	}
 }
-
-// func Create(kind, broker string, args []string, manifestFile, crdFile string) (*kubernetes.Object, bool, error) {
-// 	manifest := manifest.New(manifestFile)
-// 	err := manifest.Read()
-// 	if err != nil {
-// 		return nil, false, fmt.Errorf("unable to read the manifest: %w", err)
-// 	}
-// 	spec := pkg.ParseArgs(args)
-// 	t, err := kubernetes.CreateObject(strings.ToLower(kind)+"target", broker+"-target", broker, crdFile, spec)
-// 	if err != nil {
-// 		return nil, false, fmt.Errorf("spec processing: %w", err)
-// 	}
-
-// 	dirty, err := manifest.Add(*t)
-// 	if err != nil {
-// 		return nil, false, fmt.Errorf("manifest update: %w", err)
-// 	}
-// 	if dirty {
-// 		if err := manifest.Write(); err != nil {
-// 			return nil, false, fmt.Errorf("manifest write operation: %w", err)
-// 		}
-// 	}
-// 	return t, dirty, nil
-// }

@@ -20,10 +20,13 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/source"
 )
 
@@ -49,17 +52,33 @@ func (o *CreateOptions) Source(kind string, args []string) error {
 	ctx := context.Background()
 	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
 
-	// socket, err := runtime.GetSocket(ctx, o.Context)
-	// if err != nil {
-	// return fmt.Errorf("broker socket: %w", err)
-	// }
+	client, err := docker.NewClient()
+	if err != nil {
+		return fmt.Errorf("docker client: %w", err)
+	}
 
-	s := source.NewSource(manifest, o.CRD, kind, o.Context, o.Version, append(args, fmt.Sprintf("--sink.uri=http://fooo")))
+	broker, err := tmbroker.NewBroker(manifest, o.Context)
+	if err != nil {
+		return fmt.Errorf("broker object: %v", err)
+	}
+	brontainer, err := broker.AsContainer()
+	if err != nil {
+		return fmt.Errorf("broker container: %v", err)
+	}
+	brontainer, err = brontainer.LookupHostConfig(ctx, client)
+	if err != nil {
+		return fmt.Errorf("broker config: %v", err)
+	}
 
-	container, err := triggermesh.Create(ctx, s, manifest)
+	s := source.NewSource(manifest, o.CRD, kind, o.Context, o.Version, append(args, fmt.Sprintf("--sink.uri=http://host.docker.internal:%s", strings.Split(brontainer.Socket(), ":")[1])))
+
+	restart, err := triggermesh.Create(ctx, s, manifest)
 	if err != nil {
 		return err
 	}
-	fmt.Println(container)
+
+	if _, err := triggermesh.Start(ctx, s, restart); err != nil {
+		return err
+	}
 	return nil
 }

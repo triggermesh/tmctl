@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
 
 	configcmd "github.com/triggermesh/tmcli/cmd/config"
@@ -44,6 +45,12 @@ func NewRootCommand() *cobra.Command {
 		Long:  ``,
 
 		PersistentPreRunE: func(ccmd *cobra.Command, args []string) error {
+			// check docker server
+			_, err := docker.NewClient()
+			if err != nil {
+				return fmt.Errorf("docker client: %w", err)
+			}
+
 			if err := initConfig(); err != nil {
 				return err
 			}

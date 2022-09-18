@@ -112,32 +112,3 @@ func NewSource(manifest, crd string, kind, broker, version string, params interf
 		spec:         spec,
 	}
 }
-
-// func Create(kind, broker, socket string, args []string, manifestFile, crdFile string) (*kubernetes.Object, bool, error) {
-// 	manifest := manifest.New(manifestFile)
-// 	err := manifest.Read()
-// 	if err != nil {
-// 		return nil, false, fmt.Errorf("unable to read the manifest: %w", err)
-// 	}
-
-// 	spec := pkg.ParseArgs(args)
-// 	spec["sink"] = map[string]interface{}{
-// 		"uri": socket,
-// 	}
-
-// 	source, err := kubernetes.CreateObject(strings.ToLower(kind)+"source", broker+"-source", broker, crdFile, spec)
-// 	if err != nil {
-// 		return nil, false, fmt.Errorf("creating object: %w", err)
-// 	}
-
-// 	dirty, err := manifest.Add(*source)
-// 	if err != nil {
-// 		return nil, false, fmt.Errorf("manifest update: %w", err)
-// 	}
-// 	if dirty {
-// 		if err := manifest.Write(); err != nil {
-// 			return nil, false, fmt.Errorf("manifest write operation: %w", err)
-// 		}
-// 	}
-// 	return source, dirty, nil
-// }

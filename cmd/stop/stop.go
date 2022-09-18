@@ -21,13 +21,10 @@ import (
 	"fmt"
 	"log"
 	"path"
-	"strings"
-	"sync"
 
 	"github.com/spf13/cobra"
 
 	"github.com/triggermesh/tmcli/pkg/docker"
-	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/manifest"
 )
 
@@ -72,18 +69,13 @@ func (o *StopOptions) stop(broker string) error {
 		return fmt.Errorf("docker client: %w", err)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(len(manifest.Objects))
-
-	for i, object := range manifest.Objects {
-		go func(i int, object kubernetes.Object) {
-			name := fmt.Sprintf("%s-%s", broker, strings.ToLower(object.Kind))
-			if err := docker.ForceStop(ctx, name, client); err != nil {
-				log.Printf("Stopping %q: %v", name, err)
-			}
-			wg.Done()
-		}(i, object)
+	for _, object := range manifest.Objects {
+		if object.Kind == "Trigger" {
+			continue
+		}
+		if err := docker.ForceStop(ctx, object.Metadata.Name, client); err != nil {
+			log.Printf("Stopping %q: %v", object.Metadata.Name, err)
+		}
 	}
-	wg.Wait()
 	return nil
 }
