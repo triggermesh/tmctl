@@ -44,9 +44,11 @@ func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 
 func (o *CreateOptions) Broker(name string) error {
 	ctx := context.Background()
-	manifest := path.Join(o.ConfigBase, name, manifestFile)
 
-	broker, err := tmbroker.NewBroker(manifest, name, o.Version)
+	name = name + "-broker"
+
+	manifest := path.Join(o.ConfigBase, name, manifestFile)
+	broker, err := tmbroker.NewBroker(manifest, name)
 	if err != nil {
 		return fmt.Errorf("broker: %w", err)
 	}
@@ -57,7 +59,7 @@ func (o *CreateOptions) Broker(name string) error {
 	}
 	fmt.Println(container)
 
-	viper.Set("context", name)
+	viper.Set("context", broker.Name)
 	if err := viper.WriteConfig(); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}

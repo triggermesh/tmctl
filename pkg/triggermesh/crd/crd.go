@@ -118,7 +118,7 @@ func GetResource(resource, path string) (CRD, error) {
 	if err != nil {
 		return CRD{}, err
 	}
-	crd, ok := crds[resource]
+	crd, ok := crds[strings.ToLower(resource)]
 	if !ok {
 		return CRD{}, fmt.Errorf("CRD for resource %q does not exist", resource)
 	}

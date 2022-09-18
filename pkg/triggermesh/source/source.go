@@ -17,7 +17,6 @@ limitations under the License.
 package source
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -25,7 +24,6 @@ import (
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/adapter"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/pkg"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -33,6 +31,8 @@ import (
 var _ triggermesh.Component = (*Source)(nil)
 
 type Source struct {
+	Name string
+
 	ManifestFile string
 	CRDFile      string
 
@@ -41,15 +41,15 @@ type Source struct {
 	Version string
 
 	image string
-	args  map[string]interface{}
+	spec  map[string]interface{}
 }
 
 func (s *Source) AsUnstructured() (*unstructured.Unstructured, error) {
-	return kubernetes.CreateUnstructured(s.GetKind(), s.GetName(), s.Broker, s.CRDFile, s.args)
+	return kubernetes.CreateUnstructured(s.GetKind(), s.GetName(), s.Broker, s.CRDFile, s.spec)
 }
 
 func (s *Source) AsK8sObject() (*kubernetes.Object, error) {
-	return kubernetes.CreateObject(s.GetKind(), s.GetName(), s.Broker, s.CRDFile, s.args)
+	return kubernetes.CreateObject(s.GetKind(), s.GetName(), s.Broker, s.CRDFile, s.spec)
 }
 
 func (s *Source) AsContainer() (*docker.Container, error) {
@@ -67,55 +67,50 @@ func (s *Source) AsContainer() (*docker.Container, error) {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
 	return &docker.Container{
-		Name:                   o.GetName(),
+		Name:                   s.GetName(),
 		CreateHostOptions:      ho,
 		CreateContainerOptions: co,
 	}, nil
 }
 
 func (s *Source) GetName() string {
-	return fmt.Sprintf("%s-%ssource", s.Broker, s.Kind)
+	return s.Name
 }
 
 func (s *Source) GetKind() string {
-	return fmt.Sprintf("%ssource", strings.ToLower(s.Kind))
+	return s.Kind
 }
 
 func (s *Source) GetImage() string {
 	return s.image
 }
 
-func NewSource(manifest, crd string, kind, broker, version string, args []string) (*Source, error) {
-	b, err := tmbroker.NewBroker(manifest, broker, version)
-	if err != nil {
-		return nil, fmt.Errorf("broker error: %w", err)
+func NewSource(manifest, crd string, kind, broker, version string, params interface{}) *Source {
+	var spec map[string]interface{}
+	switch p := params.(type) {
+	case []string:
+		// args slice
+		spec = pkg.ParseArgs(p)
+	case map[string]interface{}:
+		// spec map
+		spec = p
+	default:
 	}
-	container, err := b.AsContainer()
-	if err != nil {
-		return nil, fmt.Errorf("broker container: %w", err)
+
+	// kind initially can be awss3, webhook, etc.
+	k := strings.ToLower(kind)
+	if !strings.Contains(k, "source") {
+		k = fmt.Sprintf("%ssource", kind)
 	}
-	// TODO remove this
-	client, err := docker.NewClient()
-	if err != nil {
-		return nil, fmt.Errorf("docker client: %w", err)
-	}
-	container, err = container.LookupHostConfig(context.Background(), client)
-	if err != nil {
-		return nil, fmt.Errorf("broker lookup: %w", err)
-	}
-	socket := container.Socket()
-	if socket == "" {
-		return nil, fmt.Errorf("broker socket is empty")
-	}
-	args = append(args, fmt.Sprintf("--sink.uri=http://%s", socket))
 	return &Source{
+		Name:         fmt.Sprintf("%s-%s", broker, k),
 		ManifestFile: manifest,
 		CRDFile:      crd,
 		Broker:       broker,
-		Kind:         kind,
+		Kind:         k,
 		Version:      version,
-		args:         pkg.ParseArgs(args),
-	}, nil
+		spec:         spec,
+	}
 }
 
 // func Create(kind, broker, socket string, args []string, manifestFile, crdFile string) (*kubernetes.Object, bool, error) {

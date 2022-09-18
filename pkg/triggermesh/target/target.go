@@ -31,6 +31,8 @@ import (
 var _ triggermesh.Component = (*Target)(nil)
 
 type Target struct {
+	Name string
+
 	ManifestFile string
 	CRDFile      string
 
@@ -39,15 +41,15 @@ type Target struct {
 	Kind    string
 
 	image string
-	args  map[string]interface{}
+	spec  map[string]interface{}
 }
 
 func (t *Target) AsUnstructured() (*unstructured.Unstructured, error) {
-	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.args)
+	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
 }
 
 func (t *Target) AsK8sObject() (*kubernetes.Object, error) {
-	return kubernetes.CreateObject(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.args)
+	return kubernetes.CreateObject(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
 }
 
 func (t *Target) AsContainer() (*docker.Container, error) {
@@ -65,18 +67,18 @@ func (t *Target) AsContainer() (*docker.Container, error) {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
 	return &docker.Container{
-		Name:                   o.GetName(),
+		Name:                   t.GetName(),
 		CreateHostOptions:      ho,
 		CreateContainerOptions: co,
 	}, nil
 }
 
 func (t *Target) GetName() string {
-	return fmt.Sprintf("%s-%starget", t.Broker, t.Kind)
+	return t.Name
 }
 
 func (t *Target) GetKind() string {
-	return fmt.Sprintf("%starget", strings.ToLower(t.Kind))
+	return t.Kind
 }
 
 func (t *Target) GetImage() string {
@@ -91,14 +93,31 @@ func (t *Target) GetImage() string {
 // 	return o.Spec, nil
 // }
 
-func NewTarget(manifest, crd string, kind, broker, version string, args []string) *Target {
+func NewTarget(manifest, crd string, kind, broker, version string, params interface{}) *Target {
+	var spec map[string]interface{}
+	switch p := params.(type) {
+	case []string:
+		// args slice
+		spec = pkg.ParseArgs(p)
+	case map[string]interface{}:
+		// spec map
+		spec = p
+	default:
+	}
+
+	// kind initially can be awss3, webhook, etc.
+	k := strings.ToLower(kind)
+	if !strings.Contains(k, "target") {
+		k = fmt.Sprintf("%starget", kind)
+	}
 	return &Target{
+		Name:         fmt.Sprintf("%s-%s", broker, k),
 		ManifestFile: manifest,
 		CRDFile:      crd,
 		Broker:       broker,
-		Kind:         kind,
+		Kind:         k,
 		Version:      version,
-		args:         pkg.ParseArgs(args),
+		spec:         spec,
 	}
 }
 

@@ -17,12 +17,10 @@ limitations under the License.
 package broker
 
 import (
-	"fmt"
 	"path"
 
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
-	"github.com/triggermesh/tmcli/pkg/manifest"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -116,68 +114,68 @@ func NewTrigger(name, manifest, broker, eventType string) *Trigger {
 	}
 }
 
-func AppendTriggerToBroker(config Configuration, name, eventType string) Configuration {
-	for _, trigger := range config.Triggers {
-		if trigger.Name == name {
-			trigger.Filters[0].Exact.Type = eventType
-			return config
-		}
-	}
-	config.Triggers = append(config.Triggers, TriggerSpec{Name: name, Filters: []Filter{{Exact: Exact{Type: eventType}}}})
-	return config
-}
+// func AppendTriggerToBroker(config Configuration, name, eventType string) Configuration {
+// 	for _, trigger := range config.Triggers {
+// 		if trigger.Name == name {
+// 			trigger.Filters[0].Exact.Type = eventType
+// 			return config
+// 		}
+// 	}
+// 	config.Triggers = append(config.Triggers, TriggerSpec{Name: name, Filters: []Filter{{Exact: Exact{Type: eventType}}}})
+// 	return config
+// }
 
-func TriggerObjectsFromBrokerConfig(config Configuration, broker string) []kubernetes.Object {
-	var triggers []kubernetes.Object
-	for _, trigger := range config.Triggers {
-		triggers = append(triggers, kubernetes.Object{
-			APIVersion: "eventing.triggermesh.io/v1alpha1",
-			Kind:       "Trigger",
-			Metadata: kubernetes.Metadata{
-				Name: trigger.Name,
-				Labels: map[string]string{
-					"triggermesh.io/context": broker,
-				},
-			},
-			Spec: map[string]interface{}{
-				"filters": trigger.Filters,
-				"targets": trigger.Targets,
-			},
-		})
-	}
-	return triggers
-}
+// func TriggerObjectsFromBrokerConfig(config Configuration, broker string) []kubernetes.Object {
+// 	var triggers []kubernetes.Object
+// 	for _, trigger := range config.Triggers {
+// 		triggers = append(triggers, kubernetes.Object{
+// 			APIVersion: "eventing.triggermesh.io/v1alpha1",
+// 			Kind:       "Trigger",
+// 			Metadata: kubernetes.Metadata{
+// 				Name: trigger.Name,
+// 				Labels: map[string]string{
+// 					"triggermesh.io/context": broker,
+// 				},
+// 			},
+// 			Spec: map[string]interface{}{
+// 				"filters": trigger.Filters,
+// 				"targets": trigger.Targets,
+// 			},
+// 		})
+// 	}
+// 	return triggers
+// }
 
-func CreateTrigger(name, manifestFile, broker, eventType string) (*kubernetes.Object, error) {
-	manifest := manifest.New(manifestFile)
-	if err := manifest.Read(); err != nil {
-		return nil, fmt.Errorf("unable to read the manifest: %w", err)
-	}
-	brokerConfFile := path.Join("/Users/tzununbekov/.triggermesh/cli", broker, "broker.conf")
-	config, err := ReadConfigFile(brokerConfFile)
-	if err != nil {
-		return nil, fmt.Errorf("broker config read: %w", err)
-	}
-	config = AppendTriggerToBroker(config, name, eventType)
-	triggers := TriggerObjectsFromBrokerConfig(config, broker)
-	var dirty bool
-	for _, trigger := range triggers {
-		newObject, err := manifest.Add(trigger)
-		if err != nil {
-			return nil, fmt.Errorf("adding trigger: %w", err)
-		}
-		if newObject {
-			dirty = true
-		}
-	}
-	if !dirty {
-		return nil, nil
-	}
-	if err := manifest.Write(); err != nil {
-		return nil, fmt.Errorf("manifest write: %w", err)
-	}
-	if err := WriteConfigFile(brokerConfFile, &config); err != nil {
-		return nil, fmt.Errorf("broker config write: %w", err)
-	}
-	return nil, nil
-}
+// func CreateTrigger(name, manifestFile, broker, eventType string) (*kubernetes.Object, error) {
+// 	manifest := manifest.New(manifestFile)
+// 	if err := manifest.Read(); err != nil {
+// 		return nil, fmt.Errorf("unable to read the manifest: %w", err)
+// 	}
+// 	brokerConfFile := path.Join("/Users/tzununbekov/.triggermesh/cli", broker, "broker.conf")
+// 	config, err := ReadConfigFile(brokerConfFile)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("broker config read: %w", err)
+// 	}
+// 	config = AppendTriggerToBroker(config, name, eventType)
+// 	triggers := TriggerObjectsFromBrokerConfig(config, broker)
+// 	var dirty bool
+// 	for _, trigger := range triggers {
+// 		newObject, err := manifest.Add(trigger)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("adding trigger: %w", err)
+// 		}
+// 		if newObject {
+// 			dirty = true
+// 		}
+// 	}
+// 	if !dirty {
+// 		return nil, nil
+// 	}
+// 	if err := manifest.Write(); err != nil {
+// 		return nil, fmt.Errorf("manifest write: %w", err)
+// 	}
+// 	if err := WriteConfigFile(brokerConfFile, &config); err != nil {
+// 		return nil, fmt.Errorf("broker config write: %w", err)
+// 	}
+// 	return nil, nil
+// }

@@ -21,10 +21,13 @@ import (
 	"fmt"
 	"log"
 	"path"
+	"strings"
 	"sync"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/manifest"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
@@ -32,8 +35,6 @@ import (
 	"github.com/triggermesh/tmcli/pkg/triggermesh/source"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/target"
 )
-
-const manifestFile = "manifest.yaml"
 
 type StartOptions struct {
 	ConfigDir string
@@ -70,37 +71,65 @@ func NewCmd() *cobra.Command {
 
 func (o *StartOptions) start(broker string) error {
 	ctx := context.Background()
-	manifest := manifest.New(path.Join(o.ConfigDir, broker, manifestFile))
-	if err := manifest.Read(); err != nil {
+	manifestFile := path.Join(o.ConfigDir, broker+"-broker", "manifest.yaml")
+	manifestOrig := manifest.New(manifestFile)
+	if err := manifestOrig.Read(); err != nil {
 		return fmt.Errorf("cannot parse manifest: %w", err)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(len(manifest.Objects))
+	client, err := docker.NewClient()
+	if err != nil {
+		return fmt.Errorf("docker client: %v", err)
+	}
 
-	for i, object := range manifest.Objects {
+	var socket string
+	manifestWoBroker := manifestOrig
+
+	// start broker first
+	for i, object := range manifestOrig.Objects {
+		if object.Kind == "Broker" {
+			manifestWoBroker.Objects = append(manifestOrig.Objects[:i], manifestOrig.Objects[i+1:]...)
+			broker, err := tmbroker.NewBroker(manifestFile, object.Metadata.Name)
+			if err != nil {
+				return fmt.Errorf("creating broker object: %v", err)
+			}
+			container, err := broker.AsContainer()
+			if err != nil {
+				return fmt.Errorf("creating broker container: %v", err)
+			}
+			brontainer, err := container.Start(ctx, client)
+			if err != nil {
+				return fmt.Errorf("starting broker container: %v", err)
+			}
+			socket = brontainer.Socket()
+		}
+	}
+
+	if socket == "" {
+		return fmt.Errorf("broker is not available")
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(manifestWoBroker.Objects))
+
+	for i, object := range manifestWoBroker.Objects {
 		go func(i int, object kubernetes.Object) {
 			var c triggermesh.Component
-			var err error
-			switch object.Kind {
-			case "Source":
-				c, err = source.NewSource(manifestFile, o.CRD, object.Kind, broker, o.Version, []string{})
-				if err != nil {
-					log.Printf("Creating source: %v", err)
-				}
-			case "Target":
-				c = target.NewTarget(manifestFile, o.CRD, object.Kind, broker, o.Version, []string{})
-			case "Broker":
-				c, err = tmbroker.NewBroker(manifestFile, object.Metadata.Name, o.Version)
-				if err != nil {
-					log.Printf("Creating broker: %v", err)
-				}
+			switch {
+			case strings.HasSuffix(object.Kind, "Source"):
+				manifestOrig.Objects[i].Spec["sink"] = map[string]interface{}{"uri": "http://" + socket}
+				c = source.NewSource(manifestFile, o.CRD, object.Kind, broker, o.Version, manifestOrig.Objects[i].Spec)
+
+				// update sink in local manifest. Not required
+				// manifestOrig.Write()
+			case strings.HasSuffix(object.Kind, "Target"):
+				c = target.NewTarget(manifestFile, o.CRD, object.Kind, broker, o.Version, object.Spec)
 			}
-			container, err := triggermesh.Run(ctx, c)
+
+			_, err := triggermesh.Run(ctx, c)
 			if err != nil {
 				log.Printf("Starting container: %v", err)
 			}
-			fmt.Println(container)
 
 			wg.Done()
 		}(i, object)

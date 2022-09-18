@@ -208,7 +208,6 @@ func ForceStop(ctx context.Context, name string, client *client.Client) error {
 	}
 	return client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{
 		RemoveVolumes: true,
-		RemoveLinks:   true,
 		Force:         true,
 	})
 }

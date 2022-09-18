@@ -51,13 +51,10 @@ func (o *CreateOptions) Source(kind string, args []string) error {
 
 	// socket, err := runtime.GetSocket(ctx, o.Context)
 	// if err != nil {
-	// 	return fmt.Errorf("broker socket: %w", err)
+	// return fmt.Errorf("broker socket: %w", err)
 	// }
 
-	s, err := source.NewSource(manifest, o.CRD, kind, o.Context, o.Version, args)
-	if err != nil {
-		return fmt.Errorf("source: %w", err)
-	}
+	s := source.NewSource(manifest, o.CRD, kind, o.Context, o.Version, append(args, fmt.Sprintf("--sink.uri=http://fooo")))
 
 	container, err := triggermesh.Create(ctx, s, manifest)
 	if err != nil {
