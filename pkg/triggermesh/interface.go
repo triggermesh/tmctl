@@ -14,22 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubernetes
+package triggermesh
 
-import "fmt"
+import (
+	"github.com/triggermesh/tmcli/pkg/docker"
+	"github.com/triggermesh/tmcli/pkg/kubernetes"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+)
 
-type Sink struct {
-	Ref struct {
-		APIVersion string `json:"apiVersion"`
-		Kind       string `json:"kind"`
-		Name       string `json:"name"`
-		Namespace  string `json:"namespace"`
-	} `json:"ref"`
-	URI string `json:"uri"`
-}
+type Component interface {
+	AsUnstructured() (*unstructured.Unstructured, error)
+	AsK8sObject() (*kubernetes.Object, error)
+	AsContainer() (*docker.Container, error)
 
-func GetSink(broker string) Sink {
-	return Sink{
-		URI: fmt.Sprintf("%s.user-namespace.svc.cluster.local", broker),
-	}
+	GetName() string
+	GetKind() string
+	GetImage() string
 }

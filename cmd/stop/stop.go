@@ -19,21 +19,27 @@ package stop
 import (
 	"context"
 	"fmt"
+	"log"
 	"path"
+	"strings"
+	"sync"
 
 	"github.com/spf13/cobra"
-	"github.com/triggermesh/tmcli/pkg/runtime"
+
+	"github.com/triggermesh/tmcli/pkg/docker"
+	"github.com/triggermesh/tmcli/pkg/kubernetes"
+	"github.com/triggermesh/tmcli/pkg/manifest"
 )
 
 const manifestFile = "manifest.yaml"
 
-type StartOptions struct {
+type StopOptions struct {
 	ConfigDir string
 }
 
 func NewCmd() *cobra.Command {
-	o := &StartOptions{}
-	createCmd := &cobra.Command{
+	o := &StopOptions{}
+	stopCmd := &cobra.Command{
 		Use:   "stop <broker>",
 		Short: "stops TriggerMesh components",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -51,10 +57,34 @@ func NewCmd() *cobra.Command {
 	}
 	// createCmd.Flags().StringVarP(&o.Context, "broker", "b", "", "Connect components to this broker")
 
-	return createCmd
+	return stopCmd
 }
 
-func (o *StartOptions) stop(broker string) error {
-	manifest := path.Join(o.ConfigDir, broker, manifestFile)
-	return runtime.NewLocalSetup(manifest, "", []string{}).StopAll(context.Background())
+func (o *StopOptions) stop(broker string) error {
+	ctx := context.Background()
+	manifest := manifest.New(path.Join(o.ConfigDir, broker, manifestFile))
+	if err := manifest.Read(); err != nil {
+		return fmt.Errorf("cannot parse manifest: %w", err)
+	}
+
+	client, err := docker.NewClient()
+	if err != nil {
+		return fmt.Errorf("docker client: %w", err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(manifest.Objects))
+
+	for i, object := range manifest.Objects {
+		go func(i int, object kubernetes.Object) {
+			name := fmt.Sprintf("%s-%s", broker, strings.ToLower(object.Kind))
+			if err := docker.ForceStop(ctx, name, client); err != nil {
+				log.Printf("Stopping %q: %v", name, err)
+			}
+
+			wg.Done()
+		}(i, object)
+	}
+	wg.Wait()
+	return nil
 }

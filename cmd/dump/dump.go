@@ -22,9 +22,8 @@ import (
 	"path"
 
 	"github.com/spf13/cobra"
+	"github.com/triggermesh/tmcli/pkg/manifest"
 	"gopkg.in/yaml.v3"
-
-	"github.com/triggermesh/tmcli/pkg/kubernetes"
 )
 
 const manifestFile = "manifest.yaml"
@@ -68,7 +67,7 @@ func parseArgs(args []string) (string, error) {
 }
 
 func (o *DumpOptions) Dump() error {
-	manifest := kubernetes.NewManifest(path.Join(o.ConfigDir, o.Context, manifestFile))
+	manifest := manifest.New(path.Join(o.ConfigDir, o.Context, manifestFile))
 	if err := manifest.Read(); err != nil {
 		return err
 	}

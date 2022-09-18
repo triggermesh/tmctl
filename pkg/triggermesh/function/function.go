@@ -29,8 +29,7 @@ var functionRuntimes = map[string]string{
 	"ruby":   "gcr.io/triggermesh/knative-lambda-ruby25",
 }
 
-func ImageName(object *kubernetes.Object) (string, error) {
-	runtime := object.Spec["runtime"].(string)
+func ImageName(runtime string) (string, error) {
 	image, exists := functionRuntimes[runtime]
 	if !exists {
 		return "", fmt.Errorf("container image for %q runtime not found", runtime)

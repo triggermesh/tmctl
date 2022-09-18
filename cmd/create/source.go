@@ -22,8 +22,9 @@ import (
 	"path"
 
 	"github.com/spf13/cobra"
-	"github.com/triggermesh/tmcli/pkg/runtime"
+
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/source"
 )
 
 func (o *CreateOptions) NewSourceCmd() *cobra.Command {
@@ -48,19 +49,20 @@ func (o *CreateOptions) Source(kind string, args []string) error {
 	ctx := context.Background()
 	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
 
-	socket, err := runtime.GetSocket(ctx, o.Context)
+	// socket, err := runtime.GetSocket(ctx, o.Context)
+	// if err != nil {
+	// 	return fmt.Errorf("broker socket: %w", err)
+	// }
+
+	s, err := source.NewSource(manifest, o.CRD, kind, o.Context, o.Version, args)
 	if err != nil {
-		return fmt.Errorf("broker socket: %w", err)
+		return fmt.Errorf("source: %w", err)
 	}
 
-	object, dirty, err := triggermesh.CreateSource(kind, o.Context, socket, args, manifest, o.CRD)
+	container, err := triggermesh.Create(ctx, s, manifest)
 	if err != nil {
-		return fmt.Errorf("source creation: %w", err)
+		return err
 	}
-
-	if _, err := runtime.Initialize(ctx, object, o.Version, dirty); err != nil {
-		return fmt.Errorf("container initialization: %w", err)
-	}
-
+	fmt.Println(container)
 	return nil
 }

@@ -14,20 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package env
+package adapter
 
 import (
 	"fmt"
 
-	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func Build(object *kubernetes.Object) ([]corev1.EnvVar, error) {
-	o, err := object.ToUnstructured()
-	if err != nil {
-		return nil, fmt.Errorf("cannot convert object: %w", err)
-	}
+func buildEnv(o *unstructured.Unstructured) ([]corev1.EnvVar, error) {
 	switch o.GetAPIVersion() {
 	case "sources.triggermesh.io/v1alpha1":
 		return sources(o)

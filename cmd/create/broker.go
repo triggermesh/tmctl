@@ -23,7 +23,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/triggermesh/tmcli/pkg/runtime"
+
+	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 )
 
@@ -45,16 +46,30 @@ func (o *CreateOptions) Broker(name string) error {
 	ctx := context.Background()
 	manifest := path.Join(o.ConfigBase, name, manifestFile)
 
-	object, dirty, err := tmbroker.CreateBrokerObject(name, manifest)
+	broker, err := tmbroker.NewBroker(manifest, name, o.Version)
 	if err != nil {
-		return fmt.Errorf("broker creation: %w", err)
+		return fmt.Errorf("broker: %w", err)
 	}
-	viper.Set("context", object.Metadata.Name)
+
+	container, err := triggermesh.Create(ctx, broker, manifest)
+	if err != nil {
+		return err
+	}
+	fmt.Println(container)
+
+	viper.Set("context", name)
 	if err := viper.WriteConfig(); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
-	if _, err := runtime.Initialize(ctx, object, o.Version, dirty); err != nil {
-		return fmt.Errorf("container initialization: %w", err)
-	}
 	return nil
+
+	// object, dirty, err := tmbroker.CreateBrokerObject(name, manifest)
+	// if err != nil {
+	// 	return fmt.Errorf("broker creation: %w", err)
+	// }
+
+	// if _, err := runtime.Initialize(ctx, object, o.Version, dirty); err != nil {
+	// 	return fmt.Errorf("container initialization: %w", err)
+	// }
+	// return nil
 }

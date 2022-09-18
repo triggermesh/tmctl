@@ -14,28 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package env
+package adapter
 
 import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-
-	extensionsv1alpha1 "github.com/triggermesh/triggermesh/pkg/apis/extensions/v1alpha1"
-	"github.com/triggermesh/triggermesh/pkg/extensions/reconciler/function"
 )
 
-func extensions(object *unstructured.Unstructured) ([]corev1.EnvVar, error) {
-	switch object.GetKind() {
-	// Extensions API group
-	case "Function":
-		var o *extensionsv1alpha1.Function
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
-		}
-		return function.MakeAppEnv(o), nil
-	}
+func routing(object *unstructured.Unstructured) ([]corev1.EnvVar, error) {
 	return nil, fmt.Errorf("kind %q is not supported", object.GetKind())
 }
