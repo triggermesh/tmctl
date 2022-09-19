@@ -37,20 +37,21 @@ func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 			if len(args) != 1 {
 				return fmt.Errorf("broker name is required")
 			}
-			return o.Broker(args[0])
+			return o.broker(args[0])
 		},
 	}
 }
 
-func (o *CreateOptions) Broker(name string) error {
+func (o *CreateOptions) broker(name string) error {
 	ctx := context.Background()
 
-	manifest := path.Join(o.ConfigBase, name, manifestFile)
-	broker, err := tmbroker.NewBroker(manifest, name)
+	configDir := path.Join(o.ConfigBase, name)
+	broker, err := tmbroker.NewBroker(name, configDir)
 	if err != nil {
 		return fmt.Errorf("broker: %w", err)
 	}
 
+	manifest := path.Join(configDir, manifestFile)
 	restart, err := triggermesh.Create(ctx, broker, manifest)
 	if err != nil {
 		return err

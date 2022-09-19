@@ -33,9 +33,10 @@ import (
 var _ triggermesh.Component = (*Trigger)(nil)
 
 type Trigger struct {
-	ManifestFile string
-	Broker       string
-	Name         string
+	Name string
+
+	Broker          string
+	BrokerConfigDir string
 
 	spec TriggerSpec
 }
@@ -56,6 +57,7 @@ type Exact struct {
 
 type Target struct {
 	URL             string `yaml:"url"`
+	Component       string `yaml:"component,omitempty"` // for local version only
 	DeliveryOptions struct {
 		Retries       int    `yaml:"retries,omitempty"`
 		BackoffDelay  string `yaml:"backoffDelay,omitempty"`
@@ -105,12 +107,15 @@ func (t *Trigger) GetImage() string {
 	return ""
 }
 
-func NewTrigger(name, manifest, broker, eventType string) *Trigger {
+func (t *Trigger) GetSpec() TriggerSpec {
+	return t.spec
+}
+
+func NewTrigger(name, broker, eventType, configDir string) *Trigger {
 	return &Trigger{
-		ManifestFile: manifest,
-		// BrokerConfig: path.Join(path.Dir(manifest), "broker.conf"),
-		Broker: broker,
-		Name:   name,
+		Name:            name,
+		Broker:          broker,
+		BrokerConfigDir: configDir,
 		spec: TriggerSpec{
 			Name: name,
 			Filters: []Filter{
@@ -120,10 +125,11 @@ func NewTrigger(name, manifest, broker, eventType string) *Trigger {
 	}
 }
 
-func (t *Trigger) SetTarget(socket string) {
+func (t *Trigger) SetTarget(component, socket string) {
 	t.spec.Targets = []Target{
 		{
-			URL: socket,
+			Component: component,
+			URL:       socket,
 		},
 	}
 }
@@ -136,22 +142,24 @@ func (t *Trigger) SetFilter(eventType string) {
 	}
 }
 
-func (t *Trigger) LookupTrigger() (TriggerSpec, error) {
-	configFile := path.Join(path.Dir(t.ManifestFile), "broker.conf")
+func (t *Trigger) LookupTrigger() error {
+	configFile := path.Join(t.BrokerConfigDir, "broker.conf")
 	configuration, err := readBrokerConfig(configFile)
 	if err != nil {
-		return TriggerSpec{}, fmt.Errorf("broker config: %w", err)
+		return fmt.Errorf("broker config: %w", err)
 	}
 	for _, trigger := range configuration.Triggers {
 		if trigger.Name == t.Name {
-			return trigger, nil
+			t.spec.Filters = trigger.Filters
+			t.spec.Targets = trigger.Targets
+			return nil
 		}
 	}
-	return TriggerSpec{}, fmt.Errorf("trigger %q not found", t.Name)
+	return fmt.Errorf("trigger %q not found", t.Name)
 }
 
 func (t *Trigger) UpdateBrokerConfig() error {
-	configFile := path.Join(path.Dir(t.ManifestFile), "broker.conf")
+	configFile := path.Join(t.BrokerConfigDir, "broker.conf")
 	configuration, err := readBrokerConfig(configFile)
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -172,7 +180,7 @@ func (t *Trigger) UpdateBrokerConfig() error {
 }
 
 func (t *Trigger) UpdateManifest() error {
-	m := manifest.New(t.ManifestFile)
+	m := manifest.New(path.Join(t.BrokerConfigDir, "manifest.yaml"))
 	if err := m.Read(); err != nil {
 		return fmt.Errorf("manifest read: %w", err)
 	}

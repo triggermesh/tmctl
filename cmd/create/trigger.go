@@ -35,16 +35,16 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 			if len(args) < 1 {
 				return fmt.Errorf("trigger name is required")
 			}
-			return o.Trigger(args[0], eventType)
+			return o.trigger(args[0], eventType)
 		},
 	}
 	triggerCmd.Flags().StringVarP(&eventType, "eventType", "e", "", "Filter data based on the event type")
 	return triggerCmd
 }
 
-func (o *CreateOptions) Trigger(name, eventType string) error {
-	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
-	trigger := broker.NewTrigger(name, manifest, o.Context, eventType)
+func (o *CreateOptions) trigger(name, eventType string) error {
+	configDir := path.Join(o.ConfigBase, o.Context)
+	trigger := broker.NewTrigger(name, o.Context, eventType, configDir)
 
 	if err := trigger.UpdateBrokerConfig(); err != nil {
 		return fmt.Errorf("broker config update: %w", err)

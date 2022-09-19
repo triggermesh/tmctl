@@ -42,7 +42,8 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return o.Target(kind, args)
+			triggerName, aargs := triggerFromArgs(args)
+			return o.target(kind, triggerName, aargs)
 		},
 	}
 }
@@ -60,25 +61,23 @@ func triggerFromArgs(args []string) (string, []string) {
 			args = append(args[:k-1], args[k+1:]...)
 			break
 		}
-		k++
+		// k++
 	}
 	return target, args
 }
 
-func (o *CreateOptions) Target(kind string, args []string) error {
+func (o *CreateOptions) target(kind string, triggerName string, args []string) error {
 	ctx := context.Background()
-	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
+	configDir := path.Join(o.ConfigBase, o.Context)
 
-	trigger, aargs := triggerFromArgs(args)
-	tr := tmbroker.NewTrigger(trigger, manifest, o.Context, "")
-	ts, err := tr.LookupTrigger()
-	if err != nil {
+	tr := tmbroker.NewTrigger(triggerName, o.Context, "", configDir)
+	if err := tr.LookupTrigger(); err != nil {
 		return fmt.Errorf("trigger lookup: %w", err)
 	}
 
-	t := target.NewTarget(manifest, o.CRD, kind, o.Context, o.Version, aargs)
+	t := target.NewTarget(o.CRD, kind, o.Context, o.Version, args)
 
-	restart, err := triggermesh.Create(ctx, t, manifest)
+	restart, err := triggermesh.Create(ctx, t, path.Join(configDir, manifestFile))
 	if err != nil {
 		return err
 	}
@@ -88,8 +87,7 @@ func (o *CreateOptions) Target(kind string, args []string) error {
 		return err
 	}
 
-	tr.SetFilter(ts.Filters[0].Exact.Type)
-	tr.SetTarget(fmt.Sprintf("http://host.docker.internal:%s", strings.Split(container.Socket(), ":")[1]))
+	tr.SetTarget(container.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
 	if err := tr.UpdateBrokerConfig(); err != nil {
 		return fmt.Errorf("broker config: %w", err)
 	}

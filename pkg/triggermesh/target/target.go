@@ -31,10 +31,8 @@ import (
 var _ triggermesh.Component = (*Target)(nil)
 
 type Target struct {
-	Name string
-
-	ManifestFile string
-	CRDFile      string
+	Name    string
+	CRDFile string
 
 	Broker  string
 	Version string
@@ -81,7 +79,7 @@ func (t *Target) GetImage() string {
 	return t.image
 }
 
-func NewTarget(manifest, crd string, kind, broker, version string, params interface{}) *Target {
+func NewTarget(crd string, kind, broker, version string, params interface{}) *Target {
 	var spec map[string]interface{}
 	switch p := params.(type) {
 	case []string:
@@ -99,12 +97,11 @@ func NewTarget(manifest, crd string, kind, broker, version string, params interf
 		k = fmt.Sprintf("%starget", kind)
 	}
 	return &Target{
-		Name:         fmt.Sprintf("%s-%s", broker, k),
-		ManifestFile: manifest,
-		CRDFile:      crd,
-		Broker:       broker,
-		Kind:         k,
-		Version:      version,
-		spec:         spec,
+		Name:    fmt.Sprintf("%s-%s", broker, k),
+		CRDFile: crd,
+		Broker:  broker,
+		Kind:    k,
+		Version: version,
+		spec:    spec,
 	}
 }

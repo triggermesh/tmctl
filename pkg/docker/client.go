@@ -173,10 +173,10 @@ func (c *Container) LookupHostConfig(ctx context.Context, client *client.Client)
 	return c, nil
 }
 
-func (c *Container) Socket() string {
+func (c *Container) HostPort() string {
 	for _, bindings := range c.runtimeHostConfig.PortBindings {
 		for _, binding := range bindings {
-			return fmt.Sprintf("%s:%s", binding.HostIP, binding.HostPort)
+			return binding.HostPort
 		}
 	}
 	return ""
@@ -193,7 +193,7 @@ func (c *Container) Connect(ctx context.Context) error {
 			if now.After(till) {
 				return fmt.Errorf("service wait timeout")
 			}
-			conn, err := net.DialTimeout("tcp", c.Socket(), time.Second)
+			conn, err := net.DialTimeout("tcp", fmt.Sprintf("0.0.0.0:%s", c.HostPort()), time.Second)
 			if err != nil {
 				continue
 			}
