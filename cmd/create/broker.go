@@ -67,14 +67,4 @@ func (o *CreateOptions) Broker(name string) error {
 		return fmt.Errorf("write config: %w", err)
 	}
 	return nil
-
-	// object, dirty, err := tmbroker.CreateBrokerObject(name, manifest)
-	// if err != nil {
-	// 	return fmt.Errorf("broker creation: %w", err)
-	// }
-
-	// if _, err := runtime.Initialize(ctx, object, o.Version, dirty); err != nil {
-	// 	return fmt.Errorf("container initialization: %w", err)
-	// }
-	// return nil
 }

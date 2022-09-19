@@ -95,7 +95,7 @@ func (b *Broker) GetKind() string {
 }
 
 func (b *Broker) GetName() string {
-	return fmt.Sprintf("%s-broker", b.Name)
+	return b.Name
 }
 
 func (b *Broker) GetImage() string {
