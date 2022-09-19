@@ -57,12 +57,8 @@ func (t *Target) AsContainer() (*docker.Container, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
-	image, err := adapter.Image(o, t.Version)
-	if err != nil {
-		return nil, fmt.Errorf("adapter image: %w", err)
-	}
-	t.image = image
-	co, ho, err := adapter.RuntimeParams(o, image)
+	t.image = adapter.Image(o, t.Version)
+	co, ho, err := adapter.RuntimeParams(o, t.image, "")
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}

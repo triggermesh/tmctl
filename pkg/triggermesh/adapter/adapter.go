@@ -18,8 +18,6 @@ package adapter
 
 import (
 	"fmt"
-	"os"
-	"path"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,28 +28,14 @@ import (
 
 const (
 	registry    = "gcr.io/triggermesh"
-	brokerImage = "docker.io/tzununbekov/memory-broker"
 	adapterPort = "8080/tcp"
 )
 
-func Image(object *unstructured.Unstructured, version string) (string, error) {
-	var image string
-	switch object.GetKind() {
-	case "Broker":
-		image = brokerImage
-	// case "Function":
-	// 	fimage, err := function.ImageName(runtime)
-	// 	if err != nil {
-	// 		return "", fmt.Errorf("cannot parse function image: %w", err)
-	// 	}
-	// 	image = fmt.Sprintf("%s:%s", fimage, version)
-	default:
-		image = fmt.Sprintf("%s/%s-adapter:%s", registry, strings.ToLower(object.GetKind()), version)
-	}
-	return image, nil
+func Image(object *unstructured.Unstructured, version string) string {
+	return fmt.Sprintf("%s/%s-adapter:%s", registry, strings.ToLower(object.GetKind()), version)
 }
 
-func RuntimeParams(object *unstructured.Unstructured, image string) ([]docker.ContainerOption, []docker.HostOption, error) {
+func RuntimeParams(object *unstructured.Unstructured, image, brokerConfigFile string) ([]docker.ContainerOption, []docker.HostOption, error) {
 	co := []docker.ContainerOption{
 		docker.WithImage(image),
 		docker.WithPort(adapterPort),
@@ -63,12 +47,7 @@ func RuntimeParams(object *unstructured.Unstructured, image string) ([]docker.Co
 
 	switch object.GetKind() {
 	case "Broker":
-		// get rid of viper here
-		configFile := path.Join("/Users/tzununbekov/.triggermesh/cli", object.GetName(), "broker.conf")
-		if err := writeFile(configFile, []byte{}); err != nil {
-			return nil, nil, fmt.Errorf("writing configuration: %w", err)
-		}
-		bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", configFile)
+		bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", brokerConfigFile)
 		ho = append(ho, docker.WithVolumeBind(bind))
 	// case "Function":
 	// 	configFile := path.Join("/Users/tzununbekov/.triggermesh/cli", viper.GetString("context"), object.Metadata.Name)
@@ -96,13 +75,6 @@ func RuntimeParams(object *unstructured.Unstructured, image string) ([]docker.Co
 	}
 
 	return co, ho, nil
-}
-
-func writeFile(filePath string, data []byte) error {
-	if err := os.MkdirAll(path.Dir(filePath), os.ModePerm); err != nil {
-		return err
-	}
-	return os.WriteFile(filePath, data, os.ModePerm)
 }
 
 func envsToString(envs []corev1.EnvVar) []string {

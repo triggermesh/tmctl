@@ -59,7 +59,7 @@ func NewCmd() *cobra.Command {
 
 func (o *StopOptions) stop(broker string) error {
 	ctx := context.Background()
-	manifest := manifest.New(path.Join(o.ConfigDir, broker+"-broker", manifestFile))
+	manifest := manifest.New(path.Join(o.ConfigDir, broker, manifestFile))
 	if err := manifest.Read(); err != nil {
 		return fmt.Errorf("cannot parse manifest: %w", err)
 	}

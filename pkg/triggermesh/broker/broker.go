@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -79,7 +80,7 @@ func (b *Broker) AsContainer() (*docker.Container, error) {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
 	b.image = image
-	co, ho, err := adapter.RuntimeParams(o, b.image)
+	co, ho, err := adapter.RuntimeParams(o, b.image, b.ConfigFile)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
@@ -117,10 +118,15 @@ func NewBroker(manifest, name string) (*Broker, error) {
 	}
 
 	configFile := path.Join(path.Dir(manifest), "broker.conf")
-	if _, err := os.Create(configFile); err != nil {
-		return nil, fmt.Errorf("config file: %w", err)
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		if _, err := os.Create(configFile); err != nil {
+			return nil, fmt.Errorf("config file: %w", err)
+		}
 	}
 
+	if !strings.HasSuffix(name, "-broker") {
+		name = name + "-broker"
+	}
 	return &Broker{
 		ManifestFile: manifest,
 		ConfigFile:   configFile,

@@ -27,7 +27,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/manifest"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
@@ -71,15 +70,10 @@ func NewCmd() *cobra.Command {
 
 func (o *StartOptions) start(broker string) error {
 	ctx := context.Background()
-	manifestFile := path.Join(o.ConfigDir, broker+"-broker", "manifest.yaml")
+	manifestFile := path.Join(o.ConfigDir, broker, "manifest.yaml")
 	manifestOrig := manifest.New(manifestFile)
 	if err := manifestOrig.Read(); err != nil {
 		return fmt.Errorf("cannot parse manifest: %w", err)
-	}
-
-	client, err := docker.NewClient()
-	if err != nil {
-		return fmt.Errorf("docker client: %v", err)
 	}
 
 	var socket string
@@ -93,15 +87,12 @@ func (o *StartOptions) start(broker string) error {
 			if err != nil {
 				return fmt.Errorf("creating broker object: %v", err)
 			}
-			container, err := broker.AsContainer()
-			if err != nil {
-				return fmt.Errorf("creating broker container: %v", err)
-			}
-			brontainer, err := container.Start(ctx, client)
+
+			container, err := triggermesh.Start(ctx, broker, true)
 			if err != nil {
 				return fmt.Errorf("starting broker container: %v", err)
 			}
-			socket = brontainer.Socket()
+			socket = container.Socket()
 		}
 	}
 
@@ -124,13 +115,14 @@ func (o *StartOptions) start(broker string) error {
 				// manifestOrig.Write()
 			case strings.HasSuffix(object.Kind, "Target"):
 				c = target.NewTarget(manifestFile, o.CRD, object.Kind, broker, o.Version, object.Spec)
+			case object.Kind == "Trigger":
+				wg.Done()
+				return
 			}
-
 			_, err := triggermesh.Start(ctx, c, false)
 			if err != nil {
 				log.Printf("Starting container: %v", err)
 			}
-
 			wg.Done()
 		}(i, object)
 	}
