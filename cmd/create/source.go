@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -43,21 +42,20 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return o.Source(kind, args)
+			return o.source(kind, args)
 		},
 	}
 }
 
-func (o *CreateOptions) Source(kind string, args []string) error {
+func (o *CreateOptions) source(kind string, args []string) error {
 	ctx := context.Background()
-	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
+	configDir := path.Join(o.ConfigBase, o.Context)
 
 	client, err := docker.NewClient()
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
-
-	broker, err := tmbroker.NewBroker(manifest, o.Context)
+	broker, err := tmbroker.NewBroker(o.Context, configDir)
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}
@@ -70,13 +68,12 @@ func (o *CreateOptions) Source(kind string, args []string) error {
 		return fmt.Errorf("broker config: %v", err)
 	}
 
-	s := source.NewSource(manifest, o.CRD, kind, o.Context, o.Version, append(args, fmt.Sprintf("--sink.uri=http://host.docker.internal:%s", strings.Split(brontainer.Socket(), ":")[1])))
+	s := source.NewSource(o.CRD, kind, o.Context, o.Version, append(args, fmt.Sprintf("--sink.uri=http://host.docker.internal:%s", brontainer.HostPort())))
 
-	restart, err := triggermesh.Create(ctx, s, manifest)
+	restart, err := triggermesh.Create(ctx, s, path.Join(configDir, manifestFile))
 	if err != nil {
 		return err
 	}
-
 	if _, err := triggermesh.Start(ctx, s, restart); err != nil {
 		return err
 	}

@@ -34,13 +34,14 @@ import (
 var _ triggermesh.Component = (*Broker)(nil)
 
 const (
-	image = "tzununbekov/memory-broker"
+	manifestFile     = "manifest.yaml"
+	brokerConfigFile = "broker.conf"
+	image            = "tzununbekov/memory-broker"
 )
 
 type Broker struct {
-	ManifestFile string
-	ConfigFile   string
-	Name         string
+	ConfigFile string
+	Name       string
 
 	image string
 	// spec  map[string]interface{}
@@ -66,9 +67,9 @@ func (b *Broker) AsK8sObject() (*kubernetes.Object, error) {
 		Kind:       "Broker",
 		Metadata: kubernetes.Metadata{
 			Name: b.Name,
-			Labels: map[string]string{
-				"triggermesh.io/context": b.Name,
-			},
+			// Labels: map[string]string{
+			// "triggermesh.io/context": b.Name,
+			// },
 		},
 		Spec: map[string]interface{}{"storage": viper.GetString("storage")},
 	}, nil
@@ -103,12 +104,13 @@ func (b *Broker) GetImage() string {
 	return b.image
 }
 
-func NewBroker(manifest, name string) (*Broker, error) {
+func NewBroker(name, brokerConfigDir string) (*Broker, error) {
 	// create config folder
-	if err := os.MkdirAll(path.Dir(manifest), os.ModePerm); err != nil {
+	if err := os.MkdirAll(brokerConfigDir, os.ModePerm); err != nil {
 		return nil, fmt.Errorf("broker dir creation: %w", err)
 	}
 	// create empty manifest
+	manifest := path.Join(brokerConfigDir, manifestFile)
 	if _, err := os.Stat(manifest); os.IsNotExist(err) {
 		if _, err := os.Create(manifest); err != nil {
 			return nil, fmt.Errorf("manifest file creation: %w", err)
@@ -117,9 +119,9 @@ func NewBroker(manifest, name string) (*Broker, error) {
 		return nil, fmt.Errorf("manifest file access: %w", err)
 	}
 
-	configFile := path.Join(path.Dir(manifest), "broker.conf")
-	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		if _, err := os.Create(configFile); err != nil {
+	config := path.Join(brokerConfigDir, brokerConfigFile)
+	if _, err := os.Stat(config); os.IsNotExist(err) {
+		if _, err := os.Create(config); err != nil {
 			return nil, fmt.Errorf("config file: %w", err)
 		}
 	}
@@ -128,8 +130,7 @@ func NewBroker(manifest, name string) (*Broker, error) {
 		name = name + "-broker"
 	}
 	return &Broker{
-		ManifestFile: manifest,
-		ConfigFile:   configFile,
-		Name:         name,
+		ConfigFile: config,
+		Name:       name,
 	}, nil
 }
