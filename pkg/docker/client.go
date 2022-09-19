@@ -22,11 +22,14 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 )
+
+const connRetries = 10
 
 type imagePullEvent struct {
 	Status         string `json:"status"`
@@ -39,40 +42,41 @@ type imagePullEvent struct {
 }
 
 type Container struct {
-	HC container.HostConfig
-	CC container.Config
+	ID   string
+	Name string
+
+	CreateContainerOptions []ContainerOption
+	CreateHostOptions      []HostOption
+
+	runtimeHostConfig      container.HostConfig
+	runtimeContainerConfig container.Config
 }
 
-type Client struct {
-	docker *client.Client
+func NewClient() (*client.Client, error) {
+	return client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 }
 
-func NewClient() (Client, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	return Client{cli}, err
-}
-
-func (c Client) Logs(ctx context.Context, id string) (io.ReadCloser, error) {
+func (c *Container) Logs(ctx context.Context, client *client.Client) (io.ReadCloser, error) {
 	options := types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true, Follow: true}
-	return c.docker.ContainerLogs(ctx, id, options)
+	return client.ContainerLogs(ctx, c.ID, options)
 }
 
-func (c Client) RemoveContainer(ctx context.Context, name string) error {
-	id, err := c.nameToID(ctx, name)
+func (c *Container) Remove(ctx context.Context, client *client.Client) error {
+	// c.ID = ""
+	// c.runtimeContainerConfig = container.Config{}
+	// c.runtimeHostConfig = container.HostConfig{}
+	id, err := nameToID(ctx, c.Name, client)
 	if err != nil {
 		return err
 	}
-	if id == "" {
-		return nil
-	}
-	return c.docker.ContainerRemove(ctx, id, types.ContainerRemoveOptions{
+	return client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{
 		RemoveVolumes: true,
 		Force:         true,
 	})
 }
 
-func (c Client) PullImage(ctx context.Context, image string) error {
-	reader, err := c.docker.ImagePull(ctx, image, types.ImagePullOptions{})
+func (c *Container) PullImage(ctx context.Context, client *client.Client, image string) error {
+	reader, err := client.ImagePull(ctx, image, types.ImagePullOptions{})
 	if err != nil {
 		return err
 	}
@@ -99,45 +103,35 @@ func (c Client) PullImage(ctx context.Context, image string) error {
 	return nil
 }
 
-func (c Client) StartContainer(ctx context.Context, copts []ContainerOption, hopts []HostOption, name string) (Container, error) {
+func (c *Container) Start(ctx context.Context, client *client.Client) (*Container, error) {
 	cc := container.Config{}
-	for _, opt := range copts {
+	for _, opt := range c.CreateContainerOptions {
 		opt(&cc)
 	}
 
 	hc := container.HostConfig{}
-	for _, opt := range hopts {
+	for _, opt := range c.CreateHostOptions {
 		opt(&hc)
 	}
 
-	resp, err := c.docker.ContainerCreate(ctx, &cc, &hc, nil, nil, name)
+	resp, err := client.ContainerCreate(ctx, &cc, &hc, nil, nil, c.Name)
 	if err != nil {
-		return Container{}, err
+		return nil, err
 	}
 
-	if err := c.docker.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		return Container{}, err
+	if err := client.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+		return nil, err
 	}
 
-	// var socket string
-	// for _, bindings := range hc.PortBindings {
-	// 	for _, binding := range bindings {
-	// 		socket = fmt.Sprintf("%s:%s", binding.HostIP, binding.HostPort)
-	// 	}
-	// }
+	c.ID = resp.ID
+	c.runtimeHostConfig = hc
+	c.runtimeContainerConfig = cc
 
-	return Container{
-		HC: hc,
-		CC: cc,
-	}, nil
+	return c, nil
 }
 
-func (c Client) Inspect(ctx context.Context, name string) (types.ContainerJSON, error) {
-	id, err := c.nameToID(ctx, name)
-	if err != nil {
-		return types.ContainerJSON{}, err
-	}
-	return c.docker.ContainerInspect(ctx, id)
+func (c *Container) Inspect(ctx context.Context, client client.Client) (types.ContainerJSON, error) {
+	return client.ContainerInspect(ctx, c.ID)
 }
 
 func openPort() int {
@@ -149,8 +143,8 @@ func openPort() int {
 	return listener.Addr().(*net.TCPAddr).Port
 }
 
-func (c Client) nameToID(ctx context.Context, name string) (string, error) {
-	containers, err := c.docker.ContainerList(ctx, types.ContainerListOptions{
+func nameToID(ctx context.Context, name string, client *client.Client) (string, error) {
+	containers, err := client.ContainerList(ctx, types.ContainerListOptions{
 		All: true,
 	})
 	if err != nil {
@@ -166,11 +160,58 @@ func (c Client) nameToID(ctx context.Context, name string) (string, error) {
 	return "", nil
 }
 
-func Socket(c Container) string {
-	for _, bindings := range c.HC.PortBindings {
+func (c *Container) LookupHostConfig(ctx context.Context, client *client.Client) (*Container, error) {
+	id, err := nameToID(ctx, c.Name, client)
+	if err != nil {
+		return nil, err
+	}
+	jsn, err := client.ContainerInspect(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	c.runtimeHostConfig = *jsn.HostConfig
+	return c, nil
+}
+
+func (c *Container) Socket() string {
+	for _, bindings := range c.runtimeHostConfig.PortBindings {
 		for _, binding := range bindings {
 			return fmt.Sprintf("%s:%s", binding.HostIP, binding.HostPort)
 		}
 	}
 	return ""
+}
+
+func (c *Container) Connect(ctx context.Context) error {
+	timer := time.NewTicker(time.Second)
+	till := time.Now().Add(connRetries * time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case now := <-timer.C:
+			if now.After(till) {
+				return fmt.Errorf("service wait timeout")
+			}
+			conn, err := net.DialTimeout("tcp", c.Socket(), time.Second)
+			if err != nil {
+				continue
+			}
+			if conn != nil {
+				conn.Close()
+				return nil
+			}
+		}
+	}
+}
+
+func ForceStop(ctx context.Context, name string, client *client.Client) error {
+	id, err := nameToID(ctx, name, client)
+	if err != nil {
+		return err
+	}
+	return client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{
+		RemoveVolumes: true,
+		Force:         true,
+	})
 }

@@ -22,102 +22,108 @@ import (
 	"path"
 
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
+	"github.com/triggermesh/tmcli/pkg/triggermesh"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/adapter"
 )
 
-const brokerConfig = `triggers:
-- name: trigger1
-  filters:
-  - exact:
-      type: example.type
-  targets:
-  - url: http://localhost:8888
-    deliveryOptions:
-      retries: 2
-      backoffDelay: 2s
-      backoffPolicy: linear
-- name: trigger2
-  targets:
-  - url: http://localhost:9999
-    deliveryOptions:
-      retries: 5
-      backoffDelay: 5s
-      backoffPolicy: constant
-      deadLetterURL: http://localhost:9090`
+var _ triggermesh.Component = (*Broker)(nil)
 
-type Configuration struct {
-	Triggers []Trigger `yaml:"triggers"`
+const (
+	image = "tzununbekov/memory-broker"
+)
+
+type Broker struct {
+	ManifestFile string
+	ConfigFile   string
+	Name         string
+
+	image string
+	// spec  map[string]interface{}
+	// Configuration Configuration
 }
 
-func CreateBrokerObject(name, manifestFile string) (*kubernetes.Object, bool, error) {
-	// create config folder
-	if err := os.MkdirAll(path.Dir(manifestFile), os.ModePerm); err != nil {
-		return nil, false, fmt.Errorf("broker dir creation: %w", err)
-	}
-	// create empty manifest
-	if _, err := os.Stat(manifestFile); os.IsNotExist(err) {
-		if _, err := os.Create(manifestFile); err != nil {
-			return nil, false, fmt.Errorf("manifest file creation: %w", err)
-		}
-	} else if err != nil {
-		return nil, false, fmt.Errorf("manifest file access: %w", err)
-	}
+type Configuration struct {
+	Triggers []TriggerSpec `yaml:"triggers"`
+}
 
-	broker := kubernetes.Object{
+func (b *Broker) AsUnstructured() (*unstructured.Unstructured, error) {
+	u := &unstructured.Unstructured{}
+	u.SetAPIVersion("eventing.triggermesh.io/v1alpha1")
+	u.SetKind("Broker")
+	u.SetName(b.Name)
+	u.SetLabels(map[string]string{"context": b.Name})
+	return u, unstructured.SetNestedField(u.Object, nil, "spec")
+}
+
+func (b *Broker) AsK8sObject() (*kubernetes.Object, error) {
+	return &kubernetes.Object{
 		APIVersion: "eventing.triggermesh.io/v1alpha1",
 		Kind:       "Broker",
 		Metadata: kubernetes.Metadata{
-			Name: name,
+			Name: b.Name,
 			Labels: map[string]string{
-				"triggermesh.io/context": name,
+				"triggermesh.io/context": b.Name,
 			},
 		},
 		Spec: map[string]interface{}{"storage": viper.GetString("storage")},
-	}
-
-	manifest := kubernetes.NewManifest(manifestFile)
-	dirty, err := manifest.Add(broker)
-	if err != nil {
-		return nil, false, fmt.Errorf("manifest update: %w", err)
-	}
-	if dirty {
-		if err := manifest.Write(); err != nil {
-			return nil, false, fmt.Errorf("manifest write operation: %w", err)
-		}
-	}
-	return &broker, dirty, nil
+	}, nil
 }
 
-func AddTarget(c *Configuration, triggerName, targetURL string) *Configuration {
-	for k, trigger := range c.Triggers {
-		if trigger.Name != triggerName {
-			continue
-		}
-		for _, target := range trigger.Targets {
-			if target.URL == targetURL {
-				return c
-			}
-		}
-		c.Triggers[k].Targets = append(c.Triggers[k].Targets, Target{URL: targetURL})
+func (b *Broker) AsContainer() (*docker.Container, error) {
+	o, err := b.AsUnstructured()
+	if err != nil {
+		return nil, fmt.Errorf("creating object: %w", err)
 	}
-	return c
+	b.image = image
+	co, ho, err := adapter.RuntimeParams(o, b.image)
+	if err != nil {
+		return nil, fmt.Errorf("creating adapter params: %w", err)
+	}
+	return &docker.Container{
+		Name:                   o.GetName(),
+		CreateHostOptions:      ho,
+		CreateContainerOptions: co,
+	}, nil
 }
 
-func ReadConfigFile(path string) (Configuration, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return Configuration{}, fmt.Errorf("read file: %w", err)
-	}
-	var config Configuration
-	return config, yaml.Unmarshal(data, &config)
+func (b *Broker) GetKind() string {
+	return "Broker"
 }
 
-func WriteConfigFile(filePath string, config *Configuration) error {
-	out, err := yaml.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("marshal broker configuration: %w", err)
+func (b *Broker) GetName() string {
+	return b.Name
+}
+
+func (b *Broker) GetImage() string {
+	return b.image
+}
+
+func NewBroker(manifest, name string) (*Broker, error) {
+	// create config folder
+	if err := os.MkdirAll(path.Dir(manifest), os.ModePerm); err != nil {
+		return nil, fmt.Errorf("broker dir creation: %w", err)
 	}
-	return os.WriteFile(filePath, out, os.ModePerm)
+	// create empty manifest
+	if _, err := os.Stat(manifest); os.IsNotExist(err) {
+		if _, err := os.Create(manifest); err != nil {
+			return nil, fmt.Errorf("manifest file creation: %w", err)
+		}
+	} else if err != nil {
+		return nil, fmt.Errorf("manifest file access: %w", err)
+	}
+
+	configFile := path.Join(path.Dir(manifest), "broker.conf")
+	if _, err := os.Create(configFile); err != nil {
+		return nil, fmt.Errorf("config file: %w", err)
+	}
+
+	return &Broker{
+		ManifestFile: manifest,
+		ConfigFile:   configFile,
+		Name:         name,
+	}, nil
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package oas
+package openapi
 
 import (
 	"encoding/json"
@@ -57,10 +57,12 @@ func (s *Schema) Process(spec map[string]interface{}) (map[string]interface{}, e
 
 		// plain secret value only supported right now
 		if isSecret(schemaKey.Properties) {
-			v = map[string]interface{}{
-				"value": v,
+			if _, ok := v.(map[string]interface{}); !ok {
+				v = map[string]interface{}{
+					"value": v,
+				}
+				spec[k] = v
 			}
-			spec[k] = v
 		}
 
 		switch value := v.(type) {

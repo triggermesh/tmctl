@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package triggermesh
+package adapter
 
 import (
 	"fmt"
@@ -23,12 +23,9 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/spf13/viper"
 	"github.com/triggermesh/tmcli/pkg/docker"
-	"github.com/triggermesh/tmcli/pkg/kubernetes"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/env"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/function"
 )
 
 const (
@@ -37,24 +34,24 @@ const (
 	adapterPort = "8080/tcp"
 )
 
-func AdapterImage(object *kubernetes.Object, version string) (string, error) {
+func Image(object *unstructured.Unstructured, version string) (string, error) {
 	var image string
-	switch object.Kind {
+	switch object.GetKind() {
 	case "Broker":
 		image = brokerImage
-	case "Function":
-		fimage, err := function.ImageName(object)
-		if err != nil {
-			return "", fmt.Errorf("cannot parse function image: %w", err)
-		}
-		image = fmt.Sprintf("%s:%s", fimage, version)
+	// case "Function":
+	// 	fimage, err := function.ImageName(runtime)
+	// 	if err != nil {
+	// 		return "", fmt.Errorf("cannot parse function image: %w", err)
+	// 	}
+	// 	image = fmt.Sprintf("%s:%s", fimage, version)
 	default:
-		image = fmt.Sprintf("%s/%s-adapter:%s", registry, strings.ToLower(object.Kind), version)
+		image = fmt.Sprintf("%s/%s-adapter:%s", registry, strings.ToLower(object.GetKind()), version)
 	}
 	return image, nil
 }
 
-func AdapterParams(object *kubernetes.Object, image string) ([]docker.ContainerOption, []docker.HostOption, error) {
+func RuntimeParams(object *unstructured.Unstructured, image string) ([]docker.ContainerOption, []docker.HostOption, error) {
 	co := []docker.ContainerOption{
 		docker.WithImage(image),
 		docker.WithPort(adapterPort),
@@ -64,38 +61,36 @@ func AdapterParams(object *kubernetes.Object, image string) ([]docker.ContainerO
 		docker.WithExtraHost(),
 	}
 
-	switch object.Kind {
+	switch object.GetKind() {
 	case "Broker":
 		// get rid of viper here
-		configFile := path.Join("/Users/tzununbekov/.triggermesh/cli", object.Metadata.Name, "broker.conf")
+		configFile := path.Join("/Users/tzununbekov/.triggermesh/cli", object.GetName(), "broker.conf")
 		if err := writeFile(configFile, []byte{}); err != nil {
 			return nil, nil, fmt.Errorf("writing configuration: %w", err)
 		}
 		bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", configFile)
 		ho = append(ho, docker.WithVolumeBind(bind))
-	case "Function":
-		configFile := path.Join("/Users/tzununbekov/.triggermesh/cli", viper.GetString("context"), object.Metadata.Name)
-		if err := writeFile(configFile, []byte(function.Code(object))); err != nil {
-			return nil, nil, fmt.Errorf("writing function: %w", err)
-		}
-		bind := fmt.Sprintf("%s:/opt/source.%s", configFile, function.FileExtension(object))
-		ho = append(ho, docker.WithVolumeBind(bind))
-		co = append(co, docker.WithEntrypoint("/opt/aws-custom-runtime"))
-		// yikes
-		fallthrough
+	// case "Function":
+	// 	configFile := path.Join("/Users/tzununbekov/.triggermesh/cli", viper.GetString("context"), object.Metadata.Name)
+	// 	if err := writeFile(configFile, []byte(function.Code(object))); err != nil {
+	// 		return nil, nil, fmt.Errorf("writing function: %w", err)
+	// 	}
+	// 	bind := fmt.Sprintf("%s:/opt/source.%s", configFile, function.FileExtension(object))
+	// 	ho = append(ho, docker.WithVolumeBind(bind))
+	// 	co = append(co, docker.WithEntrypoint("/opt/aws-custom-runtime"))
+	// 	// yikes
+	// 	fallthrough
 	default:
-		kenv, err := env.Build(object)
+		kenv, err := buildEnv(object)
 		if err != nil {
 			return nil, nil, fmt.Errorf("adapter environment: %w", err)
 		}
-		sink, exists := object.Spec["sink"]
-		if exists {
-			if s, ok := sink.(map[string]interface{}); ok {
-				if sinkURI, set := s["uri"]; set {
-					kenv = append(kenv, corev1.EnvVar{Name: "K_SINK", Value: sinkURI.(string)})
-				}
-			}
-
+		sinkURI, set, err := unstructured.NestedString(object.Object, "spec", "sink", "uri")
+		if err != nil {
+			return nil, nil, fmt.Errorf("sink URI type: %w", err)
+		}
+		if set {
+			kenv = append(kenv, corev1.EnvVar{Name: "K_SINK", Value: sinkURI})
 		}
 		co = append(co, docker.WithEnv(envsToString(kenv)))
 	}
@@ -117,6 +112,3 @@ func envsToString(envs []corev1.EnvVar) []string {
 	}
 	return result
 }
-
-// functiondir := path.Join(configBase, context, "config",
-// brokerdir := path.Join(configBase, context, "config",
