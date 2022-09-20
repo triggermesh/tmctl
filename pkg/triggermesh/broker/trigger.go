@@ -115,7 +115,7 @@ func NewTrigger(name, broker, eventType, configDir string) *Trigger {
 	filters := []Filter{{
 		Exact: Exact{Type: eventType},
 	}}
-	if eventType != "" {
+	if eventType == "" {
 		filters = []Filter{}
 	}
 	return &Trigger{
