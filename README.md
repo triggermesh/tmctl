@@ -36,6 +36,12 @@ Create source:
 tmcli create source awssqs --arn <arn> --auth.credentials.accessKeyID=<access key> --auth.credentials.secretAccessKey=<secret key>
 ```
 
+Watch incoming events:
+
+```
+tmcli watch
+```
+
 Create trigger:
 
 ```
