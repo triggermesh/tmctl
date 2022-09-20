@@ -112,24 +112,28 @@ func (t *Trigger) GetSpec() TriggerSpec {
 }
 
 func NewTrigger(name, broker, eventType, configDir string) *Trigger {
+	filters := []Filter{{
+		Exact: Exact{Type: eventType},
+	}}
+	if eventType != "" {
+		filters = []Filter{}
+	}
 	return &Trigger{
 		Name:            name,
 		Broker:          broker,
 		BrokerConfigDir: configDir,
 		spec: TriggerSpec{
-			Name: name,
-			Filters: []Filter{
-				{Exact{Type: eventType}},
-			},
+			Name:    name,
+			Filters: filters,
 		},
 	}
 }
 
-func (t *Trigger) SetTarget(component, socket string) {
+func (t *Trigger) SetTarget(component, destination string) {
 	t.spec.Targets = []Target{
 		{
 			Component: component,
-			URL:       socket,
+			URL:       destination,
 		},
 	}
 }
@@ -156,6 +160,26 @@ func (t *Trigger) LookupTrigger() error {
 		}
 	}
 	return fmt.Errorf("trigger %q not found", t.Name)
+}
+
+func (t *Trigger) RemoveTriggerFromConfig() error {
+	configFile := path.Join(t.BrokerConfigDir, "broker.conf")
+	configuration, err := readBrokerConfig(configFile)
+	if err != nil {
+		return fmt.Errorf("broker config: %w", err)
+	}
+
+	for i, trigger := range configuration.Triggers {
+		if trigger.Name == t.Name {
+			if len(configuration.Triggers) > i+1 {
+				configuration.Triggers = append(configuration.Triggers[:i], configuration.Triggers[i+1:]...)
+			} else {
+				configuration.Triggers = configuration.Triggers[:i]
+			}
+			return writeBrokerConfig(configFile, &configuration)
+		}
+	}
+	return nil
 }
 
 func (t *Trigger) UpdateBrokerConfig() error {
