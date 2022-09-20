@@ -32,6 +32,7 @@ import (
 	dumpcmd "github.com/triggermesh/tmcli/cmd/dump"
 	startcmd "github.com/triggermesh/tmcli/cmd/start"
 	stopcmd "github.com/triggermesh/tmcli/cmd/stop"
+	watchcmd "github.com/triggermesh/tmcli/cmd/watch"
 )
 
 var (
@@ -81,6 +82,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.AddCommand(dumpcmd.NewCmd())
 	rootCmd.AddCommand(startcmd.NewCmd())
 	rootCmd.AddCommand(stopcmd.NewCmd())
+	rootCmd.AddCommand(watchcmd.NewCmd())
 
 	return rootCmd
 }
