@@ -42,7 +42,7 @@ type Metadata struct {
 }
 
 func CreateObject(resource, name, broker, crdFile string, spec map[string]interface{}) (*Object, error) {
-	crdObject, err := crd.GetResource(resource, crdFile)
+	crdObject, err := crd.GetResourceCRD(resource, crdFile)
 	if err != nil {
 		return nil, fmt.Errorf("CRD schema not found: %w", err)
 	}
@@ -70,7 +70,7 @@ func CreateObject(resource, name, broker, crdFile string, spec map[string]interf
 }
 
 func CreateUnstructured(resource, name, broker, crdFile string, spec map[string]interface{}) (*unstructured.Unstructured, error) {
-	crdObject, err := crd.GetResource(resource, crdFile)
+	crdObject, err := crd.GetResourceCRD(resource, crdFile)
 	if err != nil {
 		return nil, fmt.Errorf("CRD schema not found: %w", err)
 	}

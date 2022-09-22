@@ -17,6 +17,7 @@ limitations under the License.
 package source
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/pkg"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -79,7 +81,31 @@ func (s *Source) GetImage() string {
 	return s.image
 }
 
-func NewSource(crd string, kind, broker, version string, params interface{}) *Source {
+func (s *Source) GetEventTypes() ([]string, error) {
+	if ceOverrides, set := s.spec["ceOverrides"]; set {
+		// interface type is verified by CRD validation
+		if extensions, set := ceOverrides.(map[string]interface{})["extensions"]; set {
+			if typeOverride, exists := extensions.(map[string]string)["type"]; exists {
+				return []string{typeOverride}, nil
+			}
+		}
+	}
+	sourceCRD, err := crd.GetResourceCRD(s.Kind, s.CRDFile)
+	if err != nil {
+		return []string{}, fmt.Errorf("source CRD: %w", err)
+	}
+	var et crd.EventTypes
+	if err := json.Unmarshal([]byte(sourceCRD.Metadata.Annotations.EventTypes), &et); err != nil {
+		return []string{}, fmt.Errorf("event types: %w", err)
+	}
+	var result []string
+	for _, v := range et {
+		result = append(result, v.Type)
+	}
+	return result, nil
+}
+
+func New(crdFile string, kind, broker, version string, params interface{}) *Source {
 	var spec map[string]interface{}
 	switch p := params.(type) {
 	case []string:
@@ -88,7 +114,6 @@ func NewSource(crd string, kind, broker, version string, params interface{}) *So
 	case map[string]interface{}:
 		// spec map
 		spec = p
-	default:
 	}
 
 	// kind initially can be awss3, webhook, etc.
@@ -98,7 +123,7 @@ func NewSource(crd string, kind, broker, version string, params interface{}) *So
 	}
 	return &Source{
 		Name:    fmt.Sprintf("%s-%s", broker, k),
-		CRDFile: crd,
+		CRDFile: crdFile,
 		Broker:  broker,
 		Kind:    k,
 		Version: version,

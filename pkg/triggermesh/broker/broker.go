@@ -104,7 +104,7 @@ func (b *Broker) GetImage() string {
 	return b.image
 }
 
-func NewBroker(name, brokerConfigDir string) (*Broker, error) {
+func New(name, brokerConfigDir string) (*Broker, error) {
 	// create config folder
 	if err := os.MkdirAll(brokerConfigDir, os.ModePerm); err != nil {
 		return nil, fmt.Errorf("broker dir creation: %w", err)

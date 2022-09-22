@@ -17,44 +17,70 @@ limitations under the License.
 package create
 
 import (
+	"bufio"
 	"context"
 	"fmt"
-	"log"
+	"os"
 	"path"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/source"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/target"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/transformation"
 )
 
-func (o *CreateOptions) NewTargetCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:                "target <kind> <args>",
-		Short:              "TriggerMesh target",
+/*
+context:
+  - operation: store
+    paths:
+  - key: $time
+    value: time
+  - key: $id
+    value: id
+  - operation: add
+    paths:
+  - key: id
+    value: $person-$id
+  - key: type
+    value: io.triggermesh.transformation.pingsource
+
+data:
+  - operation: store
+    paths:
+  - key: $person
+    value: First Name
+  - operation: add
+    paths:
+  - key: event.ID
+    value: $id
+  - key: event.time
+    value: $time
+  - operation: shift
+    paths:
+  - key: Date of birth:birthday
+  - key: First Name:firstname
+  - key: Last Name:lastname
+  - operation: delete
+    paths:
+  - key: Mobile phone
+  - key: Children[1].Year of birth
+  - value: Martin
+*/
+func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
+	transformationCmd := &cobra.Command{
+		Use:                "transformation <args>",
+		Short:              "TriggerMesh transformation",
 		DisableFlagParsing: true,
 		SilenceErrors:      true,
 		SilenceUsage:       true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
-			if len(args) == 0 {
-				sources, err := crd.ListTargets(o.CRD)
-				if err != nil {
-					return fmt.Errorf("list sources: %w", err)
-				}
-				fmt.Printf("Available targets:\n---\n%s\n", strings.Join(sources, "\n"))
-				return nil
-			}
-			kind, args, err := parse(args)
-			if err != nil {
-				return err
-			}
 			sourceFilter, args := parameterFromArgs("source", args)
-			eventTypesFilter, args := parameterFromArgs("eventTypes", args)
+			eventTypesFilter, _ := parameterFromArgs("eventTypes", args)
 			if sourceFilter == "" && eventTypesFilter == "" {
 				return fmt.Errorf("\"--source=<kind>\" or \"--eventTypes=<a,b,c>\" is required")
 			}
@@ -62,49 +88,47 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 			if eventTypesFilter != "" {
 				eventFilter = strings.Split(eventTypesFilter, ",")
 			}
-			return o.target(kind, args, sourceFilter, eventFilter)
+			return o.transformation(sourceFilter, eventFilter)
 		},
 	}
+
+	return transformationCmd
+
 }
 
-func parameterFromArgs(parameter string, args []string) (string, []string) {
-	var value string
-	for k := 0; k < len(args); k++ {
-		if strings.HasPrefix(args[k], "--"+parameter) {
-			if kv := strings.Split(args[k], "="); len(kv) == 2 {
-				value = kv[1]
-			} else if len(args) > k+1 && !strings.HasPrefix(args[k+1], "--") {
-				value = args[k+1]
-				k++
-			}
-			args = append(args[:k-1], args[k+1:]...)
-			break
-		}
-	}
-	return value, args
-}
-
-func (o *CreateOptions) target(kind string, args []string, sourceKind string, eventTypes []string) error {
+func (o *CreateOptions) transformation(sourceKind string, eventTypes []string) error {
 	ctx := context.Background()
 	configDir := path.Join(o.ConfigBase, o.Context)
 
-	var s triggermesh.Component
 	if sourceKind != "" {
-		s = source.New(o.CRD, sourceKind, o.Context, o.Version, nil)
-		et, err := s.(*source.Source).GetEventTypes()
+		s := source.New(o.CRD, sourceKind, o.Context, o.Version, nil)
+		et, err := s.GetEventTypes()
 		if err != nil {
 			return fmt.Errorf("source event types: %w", err)
 		}
 		eventTypes = append(eventTypes, et...)
 	}
 
-	t := target.New(o.CRD, kind, o.Context, o.Version, args)
-	log.Println("Updating manifest")
+	fmt.Printf("Insert Bumblebee transformation below\nPress Enter key twice to finish:\n")
+	spec, err := readInput()
+	if err != nil {
+		return fmt.Errorf("input read: %w", err)
+	}
+	spec = strings.TrimRight(spec, "\n")
+	spec = strings.TrimLeft(spec, "\n")
+
+	var s map[string]interface{}
+	if err := yaml.Unmarshal([]byte(spec), &s); err != nil {
+		return fmt.Errorf("spec unmarshal: %w", err)
+	}
+
+	t := transformation.New(o.CRD, "transformation", o.Context, o.Version, s)
+
 	restart, err := triggermesh.Create(ctx, t, path.Join(configDir, manifestFile))
 	if err != nil {
 		return err
 	}
-	log.Println("Starting container")
+
 	container, err := triggermesh.Start(ctx, t, restart)
 	if err != nil {
 		return err
@@ -119,16 +143,18 @@ func (o *CreateOptions) target(kind string, args []string, sourceKind string, ev
 		return fmt.Errorf("broker manifest: %w", err)
 	}
 
-	sourceMsg := strings.Join(eventTypes, ", ")
-	if s != nil {
-		sourceMsg = fmt.Sprintf("%s(%s)", s.GetKind(), sourceMsg)
-	}
-	fmt.Println("---")
-	fmt.Printf("Target is subscribed to:\n\t%s\n", sourceMsg)
-	fmt.Println("\nNext steps:")
-	fmt.Println("\ttmcli watch\t - show events flowing through the broker in the real time")
-	fmt.Println("\ttmcli dump\t - dump Kubernetes manifest")
-	fmt.Println("---")
-
 	return nil
+}
+
+func readInput() (string, error) {
+	var lines string
+	scn := bufio.NewScanner(os.Stdin)
+	for scn.Scan() {
+		line := scn.Text()
+		if len(line) == 0 {
+			break
+		}
+		lines = fmt.Sprintf("%s\n%s", lines, line)
+	}
+	return lines, scn.Err()
 }

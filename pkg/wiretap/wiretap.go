@@ -79,8 +79,8 @@ func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
 	return c.Logs(ctx, client)
 }
 
-func (w *Wiretap) CreateTrigger() error {
-	trigger := tmbroker.NewTrigger("wiretap", w.Broker, "", w.ConfigDir)
+func (w *Wiretap) CreateTrigger(eventTypes []string) error {
+	trigger := tmbroker.NewTrigger("wiretap", w.Broker, w.ConfigDir, eventTypes)
 	trigger.SetTarget("wiretap", w.Destination)
 	return trigger.UpdateBrokerConfig()
 }
@@ -90,7 +90,7 @@ func (w *Wiretap) Cleanup(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
-	trigger := tmbroker.NewTrigger("wiretap", w.Broker, "", w.ConfigDir)
+	trigger := tmbroker.NewTrigger("wiretap", w.Broker, w.ConfigDir, []string{})
 	if err := trigger.RemoveTriggerFromConfig(); err != nil {
 		return fmt.Errorf("removing trigger: %v", err)
 	}

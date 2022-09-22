@@ -14,43 +14,41 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package target
+package transformation
 
 import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/adapter"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/pkg"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-var _ triggermesh.Component = (*Target)(nil)
+var _ triggermesh.Component = (*Transformation)(nil)
 
-type Target struct {
+type Transformation struct {
 	Name    string
 	CRDFile string
-
 	Broker  string
 	Version string
-	Kind    string
 
 	image string
 	spec  map[string]interface{}
 }
 
-func (t *Target) AsUnstructured() (*unstructured.Unstructured, error) {
+func (t *Transformation) AsUnstructured() (*unstructured.Unstructured, error) {
 	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
 }
 
-func (t *Target) AsK8sObject() (*kubernetes.Object, error) {
+func (t *Transformation) AsK8sObject() (*kubernetes.Object, error) {
 	return kubernetes.CreateObject(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
 }
 
-func (t *Target) AsContainer() (*docker.Container, error) {
+func (t *Transformation) AsContainer() (*docker.Container, error) {
 	o, err := t.AsUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -67,41 +65,33 @@ func (t *Target) AsContainer() (*docker.Container, error) {
 	}, nil
 }
 
-func (t *Target) GetName() string {
+func (t *Transformation) GetName() string {
 	return t.Name
 }
 
-func (t *Target) GetKind() string {
-	return t.Kind
+func (t *Transformation) GetKind() string {
+	return "transformation"
 }
 
-func (t *Target) GetImage() string {
+func (t *Transformation) GetImage() string {
 	return t.image
 }
 
-func New(crd string, kind, broker, version string, params interface{}) *Target {
-	var spec map[string]interface{}
-	switch p := params.(type) {
-	case []string:
-		// args slice
-		spec = pkg.ParseArgs(p)
-	case map[string]interface{}:
-		// spec map
-		spec = p
-	default:
-	}
-
-	// kind initially can be awss3, webhook, etc.
-	k := strings.ToLower(kind)
-	if !strings.Contains(k, "target") {
-		k = fmt.Sprintf("%starget", kind)
-	}
-	return &Target{
-		Name:    fmt.Sprintf("%s-%s", broker, k),
-		CRDFile: crd,
+func New(crdFile, kind, broker, version string, spec map[string]interface{}) *Transformation {
+	return &Transformation{
+		Name:    strings.ToLower(broker + "-transformation"),
+		CRDFile: crdFile,
 		Broker:  broker,
-		Kind:    k,
 		Version: version,
-		spec:    spec,
+
+		spec: spec,
 	}
 }
+
+// tmcli create broker foo
+// tmcli create source awss3
+// ?[ tmcli create transformation --source awss3 ]
+// tmcli create target --source awss3 [--eventType]
+// tmcli create transformation --source awss3
+
+// tmcli create trigger bar --eventType bar.message.sample

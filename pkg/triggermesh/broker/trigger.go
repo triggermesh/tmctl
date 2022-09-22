@@ -111,12 +111,10 @@ func (t *Trigger) GetSpec() TriggerSpec {
 	return t.spec
 }
 
-func NewTrigger(name, broker, eventType, configDir string) *Trigger {
-	filters := []Filter{{
-		Exact: Exact{Type: eventType},
-	}}
-	if eventType == "" {
-		filters = []Filter{}
+func NewTrigger(name, broker, configDir string, eventType []string) *Trigger {
+	var filters []Filter
+	for _, v := range eventType {
+		filters = append(filters, Filter{Exact{Type: v}})
 	}
 	return &Trigger{
 		Name:            name,
