@@ -23,7 +23,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/manifest"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
@@ -91,10 +90,6 @@ func (t *Trigger) AsK8sObject() (*kubernetes.Object, error) {
 	}, nil
 }
 
-func (t *Trigger) AsContainer() (*docker.Container, error) {
-	return nil, nil
-}
-
 func (t *Trigger) GetKind() string {
 	return "Trigger"
 }
@@ -103,12 +98,8 @@ func (t *Trigger) GetName() string {
 	return t.Name
 }
 
-func (t *Trigger) GetImage() string {
-	return ""
-}
-
-func (t *Trigger) GetSpec() TriggerSpec {
-	return t.spec
+func (t *Trigger) GetTargets() []Target {
+	return t.spec.Targets
 }
 
 func NewTrigger(name, broker, configDir string, eventType []string) *Trigger {

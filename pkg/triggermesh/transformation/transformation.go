@@ -17,8 +17,10 @@ limitations under the License.
 package transformation
 
 import (
+	"context"
 	"fmt"
-	"strings"
+
+	"github.com/docker/docker/client"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -28,7 +30,12 @@ import (
 	"github.com/triggermesh/tmcli/pkg/triggermesh/adapter"
 )
 
-var _ triggermesh.Component = (*Transformation)(nil)
+var (
+	_ triggermesh.Component = (*Transformation)(nil)
+	_ triggermesh.Consumer  = (*Transformation)(nil)
+	_ triggermesh.Producer  = (*Transformation)(nil)
+	_ triggermesh.Runnable  = (*Transformation)(nil)
+)
 
 type Transformation struct {
 	Name    string
@@ -77,9 +84,66 @@ func (t *Transformation) GetImage() string {
 	return t.image
 }
 
-func New(crdFile, kind, broker, version string, spec map[string]interface{}) *Transformation {
+func (t *Transformation) GetEventTypes() ([]string, error) {
+	return t.getEventTypeTransformation()
+}
+
+func (t *Transformation) ConsumedEventTypes() ([]string, error) {
+	return []string{}, nil
+}
+
+// SetEventType sets "type" context attribute transformation.
+func (t *Transformation) SetEventType(eventType string) error {
+	operation := map[string]interface{}{
+		"operation": "add",
+		"paths": []interface{}{
+			map[string]interface{}{
+				"key":   "type",
+				"value": eventType,
+			},
+		},
+	}
+	u, err := t.AsUnstructured()
+	if err != nil {
+		return err
+	}
+	contextTrn, exists, err := unstructured.NestedSlice(u.Object, "spec", "context")
+	if err != nil {
+		return err
+	}
+	if !exists {
+		if err := unstructured.SetNestedSlice(u.Object, []interface{}{
+			operation,
+		}, "spec", "context"); err != nil {
+			return err
+		}
+	} else {
+		contextTrn = append(contextTrn, operation)
+		if err := unstructured.SetNestedSlice(u.Object, contextTrn, "spec", "context"); err != nil {
+			return err
+		}
+	}
+	t.spec = u.Object["spec"].(map[string]interface{})
+	return nil
+}
+
+func (t *Transformation) GetPort(ctx context.Context, client *client.Client) (string, error) {
+	container, err := t.AsContainer()
+	if err != nil {
+		return "", fmt.Errorf("container object: %w", err)
+	}
+	if container, err = container.LookupHostConfig(ctx, client); err != nil {
+		return "", fmt.Errorf("container config: %w", err)
+	}
+	return container.HostPort(), nil
+}
+
+func New(name, crdFile, kind, broker, version string, spec map[string]interface{}) *Transformation {
+	if name == "" {
+		name = fmt.Sprintf("%s-transformation", broker)
+	}
 	return &Transformation{
-		Name:    strings.ToLower(broker + "-transformation"),
+		Name:    name,
 		CRDFile: crdFile,
 		Broker:  broker,
 		Version: version,
@@ -88,10 +152,34 @@ func New(crdFile, kind, broker, version string, spec map[string]interface{}) *Tr
 	}
 }
 
-// tmcli create broker foo
-// tmcli create source awss3
-// ?[ tmcli create transformation --source awss3 ]
-// tmcli create target --source awss3 [--eventType]
-// tmcli create transformation --source awss3
-
-// tmcli create trigger bar --eventType bar.message.sample
+// getEventTypeTransformation return the value of "Add" transformation
+// applied on context's "type" attribute. Does not support complex tramsformations.
+func (t *Transformation) getEventTypeTransformation() ([]string, error) {
+	u, err := t.AsUnstructured()
+	if err != nil {
+		return []string{}, err
+	}
+	contextTrn, exists, err := unstructured.NestedSlice(u.Object, "spec", "context")
+	if err != nil {
+		return []string{}, err
+	}
+	if !exists {
+		return []string{}, nil
+	}
+	for _, op := range contextTrn {
+		if opp, ok := op.(map[string]interface{}); ok {
+			if opp["operation"] == "add" {
+				if p, ok := opp["paths"].([]interface{}); ok {
+					for _, pp := range p {
+						if pm, ok := pp.(map[string]interface{}); ok {
+							if pm["key"] == "type" {
+								return []string{pm["value"].(string)}, nil
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return []string{}, nil
+}

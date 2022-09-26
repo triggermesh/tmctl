@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 )
@@ -53,14 +54,13 @@ func (o *CreateOptions) broker(name string) error {
 	}
 
 	log.Println("Updating manifest")
-	restart, err := triggermesh.Create(ctx, broker, path.Join(configDir, manifestFile))
+	restart, err := triggermesh.WriteObject(ctx, broker, path.Join(configDir, manifestFile))
 	if err != nil {
 		return err
 	}
 
 	log.Println("Starting container")
-	container, err := triggermesh.Start(ctx, broker, restart)
-	if err != nil {
+	if _, err := triggermesh.Start(ctx, broker, restart); err != nil {
 		return err
 	}
 
@@ -68,13 +68,7 @@ func (o *CreateOptions) broker(name string) error {
 	if err := viper.WriteConfig(); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
-	fmt.Println("---")
-	fmt.Printf("Broker is serving events at http://0.0.0.0:%s\n", container.HostPort())
-	fmt.Printf("Current context is set to %q\n", name)
-	fmt.Println("To change the context run \"tmcli config set context <context name>\"")
-	fmt.Println("\nNext steps:")
-	fmt.Println("\ttmcli create source\t - create source that will produce events")
-	fmt.Println("---")
 
+	fmt.Println(output.ComponentStatus("broker", broker, "", []string{}))
 	return nil
 }

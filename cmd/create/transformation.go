@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"strings"
@@ -27,51 +28,14 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
+	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/source"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/transformation"
 )
 
-/*
-context:
-  - operation: store
-    paths:
-  - key: $time
-    value: time
-  - key: $id
-    value: id
-  - operation: add
-    paths:
-  - key: id
-    value: $person-$id
-  - key: type
-    value: io.triggermesh.transformation.pingsource
-
-data:
-  - operation: store
-    paths:
-  - key: $person
-    value: First Name
-  - operation: add
-    paths:
-  - key: event.ID
-    value: $id
-  - key: event.time
-    value: $time
-  - operation: shift
-    paths:
-  - key: Date of birth:birthday
-  - key: First Name:firstname
-  - key: Last Name:lastname
-  - operation: delete
-    paths:
-  - key: Mobile phone
-  - key: Children[1].Year of birth
-  - value: Martin
-*/
 func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
-	transformationCmd := &cobra.Command{
+	return &cobra.Command{
 		Use:                "transformation <args>",
 		Short:              "TriggerMesh transformation",
 		DisableFlagParsing: true,
@@ -79,62 +43,76 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 		SilenceUsage:       true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
-			sourceFilter, args := parameterFromArgs("source", args)
+			name, args := parameterFromArgs("name", args)
+			eventSourceFilter, args := parameterFromArgs("source", args)
 			eventTypesFilter, _ := parameterFromArgs("eventTypes", args)
-			if sourceFilter == "" && eventTypesFilter == "" {
+			if eventSourceFilter == "" && eventTypesFilter == "" {
 				return fmt.Errorf("\"--source=<kind>\" or \"--eventTypes=<a,b,c>\" is required")
 			}
 			var eventFilter []string
 			if eventTypesFilter != "" {
 				eventFilter = strings.Split(eventTypesFilter, ",")
 			}
-			return o.transformation(sourceFilter, eventFilter)
+			return o.transformation(name, eventSourceFilter, eventFilter)
 		},
 	}
-
-	return transformationCmd
-
 }
 
-func (o *CreateOptions) transformation(sourceKind string, eventTypes []string) error {
+func (o *CreateOptions) transformation(name, eventSourceFilter string, eventTypesFilter []string) error {
 	ctx := context.Background()
 	configDir := path.Join(o.ConfigBase, o.Context)
+	manifest := path.Join(configDir, manifestFile)
 
-	if sourceKind != "" {
-		s := source.New(o.CRD, sourceKind, o.Context, o.Version, nil)
-		et, err := s.GetEventTypes()
+	if eventSourceFilter != "" {
+		c, err := o.getObject(eventSourceFilter, manifest)
 		if err != nil {
-			return fmt.Errorf("source event types: %w", err)
+			return fmt.Errorf("%q does not exist", eventSourceFilter)
 		}
-		eventTypes = append(eventTypes, et...)
+		producer, ok := c.(triggermesh.Producer)
+		if !ok {
+			return fmt.Errorf("%q is not an event producer", eventSourceFilter)
+		}
+		et, err := producer.GetEventTypes()
+		if err != nil {
+			return fmt.Errorf("%q event types: %w", eventSourceFilter, err)
+		}
+		if len(et) == 0 {
+			return fmt.Errorf("%q does not expose its event types", eventSourceFilter)
+		}
+		eventTypesFilter = append(eventTypesFilter, et...)
 	}
 
 	fmt.Printf("Insert Bumblebee transformation below\nPress Enter key twice to finish:\n")
-	spec, err := readInput()
+	input, err := readInput()
 	if err != nil {
 		return fmt.Errorf("input read: %w", err)
 	}
-	spec = strings.TrimRight(spec, "\n")
-	spec = strings.TrimLeft(spec, "\n")
+	input = strings.TrimRight(input, "\n")
+	input = strings.TrimLeft(input, "\n")
 
-	var s map[string]interface{}
-	if err := yaml.Unmarshal([]byte(spec), &s); err != nil {
+	var spec map[string]interface{}
+	if err := yaml.Unmarshal([]byte(input), &spec); err != nil {
 		return fmt.Errorf("spec unmarshal: %w", err)
 	}
 
-	t := transformation.New(o.CRD, "transformation", o.Context, o.Version, s)
-
-	restart, err := triggermesh.Create(ctx, t, path.Join(configDir, manifestFile))
+	t := transformation.New(name, o.CRD, "transformation", o.Context, o.Version, spec)
+	if et, _ := t.GetEventTypes(); len(et) == 0 {
+		if err := t.SetEventType(eventSourceFilter + "-transformed-event"); err != nil {
+			return fmt.Errorf("setting event type: %w", err)
+		}
+	}
+	log.Println("Updating manifest")
+	restart, err := triggermesh.WriteObject(ctx, t, manifest)
 	if err != nil {
 		return err
 	}
-
+	log.Println("Starting container")
 	container, err := triggermesh.Start(ctx, t, restart)
 	if err != nil {
 		return err
 	}
 
-	tr := tmbroker.NewTrigger(fmt.Sprintf("%s-trigger", t.GetName()), o.Context, configDir, eventTypes)
+	tr := tmbroker.NewTrigger(fmt.Sprintf("%s-trigger", t.GetName()), o.Context, configDir, eventTypesFilter)
 	tr.SetTarget(container.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
 	if err := tr.UpdateBrokerConfig(); err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -142,7 +120,7 @@ func (o *CreateOptions) transformation(sourceKind string, eventTypes []string) e
 	if err := tr.UpdateManifest(); err != nil {
 		return fmt.Errorf("broker manifest: %w", err)
 	}
-
+	fmt.Println(output.ComponentStatus("consumer", t, eventSourceFilter, eventTypesFilter))
 	return nil
 }
 

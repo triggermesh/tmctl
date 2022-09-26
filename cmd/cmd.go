@@ -110,7 +110,6 @@ func initConfig() error {
 				return err
 			}
 			viper.SetDefault("context", "default")
-			viper.SetDefault("storage", "inmemory")
 			viper.SetDefault("triggermesh.crd", "https://github.com/triggermesh/triggermesh/releases/download/${VERSION}/triggermesh-crds.yaml")
 			viper.SetDefault("triggermesh.version", "latest")
 			return viper.SafeWriteConfig()

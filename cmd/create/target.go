@@ -25,10 +25,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/source"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/target"
 )
 
@@ -53,54 +53,48 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			sourceFilter, args := parameterFromArgs("source", args)
+			name, args := parameterFromArgs("name", args)
+			eventSourceFilter, args := parameterFromArgs("source", args)
 			eventTypesFilter, args := parameterFromArgs("eventTypes", args)
-			if sourceFilter == "" && eventTypesFilter == "" {
+			if eventSourceFilter == "" && eventTypesFilter == "" {
 				return fmt.Errorf("\"--source=<kind>\" or \"--eventTypes=<a,b,c>\" is required")
 			}
 			var eventFilter []string
 			if eventTypesFilter != "" {
 				eventFilter = strings.Split(eventTypesFilter, ",")
 			}
-			return o.target(kind, args, sourceFilter, eventFilter)
+			return o.target(name, kind, args, eventSourceFilter, eventFilter)
 		},
 	}
 }
 
-func parameterFromArgs(parameter string, args []string) (string, []string) {
-	var value string
-	for k := 0; k < len(args); k++ {
-		if strings.HasPrefix(args[k], "--"+parameter) {
-			if kv := strings.Split(args[k], "="); len(kv) == 2 {
-				value = kv[1]
-			} else if len(args) > k+1 && !strings.HasPrefix(args[k+1], "--") {
-				value = args[k+1]
-				k++
-			}
-			args = append(args[:k-1], args[k+1:]...)
-			break
-		}
-	}
-	return value, args
-}
-
-func (o *CreateOptions) target(kind string, args []string, sourceKind string, eventTypes []string) error {
+func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilter string, eventTypesFilter []string) error {
 	ctx := context.Background()
 	configDir := path.Join(o.ConfigBase, o.Context)
+	manifest := path.Join(configDir, manifestFile)
 
-	var s triggermesh.Component
-	if sourceKind != "" {
-		s = source.New(o.CRD, sourceKind, o.Context, o.Version, nil)
-		et, err := s.(*source.Source).GetEventTypes()
+	if eventSourceFilter != "" {
+		c, err := o.getObject(eventSourceFilter, manifest)
 		if err != nil {
-			return fmt.Errorf("source event types: %w", err)
+			return fmt.Errorf("%q does not exist", eventSourceFilter)
 		}
-		eventTypes = append(eventTypes, et...)
+		producer, ok := c.(triggermesh.Producer)
+		if !ok {
+			return fmt.Errorf("%q is not an event producer", eventSourceFilter)
+		}
+		et, err := producer.GetEventTypes()
+		if err != nil {
+			return fmt.Errorf("%q event types: %w", eventSourceFilter, err)
+		}
+		if len(et) == 0 {
+			return fmt.Errorf("%q does not expose its event types", eventSourceFilter)
+		}
+		eventTypesFilter = append(eventTypesFilter, et...)
 	}
 
-	t := target.New(o.CRD, kind, o.Context, o.Version, args)
+	t := target.New(name, o.CRD, kind, o.Context, o.Version, args)
 	log.Println("Updating manifest")
-	restart, err := triggermesh.Create(ctx, t, path.Join(configDir, manifestFile))
+	restart, err := triggermesh.WriteObject(ctx, t, manifest)
 	if err != nil {
 		return err
 	}
@@ -110,7 +104,7 @@ func (o *CreateOptions) target(kind string, args []string, sourceKind string, ev
 		return err
 	}
 
-	tr := tmbroker.NewTrigger(fmt.Sprintf("%s-trigger", t.GetName()), o.Context, configDir, eventTypes)
+	tr := tmbroker.NewTrigger(fmt.Sprintf("%s-trigger", t.GetName()), o.Context, configDir, eventTypesFilter)
 	tr.SetTarget(container.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
 	if err := tr.UpdateBrokerConfig(); err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -118,17 +112,6 @@ func (o *CreateOptions) target(kind string, args []string, sourceKind string, ev
 	if err := tr.UpdateManifest(); err != nil {
 		return fmt.Errorf("broker manifest: %w", err)
 	}
-
-	sourceMsg := strings.Join(eventTypes, ", ")
-	if s != nil {
-		sourceMsg = fmt.Sprintf("%s(%s)", s.GetKind(), sourceMsg)
-	}
-	fmt.Println("---")
-	fmt.Printf("Target is subscribed to:\n\t%s\n", sourceMsg)
-	fmt.Println("\nNext steps:")
-	fmt.Println("\ttmcli watch\t - show events flowing through the broker in the real time")
-	fmt.Println("\ttmcli dump\t - dump Kubernetes manifest")
-	fmt.Println("---")
-
+	fmt.Println(output.ComponentStatus("consumer", t, eventSourceFilter, eventTypesFilter))
 	return nil
 }

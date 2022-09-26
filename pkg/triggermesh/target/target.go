@@ -17,18 +17,25 @@ limitations under the License.
 package target
 
 import (
+	"context"
 	"fmt"
 	"strings"
+
+	"github.com/docker/docker/client"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/adapter"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/pkg"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-var _ triggermesh.Component = (*Target)(nil)
+var (
+	_ triggermesh.Component = (*Target)(nil)
+	_ triggermesh.Consumer  = (*Target)(nil)
+	_ triggermesh.Runnable  = (*Target)(nil)
+)
 
 type Target struct {
 	Name    string
@@ -79,7 +86,22 @@ func (t *Target) GetImage() string {
 	return t.image
 }
 
-func New(crd string, kind, broker, version string, params interface{}) *Target {
+func (t *Target) GetPort(ctx context.Context, client *client.Client) (string, error) {
+	container, err := t.AsContainer()
+	if err != nil {
+		return "", fmt.Errorf("container object: %w", err)
+	}
+	if container, err = container.LookupHostConfig(ctx, client); err != nil {
+		return "", fmt.Errorf("container config: %w", err)
+	}
+	return container.HostPort(), nil
+}
+
+func (t *Target) ConsumedEventTypes() ([]string, error) {
+	return []string{}, nil
+}
+
+func New(name, crdFile, kind, broker, version string, params interface{}) *Target {
 	var spec map[string]interface{}
 	switch p := params.(type) {
 	case []string:
@@ -96,9 +118,14 @@ func New(crd string, kind, broker, version string, params interface{}) *Target {
 	if !strings.Contains(k, "target") {
 		k = fmt.Sprintf("%starget", kind)
 	}
+
+	if name == "" {
+		name = fmt.Sprintf("%s-%s", broker, k)
+	}
+
 	return &Target{
-		Name:    fmt.Sprintf("%s-%s", broker, k),
-		CRDFile: crd,
+		Name:    name,
+		CRDFile: crdFile,
 		Broker:  broker,
 		Kind:    k,
 		Version: version,

@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/triggermesh/tmcli/pkg/docker"
+	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
@@ -53,12 +54,13 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return o.source(kind, args)
+			name, args := parameterFromArgs("name", args)
+			return o.source(name, kind, args)
 		},
 	}
 }
 
-func (o *CreateOptions) source(kind string, args []string) error {
+func (o *CreateOptions) source(name, kind string, args []string) error {
 	ctx := context.Background()
 	configDir := path.Join(o.ConfigBase, o.Context)
 
@@ -70,20 +72,17 @@ func (o *CreateOptions) source(kind string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}
-	brontainer, err := broker.AsContainer()
+	port, err := broker.GetPort(ctx, client)
 	if err != nil {
-		return fmt.Errorf("broker container: %v", err)
-	}
-	brontainer, err = brontainer.LookupHostConfig(ctx, client)
-	if err != nil {
-		return fmt.Errorf("broker config: %v", err)
+		return fmt.Errorf("broker port: %v", err)
 	}
 
-	s := source.New(o.CRD, kind, o.Context, o.Version,
-		append(args, fmt.Sprintf("--sink.uri=http://host.docker.internal:%s", brontainer.HostPort())))
+	spec := append(args, fmt.Sprintf("--sink.uri=http://host.docker.internal:%s", port))
+
+	s := source.New(name, o.CRD, kind, o.Context, o.Version, spec)
 
 	log.Println("Updating manifest")
-	restart, err := triggermesh.Create(ctx, s, path.Join(configDir, manifestFile))
+	restart, err := triggermesh.WriteObject(ctx, s, path.Join(configDir, manifestFile))
 	if err != nil {
 		return err
 	}
@@ -91,21 +90,6 @@ func (o *CreateOptions) source(kind string, args []string) error {
 	if _, err := triggermesh.Start(ctx, s, restart); err != nil {
 		return err
 	}
-
-	eventTypesMessage := "This event source does not announce its event types"
-	eventTypes, err := s.GetEventTypes()
-	if err != nil {
-		return err
-	}
-	if len(eventTypes) != 0 {
-		eventTypesMessage = fmt.Sprintf("Event types produced by this source:\n\t%s", strings.Join(eventTypes, ", "))
-	}
-	fmt.Println("---")
-	fmt.Println(eventTypesMessage)
-	fmt.Println("\nNext steps:")
-	fmt.Printf("\ttmcli create target <kind> --source %s [--eventTypes <types>]\t - create target that will consume events from this source\n", kind)
-	fmt.Println("\ttmcli watch\t\t\t\t\t\t\t\t - show events flowing through the broker in the real time")
-	fmt.Println("---")
-
+	fmt.Println(output.ComponentStatus("producer", s, "", []string{}))
 	return nil
 }

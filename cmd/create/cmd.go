@@ -18,9 +18,16 @@ package create
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/triggermesh/tmcli/pkg/manifest"
+	"github.com/triggermesh/tmcli/pkg/triggermesh"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/source"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/target"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/transformation"
 )
 
 const manifestFile = "manifest.yaml"
@@ -68,4 +75,41 @@ func parse(args []string) (string, []string, error) {
 		return "", []string{}, fmt.Errorf("expected at least 1 arguments, got %d", l)
 	}
 	return args[0], args[1:], nil
+}
+
+func (o *CreateOptions) getObject(name, manifestPath string) (triggermesh.Component, error) {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
+		return nil, fmt.Errorf("reading manifest: %w", err)
+	}
+	for _, object := range manifest.Objects {
+		if object.Metadata.Name == name {
+			switch object.APIVersion {
+			case "sources.triggermesh.io/v1alpha1":
+				return source.New(object.Metadata.Name, o.CRD, object.Kind, "", o.Version, object.Spec), nil
+			case "targets.triggermesh.io/v1alpha1":
+				return target.New(object.Metadata.Name, o.CRD, object.Kind, "", o.Version, object.Spec), nil
+			case "flow.triggermesh.io/v1alpha1":
+				return transformation.New(object.Metadata.Name, o.CRD, object.Kind, "", o.Version, object.Spec), nil
+			}
+		}
+	}
+	return nil, nil
+}
+
+func parameterFromArgs(parameter string, args []string) (string, []string) {
+	var value string
+	for k := 0; k < len(args); k++ {
+		if strings.HasPrefix(args[k], "--"+parameter) {
+			if kv := strings.Split(args[k], "="); len(kv) == 2 {
+				value = kv[1]
+			} else if len(args) > k+1 && !strings.HasPrefix(args[k+1], "--") {
+				value = args[k+1]
+				k++
+			}
+			args = append(args[:k-1], args[k+1:]...)
+			break
+		}
+	}
+	return value, args
 }

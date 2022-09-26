@@ -97,10 +97,10 @@ func (o *StartOptions) start(broker string) error {
 			if err := trigger.LookupTrigger(); err != nil {
 				return fmt.Errorf("trigger configuration: %v", err)
 			}
-			for _, target := range trigger.GetSpec().Targets {
+			for _, target := range trigger.GetTargets() {
 				componentTriggers[target.Component] = trigger
 			}
-			if _, err := triggermesh.Create(ctx, trigger, manifestFile); err != nil {
+			if _, err := triggermesh.WriteObject(ctx, trigger, manifestFile); err != nil {
 				return fmt.Errorf("creating trigger: %v", err)
 			}
 		}
@@ -114,8 +114,8 @@ func (o *StartOptions) start(broker string) error {
 		switch {
 		case strings.HasSuffix(object.Kind, "Source"):
 			manifest.Objects[i].Spec["sink"] = map[string]interface{}{"uri": fmt.Sprintf("http://host.docker.internal:%s", brokerPort)}
-			c := source.New(o.CRD, object.Kind, broker, o.Version, object.Spec)
-			if _, err := triggermesh.Create(ctx, c, manifestFile); err != nil {
+			c := source.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
+			if _, err := triggermesh.WriteObject(ctx, c, manifestFile); err != nil {
 				return fmt.Errorf("creating object: %w", err)
 			}
 			if _, err := triggermesh.Start(ctx, c, true); err != nil {
@@ -126,15 +126,15 @@ func (o *StartOptions) start(broker string) error {
 
 			var c triggermesh.Component
 			if object.Kind == "Transformation" {
-				c = transformation.New(o.CRD, object.Kind, broker, o.Version, object.Spec)
+				c = transformation.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
 			} else {
-				c = target.New(o.CRD, object.Kind, broker, o.Version, object.Spec)
+				c = target.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
 			}
 
-			if _, err := triggermesh.Create(ctx, c, manifestFile); err != nil {
+			if _, err := triggermesh.WriteObject(ctx, c, manifestFile); err != nil {
 				return fmt.Errorf("creating object: %w", err)
 			}
-			container, err := triggermesh.Start(ctx, c, true)
+			container, err := triggermesh.Start(ctx, c.(triggermesh.Runnable), true)
 			if err != nil {
 				return fmt.Errorf("starting container: %w", err)
 			}

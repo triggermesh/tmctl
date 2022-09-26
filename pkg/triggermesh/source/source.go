@@ -30,7 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-var _ triggermesh.Component = (*Source)(nil)
+var (
+	_ triggermesh.Component = (*Source)(nil)
+	_ triggermesh.Producer  = (*Source)(nil)
+	_ triggermesh.Runnable  = (*Source)(nil)
+)
 
 type Source struct {
 	Name    string
@@ -105,7 +109,11 @@ func (s *Source) GetEventTypes() ([]string, error) {
 	return result, nil
 }
 
-func New(crdFile string, kind, broker, version string, params interface{}) *Source {
+func (s *Source) SetEventType(string) error {
+	return fmt.Errorf("event source does not support context attributes override")
+}
+
+func New(name, crdFile, kind, broker, version string, params interface{}) *Source {
 	var spec map[string]interface{}
 	switch p := params.(type) {
 	case []string:
@@ -121,8 +129,13 @@ func New(crdFile string, kind, broker, version string, params interface{}) *Sour
 	if !strings.Contains(k, "source") {
 		k = fmt.Sprintf("%ssource", kind)
 	}
+
+	if name == "" {
+		name = fmt.Sprintf("%s-%s", broker, k)
+	}
+
 	return &Source{
-		Name:    fmt.Sprintf("%s-%s", broker, k),
+		Name:    name,
 		CRDFile: crdFile,
 		Broker:  broker,
 		Kind:    k,

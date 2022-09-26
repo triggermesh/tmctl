@@ -17,12 +17,13 @@ limitations under the License.
 package broker
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
 	"strings"
 
-	"github.com/spf13/viper"
+	"github.com/docker/docker/client"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/triggermesh/tmcli/pkg/docker"
@@ -31,7 +32,11 @@ import (
 	"github.com/triggermesh/tmcli/pkg/triggermesh/adapter"
 )
 
-var _ triggermesh.Component = (*Broker)(nil)
+var (
+	_ triggermesh.Component = (*Broker)(nil)
+	_ triggermesh.Runnable  = (*Broker)(nil)
+	_ triggermesh.Consumer  = (*Broker)(nil)
+)
 
 const (
 	manifestFile     = "manifest.yaml"
@@ -71,7 +76,7 @@ func (b *Broker) AsK8sObject() (*kubernetes.Object, error) {
 			// "triggermesh.io/context": b.Name,
 			// },
 		},
-		Spec: map[string]interface{}{"storage": viper.GetString("storage")},
+		Spec: map[string]interface{}{"storage": "inmemory"},
 	}, nil
 }
 
@@ -85,8 +90,12 @@ func (b *Broker) AsContainer() (*docker.Container, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
+	name := o.GetName()
+	if !strings.HasSuffix(name, "-broker") {
+		name = name + "-broker"
+	}
 	return &docker.Container{
-		Name:                   o.GetName(),
+		Name:                   name,
 		CreateHostOptions:      ho,
 		CreateContainerOptions: co,
 	}, nil
@@ -102,6 +111,21 @@ func (b *Broker) GetName() string {
 
 func (b *Broker) GetImage() string {
 	return b.image
+}
+
+func (b *Broker) GetPort(ctx context.Context, client *client.Client) (string, error) {
+	container, err := b.AsContainer()
+	if err != nil {
+		return "", fmt.Errorf("container object: %w", err)
+	}
+	if container, err = container.LookupHostConfig(ctx, client); err != nil {
+		return "", fmt.Errorf("container runtime config: %w", err)
+	}
+	return container.HostPort(), nil
+}
+
+func (b *Broker) ConsumedEventTypes() ([]string, error) {
+	return []string{}, nil
 }
 
 func New(name, brokerConfigDir string) (*Broker, error) {
@@ -126,9 +150,6 @@ func New(name, brokerConfigDir string) (*Broker, error) {
 		}
 	}
 
-	if !strings.HasSuffix(name, "-broker") {
-		name = name + "-broker"
-	}
 	return &Broker{
 		ConfigFile: config,
 		Name:       name,
