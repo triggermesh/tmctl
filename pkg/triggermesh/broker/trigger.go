@@ -22,11 +22,12 @@ import (
 	"path"
 
 	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	eventingv1 "knative.dev/eventing/pkg/apis/eventing/v1"
 
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/manifest"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var _ triggermesh.Component = (*Trigger)(nil)
@@ -42,25 +43,18 @@ type Trigger struct {
 
 type TriggerSpec struct {
 	Name    string
-	Filters []Filter `yaml:"filters,omitempty"`
-	Targets []Target `yaml:"targets"`
-}
-
-type Filter struct {
-	Exact Exact `yaml:"exact"`
-}
-
-type Exact struct {
-	Type string `yaml:"type"`
+	Filters []eventingv1.SubscriptionsAPIFilter `yaml:"filters,omitempty"`
+	Targets []Target                            `yaml:"targets"`
 }
 
 type Target struct {
 	URL             string `yaml:"url"`
 	Component       string `yaml:"component,omitempty"` // for local version only
 	DeliveryOptions struct {
-		Retries       int    `yaml:"retries,omitempty"`
-		BackoffDelay  string `yaml:"backoffDelay,omitempty"`
-		BackoffPolicy string `yaml:"backoffPolicy,omitempty"`
+		Retry         int32   `yaml:"retry,omitempty"`
+		BackoffDelay  string  `yaml:"backoffDelay,omitempty"`
+		BackoffPolicy string  `yaml:"backoffPolicy,omitempty"`
+		DeadLetterURL *string `json:"deadLetterURL,omitempty"`
 	} `yaml:"deliveryOptions,omitempty"`
 }
 
@@ -103,9 +97,11 @@ func (t *Trigger) GetTargets() []Target {
 }
 
 func NewTrigger(name, broker, configDir string, eventType []string) *Trigger {
-	var filters []Filter
+	var filters []eventingv1.SubscriptionsAPIFilter
 	for _, v := range eventType {
-		filters = append(filters, Filter{Exact{Type: v}})
+		filters = append(filters, eventingv1.SubscriptionsAPIFilter{
+			Exact: map[string]string{"type": v},
+		})
 	}
 	return &Trigger{
 		Name:            name,
@@ -128,9 +124,9 @@ func (t *Trigger) SetTarget(component, destination string) {
 }
 
 func (t *Trigger) SetFilter(eventType string) {
-	t.spec.Filters = []Filter{
+	t.spec.Filters = []eventingv1.SubscriptionsAPIFilter{
 		{
-			Exact: Exact{eventType},
+			Exact: map[string]string{"type": eventType},
 		},
 	}
 }
