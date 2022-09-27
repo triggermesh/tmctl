@@ -23,7 +23,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/manifest"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
@@ -91,10 +90,6 @@ func (t *Trigger) AsK8sObject() (*kubernetes.Object, error) {
 	}, nil
 }
 
-func (t *Trigger) AsContainer() (*docker.Container, error) {
-	return nil, nil
-}
-
 func (t *Trigger) GetKind() string {
 	return "Trigger"
 }
@@ -103,20 +98,14 @@ func (t *Trigger) GetName() string {
 	return t.Name
 }
 
-func (t *Trigger) GetImage() string {
-	return ""
+func (t *Trigger) GetTargets() []Target {
+	return t.spec.Targets
 }
 
-func (t *Trigger) GetSpec() TriggerSpec {
-	return t.spec
-}
-
-func NewTrigger(name, broker, eventType, configDir string) *Trigger {
-	filters := []Filter{{
-		Exact: Exact{Type: eventType},
-	}}
-	if eventType == "" {
-		filters = []Filter{}
+func NewTrigger(name, broker, configDir string, eventType []string) *Trigger {
+	var filters []Filter
+	for _, v := range eventType {
+		filters = append(filters, Filter{Exact{Type: v}})
 	}
 	return &Trigger{
 		Name:            name,

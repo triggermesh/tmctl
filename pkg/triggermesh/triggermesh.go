@@ -24,7 +24,7 @@ import (
 	"github.com/triggermesh/tmcli/pkg/manifest"
 )
 
-func Create(ctx context.Context, object Component, manifestFile string) (bool, error) {
+func WriteObject(ctx context.Context, object Component, manifestFile string) (bool, error) {
 	manifest := manifest.New(manifestFile)
 	if err := manifest.Read(); err != nil {
 		return false, fmt.Errorf("reading manifest: %w", err)
@@ -46,7 +46,7 @@ func Create(ctx context.Context, object Component, manifestFile string) (bool, e
 	return false, nil
 }
 
-func Start(ctx context.Context, object Component, restart bool) (*docker.Container, error) {
+func Start(ctx context.Context, object Runnable, restart bool) (*docker.Container, error) {
 	client, err := docker.NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("creating docker client: %w", err)
@@ -78,7 +78,7 @@ func Start(ctx context.Context, object Component, restart bool) (*docker.Contain
 	return container, nil
 }
 
-func Stop(ctx context.Context, object Component) error {
+func Stop(ctx context.Context, object Runnable) error {
 	client, err := docker.NewClient()
 	if err != nil {
 		return fmt.Errorf("creating docker client: %w", err)

@@ -17,6 +17,7 @@ limitations under the License.
 package source
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -24,11 +25,16 @@ import (
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/pkg"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-var _ triggermesh.Component = (*Source)(nil)
+var (
+	_ triggermesh.Component = (*Source)(nil)
+	_ triggermesh.Producer  = (*Source)(nil)
+	_ triggermesh.Runnable  = (*Source)(nil)
+)
 
 type Source struct {
 	Name    string
@@ -79,7 +85,35 @@ func (s *Source) GetImage() string {
 	return s.image
 }
 
-func NewSource(crd string, kind, broker, version string, params interface{}) *Source {
+func (s *Source) GetEventTypes() ([]string, error) {
+	if ceOverrides, set := s.spec["ceOverrides"]; set {
+		// interface type is verified by CRD validation
+		if extensions, set := ceOverrides.(map[string]interface{})["extensions"]; set {
+			if typeOverride, exists := extensions.(map[string]string)["type"]; exists {
+				return []string{typeOverride}, nil
+			}
+		}
+	}
+	sourceCRD, err := crd.GetResourceCRD(s.Kind, s.CRDFile)
+	if err != nil {
+		return []string{}, fmt.Errorf("source CRD: %w", err)
+	}
+	var et crd.EventTypes
+	if err := json.Unmarshal([]byte(sourceCRD.Metadata.Annotations.EventTypes), &et); err != nil {
+		return []string{}, fmt.Errorf("event types: %w", err)
+	}
+	var result []string
+	for _, v := range et {
+		result = append(result, v.Type)
+	}
+	return result, nil
+}
+
+func (s *Source) SetEventType(string) error {
+	return fmt.Errorf("event source does not support context attributes override")
+}
+
+func New(name, crdFile, kind, broker, version string, params interface{}) *Source {
 	var spec map[string]interface{}
 	switch p := params.(type) {
 	case []string:
@@ -88,7 +122,6 @@ func NewSource(crd string, kind, broker, version string, params interface{}) *So
 	case map[string]interface{}:
 		// spec map
 		spec = p
-	default:
 	}
 
 	// kind initially can be awss3, webhook, etc.
@@ -96,9 +129,14 @@ func NewSource(crd string, kind, broker, version string, params interface{}) *So
 	if !strings.Contains(k, "source") {
 		k = fmt.Sprintf("%ssource", kind)
 	}
+
+	if name == "" {
+		name = fmt.Sprintf("%s-%s", broker, k)
+	}
+
 	return &Source{
-		Name:    fmt.Sprintf("%s-%s", broker, k),
-		CRDFile: crd,
+		Name:    name,
+		CRDFile: crdFile,
 		Broker:  broker,
 		Kind:    k,
 		Version: version,

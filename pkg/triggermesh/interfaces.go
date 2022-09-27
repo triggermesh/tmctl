@@ -17,6 +17,10 @@ limitations under the License.
 package triggermesh
 
 import (
+	"context"
+
+	"github.com/docker/docker/client"
+
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -25,9 +29,23 @@ import (
 type Component interface {
 	AsUnstructured() (*unstructured.Unstructured, error)
 	AsK8sObject() (*kubernetes.Object, error)
-	AsContainer() (*docker.Container, error)
 
 	GetName() string
 	GetKind() string
+}
+
+type Runnable interface {
+	AsContainer() (*docker.Container, error)
+
 	GetImage() string
+}
+
+type Producer interface {
+	SetEventType(string) error
+	GetEventTypes() ([]string, error)
+}
+
+type Consumer interface {
+	ConsumedEventTypes() ([]string, error)
+	GetPort(context.Context, *client.Client) (string, error)
 }

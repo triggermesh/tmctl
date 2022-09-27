@@ -24,17 +24,20 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmcli/pkg/triggermesh/wiretap"
+	"github.com/triggermesh/tmcli/pkg/wiretap"
 )
 
 type WatchOptions struct {
-	ConfigDir string
-	Context   string
+	ConfigDir  string
+	Context    string
+	EventTypes string
+	Source     string
 }
 
 func NewCmd() *cobra.Command {
@@ -52,6 +55,9 @@ func NewCmd() *cobra.Command {
 			return o.watch()
 		},
 	}
+
+	watchCmd.Flags().StringVarP(&o.EventTypes, "eventTypes", "e", "", "Filter events based on type attribute")
+
 	return watchCmd
 }
 
@@ -71,7 +77,7 @@ func (o *WatchOptions) watch() error {
 	if err != nil {
 		return fmt.Errorf("create container: %w", err)
 	}
-	if err := w.CreateTrigger(); err != nil {
+	if err := w.CreateTrigger(strings.Split(o.EventTypes, ",")); err != nil {
 		return fmt.Errorf("create trigger: %w", err)
 	}
 	log.Println("Watching...")

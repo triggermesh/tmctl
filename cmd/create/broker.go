@@ -19,11 +19,13 @@ package create
 import (
 	"context"
 	"fmt"
+	"log"
 	"path"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 )
@@ -46,25 +48,27 @@ func (o *CreateOptions) broker(name string) error {
 	ctx := context.Background()
 
 	configDir := path.Join(o.ConfigBase, name)
-	broker, err := tmbroker.NewBroker(name, configDir)
+	broker, err := tmbroker.New(name, configDir)
 	if err != nil {
 		return fmt.Errorf("broker: %w", err)
 	}
 
-	manifest := path.Join(configDir, manifestFile)
-	restart, err := triggermesh.Create(ctx, broker, manifest)
+	log.Println("Updating manifest")
+	restart, err := triggermesh.WriteObject(ctx, broker, path.Join(configDir, manifestFile))
 	if err != nil {
 		return err
 	}
 
+	log.Println("Starting container")
 	if _, err := triggermesh.Start(ctx, broker, restart); err != nil {
 		return err
 	}
 
 	viper.Set("context", name)
-
 	if err := viper.WriteConfig(); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
+
+	output.PrintStatus("broker", broker, "", []string{})
 	return nil
 }

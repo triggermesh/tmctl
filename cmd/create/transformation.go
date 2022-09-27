@@ -17,45 +17,62 @@ limitations under the License.
 package create
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"path"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/target"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/transformation"
 )
 
-func (o *CreateOptions) NewTargetCmd() *cobra.Command {
+const (
+	helpColorCode    = "\033[90m"
+	defaultColorCode = "\033[39m"
+	helpText         = `Transformation example:
+
+	context:
+	- operation: add
+	  paths:
+	  - key: source
+		value: some-test-source
+	data:
+	- operation: store
+	  paths:
+	  - key: $foo
+		value: Body
+	- operation: delete
+	  paths:
+	  - key:
+	- operation: add
+	  paths:
+	  - key: foo
+		value: $foo
+
+For more samples please visit:
+https://github.com/triggermesh/triggermesh/tree/main/config/samples/bumblebee`
+)
+
+func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:                "target <kind> <args>",
-		Short:              "TriggerMesh target",
+		Use:                "transformation <args>",
+		Short:              "TriggerMesh transformation",
 		DisableFlagParsing: true,
 		SilenceErrors:      true,
 		SilenceUsage:       true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
-			if len(args) == 0 {
-				sources, err := crd.ListTargets(o.CRD)
-				if err != nil {
-					return fmt.Errorf("list sources: %w", err)
-				}
-				fmt.Printf("Available targets:\n---\n%s\n", strings.Join(sources, "\n"))
-				return nil
-			}
-			kind, args, err := parse(args)
-			if err != nil {
-				return err
-			}
 			name, args := parameterFromArgs("name", args)
 			eventSourceFilter, args := parameterFromArgs("source", args)
-			eventTypesFilter, args := parameterFromArgs("eventTypes", args)
+			eventTypesFilter, _ := parameterFromArgs("eventTypes", args)
 			if eventSourceFilter == "" && eventTypesFilter == "" {
 				return fmt.Errorf("\"--source=<kind>\" or \"--eventTypes=<a,b,c>\" is required")
 			}
@@ -63,12 +80,12 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 			if eventTypesFilter != "" {
 				eventFilter = strings.Split(eventTypesFilter, ",")
 			}
-			return o.target(name, kind, args, eventSourceFilter, eventFilter)
+			return o.transformation(name, eventSourceFilter, eventFilter)
 		},
 	}
 }
 
-func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilter string, eventTypesFilter []string) error {
+func (o *CreateOptions) transformation(name, eventSourceFilter string, eventTypesFilter []string) error {
 	ctx := context.Background()
 	configDir := path.Join(o.ConfigBase, o.Context)
 	manifest := path.Join(configDir, manifestFile)
@@ -92,7 +109,26 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilt
 		eventTypesFilter = append(eventTypesFilter, et...)
 	}
 
-	t := target.New(name, o.CRD, kind, o.Context, o.Version, args)
+	fmt.Printf("%s%s%s\n\n", helpColorCode, helpText, defaultColorCode)
+	fmt.Printf("Insert Bumblebee transformation below\nPress Enter key twice to finish:\n")
+	input, err := readInput()
+	if err != nil {
+		return fmt.Errorf("input read: %w", err)
+	}
+	input = strings.TrimRight(input, "\n")
+	input = strings.TrimLeft(input, "\n")
+
+	var spec map[string]interface{}
+	if err := yaml.Unmarshal([]byte(input), &spec); err != nil {
+		return fmt.Errorf("spec unmarshal: %w", err)
+	}
+
+	t := transformation.New(name, o.CRD, "transformation", o.Context, o.Version, spec)
+	if et, _ := t.GetEventTypes(); len(et) == 0 {
+		if err := t.SetEventType(eventSourceFilter + "-transformed-event"); err != nil {
+			return fmt.Errorf("setting event type: %w", err)
+		}
+	}
 	log.Println("Updating manifest")
 	restart, err := triggermesh.WriteObject(ctx, t, manifest)
 	if err != nil {
@@ -114,4 +150,17 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilt
 	}
 	output.PrintStatus("consumer", t, eventSourceFilter, eventTypesFilter)
 	return nil
+}
+
+func readInput() (string, error) {
+	var lines string
+	scn := bufio.NewScanner(os.Stdin)
+	for scn.Scan() {
+		line := scn.Text()
+		if len(line) == 0 {
+			break
+		}
+		lines = fmt.Sprintf("%s\n%s", lines, line)
+	}
+	return lines, scn.Err()
 }

@@ -30,6 +30,7 @@ import (
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/source"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/target"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/transformation"
 )
 
 const manifestFile = "manifest.yaml"
@@ -71,20 +72,18 @@ func (o *StartOptions) start(broker string) error {
 	ctx := context.Background()
 	configDir := path.Join(o.ConfigDir, broker)
 	manifestFile := path.Join(configDir, manifestFile)
-	manifestOrig := manifest.New(manifestFile)
-	if err := manifestOrig.Read(); err != nil {
+	manifest := manifest.New(manifestFile)
+	if err := manifest.Read(); err != nil {
 		return fmt.Errorf("cannot parse manifest: %w", err)
 	}
 
-	manifestWoEventing := manifestOrig
 	componentTriggers := make(map[string]*tmbroker.Trigger)
 	var brokerPort string
 	// start eventing first
-	for i, object := range manifestOrig.Objects {
+	for _, object := range manifest.Objects {
 		switch object.Kind {
 		case "Broker":
-			manifestWoEventing.Objects = append(manifestOrig.Objects[:i], manifestOrig.Objects[i+1:]...)
-			broker, err := tmbroker.NewBroker(object.Metadata.Name, configDir)
+			broker, err := tmbroker.New(object.Metadata.Name, configDir)
 			if err != nil {
 				return fmt.Errorf("creating broker object: %v", err)
 			}
@@ -94,15 +93,14 @@ func (o *StartOptions) start(broker string) error {
 			}
 			brokerPort = container.HostPort()
 		case "Trigger":
-			manifestWoEventing.Objects = append(manifestOrig.Objects[:i], manifestOrig.Objects[i+1:]...)
-			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, "", configDir)
+			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, configDir, []string{})
 			if err := trigger.LookupTrigger(); err != nil {
 				return fmt.Errorf("trigger configuration: %v", err)
 			}
-			for _, target := range trigger.GetSpec().Targets {
+			for _, target := range trigger.GetTargets() {
 				componentTriggers[target.Component] = trigger
 			}
-			if _, err := triggermesh.Create(ctx, trigger, manifestFile); err != nil {
+			if _, err := triggermesh.WriteObject(ctx, trigger, manifestFile); err != nil {
 				return fmt.Errorf("creating trigger: %v", err)
 			}
 		}
@@ -112,23 +110,31 @@ func (o *StartOptions) start(broker string) error {
 		return fmt.Errorf("broker is not available")
 	}
 
-	for i, object := range manifestWoEventing.Objects {
+	for i, object := range manifest.Objects {
 		switch {
 		case strings.HasSuffix(object.Kind, "Source"):
-			manifestOrig.Objects[i].Spec["sink"] = map[string]interface{}{"uri": fmt.Sprintf("http://host.docker.internal:%s", brokerPort)}
-			c := source.NewSource(o.CRD, object.Kind, broker, o.Version, manifestOrig.Objects[i].Spec)
-			if _, err := triggermesh.Create(ctx, c, manifestFile); err != nil {
+			manifest.Objects[i].Spec["sink"] = map[string]interface{}{"uri": fmt.Sprintf("http://host.docker.internal:%s", brokerPort)}
+			c := source.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
+			if _, err := triggermesh.WriteObject(ctx, c, manifestFile); err != nil {
 				return fmt.Errorf("creating object: %w", err)
 			}
 			if _, err := triggermesh.Start(ctx, c, true); err != nil {
 				return fmt.Errorf("starting container: %w", err)
 			}
-		case strings.HasSuffix(object.Kind, "Target"):
-			c := target.NewTarget(o.CRD, object.Kind, broker, o.Version, object.Spec)
-			if _, err := triggermesh.Create(ctx, c, manifestFile); err != nil {
+		case strings.HasSuffix(object.Kind, "Target") ||
+			strings.HasSuffix(object.Kind, "Transformation"):
+
+			var c triggermesh.Component
+			if object.Kind == "Transformation" {
+				c = transformation.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
+			} else {
+				c = target.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
+			}
+
+			if _, err := triggermesh.WriteObject(ctx, c, manifestFile); err != nil {
 				return fmt.Errorf("creating object: %w", err)
 			}
-			container, err := triggermesh.Start(ctx, c, true)
+			container, err := triggermesh.Start(ctx, c.(triggermesh.Runnable), true)
 			if err != nil {
 				return fmt.Errorf("starting container: %w", err)
 			}

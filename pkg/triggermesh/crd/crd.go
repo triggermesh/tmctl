@@ -34,7 +34,10 @@ type CRD struct {
 	APIVersion string `yaml:"apiVersion"`
 	Kind       string `yaml:"kind"`
 	Metadata   struct {
-		Name string `yaml:"name"`
+		Name        string `yaml:"name"`
+		Annotations struct {
+			EventTypes string `yaml:"registry.knative.dev/eventTypes"`
+		} `yaml:"annotations"`
 	} `yaml:"metadata"`
 	Spec struct {
 		Group string `yaml:"group"`
@@ -61,6 +64,10 @@ type CRD struct {
 			} `yaml:"schema"`
 		} `yaml:"versions"`
 	} `yaml:"spec"`
+}
+
+type EventTypes []struct {
+	Type string `json:"type"`
 }
 
 type release struct {
@@ -113,7 +120,7 @@ func Fetch(configDir string) (string, error) {
 	return crdFile, err
 }
 
-func GetResource(resource, path string) (CRD, error) {
+func GetResourceCRD(resource, path string) (CRD, error) {
 	crds, err := readFile(path)
 	if err != nil {
 		return CRD{}, err
@@ -150,6 +157,34 @@ func readFile(path string) (map[string]CRD, error) {
 	result := make(map[string]CRD, len(crds))
 	for _, v := range crds {
 		result[strings.ToLower(v.Spec.Names.Kind)] = v
+	}
+	return result, nil
+}
+
+func ListSources(crdFile string) ([]string, error) {
+	crds, err := readFile(crdFile)
+	if err != nil {
+		return []string{}, err
+	}
+	var result []string
+	for k, crd := range crds {
+		if crd.Spec.Group == "sources.triggermesh.io" {
+			result = append(result, strings.TrimSuffix(k, "source"))
+		}
+	}
+	return result, nil
+}
+
+func ListTargets(crdFile string) ([]string, error) {
+	crds, err := readFile(crdFile)
+	if err != nil {
+		return []string{}, err
+	}
+	var result []string
+	for k, crd := range crds {
+		if crd.Spec.Group == "targets.triggermesh.io" {
+			result = append(result, strings.TrimSuffix(k, "target"))
+		}
 	}
 	return result, nil
 }

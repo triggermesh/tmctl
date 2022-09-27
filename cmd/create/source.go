@@ -19,13 +19,17 @@ package create
 import (
 	"context"
 	"fmt"
+	"log"
 	"path"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/triggermesh/tmcli/pkg/docker"
+	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/source"
 )
 
@@ -38,16 +42,25 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 		SilenceUsage:       true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
+			if len(args) == 0 {
+				sources, err := crd.ListSources(o.CRD)
+				if err != nil {
+					return fmt.Errorf("list sources: %w", err)
+				}
+				fmt.Printf("Available sources:\n---\n%s\n", strings.Join(sources, "\n"))
+				return nil
+			}
 			kind, args, err := parse(args)
 			if err != nil {
 				return err
 			}
-			return o.source(kind, args)
+			name, args := parameterFromArgs("name", args)
+			return o.source(name, kind, args)
 		},
 	}
 }
 
-func (o *CreateOptions) source(kind string, args []string) error {
+func (o *CreateOptions) source(name, kind string, args []string) error {
 	ctx := context.Background()
 	configDir := path.Join(o.ConfigBase, o.Context)
 
@@ -55,27 +68,28 @@ func (o *CreateOptions) source(kind string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
-	broker, err := tmbroker.NewBroker(o.Context, configDir)
+	broker, err := tmbroker.New(o.Context, configDir)
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}
-	brontainer, err := broker.AsContainer()
+	port, err := broker.GetPort(ctx, client)
 	if err != nil {
-		return fmt.Errorf("broker container: %v", err)
-	}
-	brontainer, err = brontainer.LookupHostConfig(ctx, client)
-	if err != nil {
-		return fmt.Errorf("broker config: %v", err)
+		return fmt.Errorf("broker port: %v", err)
 	}
 
-	s := source.NewSource(o.CRD, kind, o.Context, o.Version, append(args, fmt.Sprintf("--sink.uri=http://host.docker.internal:%s", brontainer.HostPort())))
+	spec := append(args, fmt.Sprintf("--sink.uri=http://host.docker.internal:%s", port))
 
-	restart, err := triggermesh.Create(ctx, s, path.Join(configDir, manifestFile))
+	s := source.New(name, o.CRD, kind, o.Context, o.Version, spec)
+
+	log.Println("Updating manifest")
+	restart, err := triggermesh.WriteObject(ctx, s, path.Join(configDir, manifestFile))
 	if err != nil {
 		return err
 	}
+	log.Println("Starting container")
 	if _, err := triggermesh.Start(ctx, s, restart); err != nil {
 		return err
 	}
+	output.PrintStatus("producer", s, "", []string{})
 	return nil
 }
