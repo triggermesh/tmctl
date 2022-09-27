@@ -17,11 +17,13 @@ limitations under the License.
 package docker
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -29,7 +31,10 @@ import (
 	"github.com/docker/docker/client"
 )
 
-const connRetries = 10
+const (
+	connRetries     = 5
+	logsReadTimeout = 2 // timeout to wait for logs, in seconds
+)
 
 type imagePullEvent struct {
 	Status         string `json:"status"`
@@ -116,18 +121,48 @@ func (c *Container) Start(ctx context.Context, client *client.Client) (*Containe
 
 	resp, err := client.ContainerCreate(ctx, &cc, &hc, nil, nil, c.Name)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := client.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("docker create: %w", err)
 	}
 
 	c.ID = resp.ID
 	c.runtimeHostConfig = hc
 	c.runtimeContainerConfig = cc
 
-	return c, nil
+	if err := client.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+		return nil, fmt.Errorf("docker start: %w", err)
+	}
+
+	if err := c.Connect(ctx); err != nil {
+		return nil, fmt.Errorf("docker connect: %w", err)
+	}
+
+	logsReader, err := c.Logs(ctx, client)
+	if err != nil {
+		return nil, fmt.Errorf("docker read logs: %w", err)
+	}
+	defer logsReader.Close()
+
+	stopLogs := make(chan struct{}, 1)
+	logs := readLogs(logsReader, stopLogs)
+	defer close(stopLogs)
+	timer := time.NewTimer(time.Second * logsReadTimeout)
+
+	for {
+		select {
+		case <-timer.C:
+			stopLogs <- struct{}{}
+			return c, nil
+		case log := <-logs:
+			var l map[string]interface{}
+			if err := json.Unmarshal(log, &l); err != nil {
+				continue
+				// return nil, fmt.Errorf("docker unmarshal logs: %w", err)
+			}
+			if isError(l) {
+				return nil, fmt.Errorf(string(log))
+			}
+		}
+	}
 }
 
 func (c *Container) Inspect(ctx context.Context, client client.Client) (types.ContainerJSON, error) {
@@ -214,4 +249,34 @@ func ForceStop(ctx context.Context, name string, client *client.Client) error {
 		RemoveVolumes: true,
 		Force:         true,
 	})
+}
+
+func readLogs(output io.ReadCloser, done chan struct{}) chan []byte {
+	logs := make(chan []byte)
+	scanner := bufio.NewScanner(output)
+	go func() {
+		for scanner.Scan() {
+			select {
+			case <-done:
+				close(logs)
+				return
+			default:
+				if l := len(scanner.Bytes()); l > 8 {
+					logs <- scanner.Bytes()[8:]
+				}
+			}
+		}
+	}()
+	return logs
+}
+
+func isError(logEntry map[string]interface{}) bool {
+	for k, v := range logEntry {
+		if k == "level" || k == "severity" {
+			if strings.ToLower(v.(string)) == "error" {
+				return true
+			}
+		}
+	}
+	return false
 }

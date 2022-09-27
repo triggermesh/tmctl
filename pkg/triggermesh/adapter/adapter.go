@@ -39,6 +39,7 @@ func RuntimeParams(object *unstructured.Unstructured, image, brokerConfigFile st
 	co := []docker.ContainerOption{
 		docker.WithImage(image),
 		docker.WithPort(adapterPort),
+		docker.WithErrorLoggingLevel(),
 	}
 	ho := []docker.HostOption{
 		docker.WithHostPortBinding(adapterPort),

@@ -70,9 +70,6 @@ func Start(ctx context.Context, object Runnable, restart bool) (*docker.Containe
 	}
 	container, err = container.Start(ctx, client)
 	if err != nil {
-		return nil, fmt.Errorf("starting container: %w", err)
-	}
-	if err := container.Connect(ctx); err != nil {
 		return nil, fmt.Errorf("adapter initialization: %w", err)
 	}
 	return container, nil
