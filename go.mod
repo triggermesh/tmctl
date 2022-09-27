@@ -12,6 +12,7 @@ require (
 	k8s.io/api v0.23.5
 	k8s.io/apimachinery v0.23.5
 	k8s.io/kube-openapi v0.0.0-20220124234850-424119656bbf
+	knative.dev/eventing v0.31.1-0.20220523181303-c3e13967001f
 
 )
 
@@ -51,6 +52,7 @@ require (
 	github.com/census-instrumentation/opencensus-proto v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cloudevents/sdk-go/observability/opencensus/v2 v2.6.1 // indirect
+	github.com/cloudevents/sdk-go/sql/v2 v2.8.0 // indirect
 	github.com/cloudevents/sdk-go/v2 v2.10.1 // indirect
 	github.com/containerd/containerd v1.6.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -144,7 +146,6 @@ require (
 	k8s.io/client-go v11.0.1-0.20190805182717-6502b5e7b1b5+incompatible // indirect
 	k8s.io/klog/v2 v2.60.1-0.20220317184644-43cc75f9ae89 // indirect
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
-	knative.dev/eventing v0.31.1-0.20220523181303-c3e13967001f // indirect
 	knative.dev/networking v0.0.0-20220412163509-1145ec58c8be // indirect
 	knative.dev/pkg v0.0.0-20220525153005-18f69958870f // indirect
 	knative.dev/serving v0.31.0 // indirect

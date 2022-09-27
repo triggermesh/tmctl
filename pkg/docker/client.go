@@ -146,7 +146,6 @@ func (c *Container) Start(ctx context.Context, client *client.Client) (*Containe
 	logs := readLogs(logsReader, stopLogs)
 	defer close(stopLogs)
 	timer := time.NewTimer(time.Second * logsReadTimeout)
-
 	for {
 		select {
 		case <-timer.C:
