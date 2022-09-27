@@ -43,18 +43,28 @@ type Trigger struct {
 
 type TriggerSpec struct {
 	Name    string
-	Filters []eventingv1.SubscriptionsAPIFilter `yaml:"filters,omitempty"`
-	Targets []Target                            `yaml:"targets"`
+	Filters []Filter `yaml:"filters,omitempty"`
+	Targets []Target `yaml:"targets"`
+}
+
+type Filter struct {
+	All    []eventingv1.SubscriptionsAPIFilter `yaml:"all,omitempty"`
+	Any    []eventingv1.SubscriptionsAPIFilter `yaml:"any,omitempty"`
+	Not    *eventingv1.SubscriptionsAPIFilter  `yaml:"not,omitempty"`
+	Exact  map[string]string                   `yaml:"exact,omitempty"`
+	Prefix map[string]string                   `yaml:"prefix,omitempty"`
+	Suffix map[string]string                   `yaml:"suffix,omitempty"`
+	CESQL  string                              `yaml:"cesql,omitempty"`
 }
 
 type Target struct {
 	URL             string `yaml:"url"`
 	Component       string `yaml:"component,omitempty"` // for local version only
 	DeliveryOptions struct {
-		Retry         int32   `yaml:"retry,omitempty"`
-		BackoffDelay  string  `yaml:"backoffDelay,omitempty"`
-		BackoffPolicy string  `yaml:"backoffPolicy,omitempty"`
-		DeadLetterURL *string `json:"deadLetterURL,omitempty"`
+		Retry         int32  `yaml:"retry,omitempty"`
+		BackoffDelay  string `yaml:"backoffDelay,omitempty"`
+		BackoffPolicy string `yaml:"backoffPolicy,omitempty"`
+		DeadLetterURL string `yaml:"deadLetterURL,omitempty"`
 	} `yaml:"deliveryOptions,omitempty"`
 }
 
@@ -97,9 +107,9 @@ func (t *Trigger) GetTargets() []Target {
 }
 
 func NewTrigger(name, broker, configDir string, eventType []string) *Trigger {
-	var filters []eventingv1.SubscriptionsAPIFilter
+	var filters []Filter
 	for _, v := range eventType {
-		filters = append(filters, eventingv1.SubscriptionsAPIFilter{
+		filters = append(filters, Filter{
 			Exact: map[string]string{"type": v},
 		})
 	}
@@ -124,7 +134,7 @@ func (t *Trigger) SetTarget(component, destination string) {
 }
 
 func (t *Trigger) SetFilter(eventType string) {
-	t.spec.Filters = []eventingv1.SubscriptionsAPIFilter{
+	t.spec.Filters = []Filter{
 		{
 			Exact: map[string]string{"type": eventType},
 		},
