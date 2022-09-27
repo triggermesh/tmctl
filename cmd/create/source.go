@@ -90,6 +90,6 @@ func (o *CreateOptions) source(name, kind string, args []string) error {
 	if _, err := triggermesh.Start(ctx, s, restart); err != nil {
 		return err
 	}
-	fmt.Println(output.ComponentStatus("producer", s, "", []string{}))
+	output.PrintStatus("producer", s, "", []string{})
 	return nil
 }

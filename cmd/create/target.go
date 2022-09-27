@@ -112,6 +112,6 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilt
 	if err := tr.UpdateManifest(); err != nil {
 		return fmt.Errorf("broker manifest: %w", err)
 	}
-	fmt.Println(output.ComponentStatus("consumer", t, eventSourceFilter, eventTypesFilter))
+	output.PrintStatus("consumer", t, eventSourceFilter, eventTypesFilter)
 	return nil
 }

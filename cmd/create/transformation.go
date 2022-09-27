@@ -34,6 +34,33 @@ import (
 	"github.com/triggermesh/tmcli/pkg/triggermesh/transformation"
 )
 
+const (
+	helpColorCode    = "\033[90m"
+	defaultColorCode = "\033[39m"
+	helpText         = `Transformation example:
+
+	context:
+	- operation: add
+	  paths:
+	  - key: source
+		value: some-test-source
+	data:
+	- operation: store
+	  paths:
+	  - key: $foo
+		value: Body
+	- operation: delete
+	  paths:
+	  - key:
+	- operation: add
+	  paths:
+	  - key: foo
+		value: $foo
+
+For more samples please visit:
+https://github.com/triggermesh/triggermesh/tree/main/config/samples/bumblebee`
+)
+
 func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:                "transformation <args>",
@@ -82,6 +109,7 @@ func (o *CreateOptions) transformation(name, eventSourceFilter string, eventType
 		eventTypesFilter = append(eventTypesFilter, et...)
 	}
 
+	fmt.Printf("%s%s%s\n\n", helpColorCode, helpText, defaultColorCode)
 	fmt.Printf("Insert Bumblebee transformation below\nPress Enter key twice to finish:\n")
 	input, err := readInput()
 	if err != nil {
@@ -120,7 +148,7 @@ func (o *CreateOptions) transformation(name, eventSourceFilter string, eventType
 	if err := tr.UpdateManifest(); err != nil {
 		return fmt.Errorf("broker manifest: %w", err)
 	}
-	fmt.Println(output.ComponentStatus("consumer", t, eventSourceFilter, eventTypesFilter))
+	output.PrintStatus("consumer", t, eventSourceFilter, eventTypesFilter)
 	return nil
 }
 

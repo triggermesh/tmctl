@@ -23,9 +23,14 @@ import (
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 )
 
-const delimeter = "---------------"
+const (
+	delimeter = "---------------"
 
-func ComponentStatus(kind string, object triggermesh.Component, sourceName string, eventTypesFilter []string) string {
+	successColorCode = "\033[92m"
+	defaultColorCode = "\033[39m"
+)
+
+func PrintStatus(kind string, object triggermesh.Component, sourceName string, eventTypesFilter []string) {
 	var result string
 	result = fmt.Sprintf("%s\nCreated object name:\t%s", delimeter, object.GetName())
 
@@ -57,7 +62,8 @@ func ComponentStatus(kind string, object triggermesh.Component, sourceName strin
 		result = fmt.Sprintf("%s\n\ttmcli watch\t - show events flowing through the broker in the real time", result)
 		result = fmt.Sprintf("%s\n\ttmcli dump\t - dump Kubernetes manifest", result)
 	}
-	return fmt.Sprintf("%s\n%s", result, delimeter)
+
+	fmt.Printf("%s%s\n%s\n%s", successColorCode, result, delimeter, defaultColorCode)
 }
 
 // func Draw() {}
