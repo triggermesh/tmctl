@@ -76,6 +76,7 @@ func (o *StopOptions) stop(broker string) error {
 		if object.Kind == "Broker" {
 			object.Metadata.Name += "-broker"
 		}
+		log.Printf("Stopping %s\n", object.Metadata.Name)
 		if err := docker.ForceStop(ctx, object.Metadata.Name, client); err != nil {
 			log.Printf("Stopping %q: %v", object.Metadata.Name, err)
 		}

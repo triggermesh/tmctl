@@ -23,6 +23,8 @@ import (
 	"github.com/docker/go-connections/nat"
 )
 
+const errorLoggingLevel = `K_LOGGING_CONFIG={"zap-logger-config":"{\"level\": \"error\"}"}`
+
 type ContainerOption func(*container.Config)
 type HostOption func(*container.HostConfig)
 
@@ -34,7 +36,7 @@ func WithImage(image string) ContainerOption {
 
 func WithEnv(env []string) ContainerOption {
 	return func(cc *container.Config) {
-		cc.Env = env
+		cc.Env = append(cc.Env, env...)
 	}
 }
 
@@ -74,5 +76,11 @@ func WithHostPortBinding(containerPort nat.Port) HostOption {
 func WithExtraHost() HostOption {
 	return func(hc *container.HostConfig) {
 		hc.ExtraHosts = []string{"host.docker.internal:host-gateway"}
+	}
+}
+
+func WithErrorLoggingLevel() ContainerOption {
+	return func(cc *container.Config) {
+		cc.Env = append(cc.Env, errorLoggingLevel)
 	}
 }

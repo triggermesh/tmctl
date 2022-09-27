@@ -19,6 +19,7 @@ package start
 import (
 	"context"
 	"fmt"
+	"log"
 	"path"
 	"strings"
 
@@ -87,6 +88,7 @@ func (o *StartOptions) start(broker string) error {
 			if err != nil {
 				return fmt.Errorf("creating broker object: %v", err)
 			}
+			log.Println("Starting broker")
 			container, err := triggermesh.Start(ctx, broker, true)
 			if err != nil {
 				return fmt.Errorf("starting broker container: %v", err)
@@ -118,6 +120,7 @@ func (o *StartOptions) start(broker string) error {
 			if _, err := triggermesh.WriteObject(ctx, c, manifestFile); err != nil {
 				return fmt.Errorf("creating object: %w", err)
 			}
+			log.Printf("Starting %s\n", object.Metadata.Name)
 			if _, err := triggermesh.Start(ctx, c, true); err != nil {
 				return fmt.Errorf("starting container: %w", err)
 			}
@@ -134,6 +137,7 @@ func (o *StartOptions) start(broker string) error {
 			if _, err := triggermesh.WriteObject(ctx, c, manifestFile); err != nil {
 				return fmt.Errorf("creating object: %w", err)
 			}
+			log.Printf("Starting %s\n", object.Metadata.Name)
 			container, err := triggermesh.Start(ctx, c.(triggermesh.Runnable), true)
 			if err != nil {
 				return fmt.Errorf("starting container: %w", err)

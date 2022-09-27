@@ -43,19 +43,19 @@ const (
 	- operation: add
 	  paths:
 	  - key: source
-		value: some-test-source
+	    value: some-test-source
 	data:
 	- operation: store
 	  paths:
 	  - key: $foo
-		value: Body
+	    value: Body
 	- operation: delete
 	  paths:
 	  - key:
 	- operation: add
 	  paths:
 	  - key: foo
-		value: $foo
+	    value: $foo
 
 For more samples please visit:
 https://github.com/triggermesh/triggermesh/tree/main/config/samples/bumblebee`
