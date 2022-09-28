@@ -94,6 +94,9 @@ func (s *Source) GetEventTypes() ([]string, error) {
 			}
 		}
 	}
+	if et, exists := s.spec["eventType"]; exists {
+		return []string{et.(string)}, nil
+	}
 	sourceCRD, err := crd.GetResourceCRD(s.Kind, s.CRDFile)
 	if err != nil {
 		return []string{}, fmt.Errorf("source CRD: %w", err)

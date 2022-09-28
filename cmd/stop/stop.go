@@ -23,6 +23,7 @@ import (
 	"path"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/manifest"
@@ -37,7 +38,7 @@ type StopOptions struct {
 func NewCmd() *cobra.Command {
 	o := &StopOptions{}
 	stopCmd := &cobra.Command{
-		Use:   "stop <broker>",
+		Use:   "stop [broker]",
 		Short: "stops TriggerMesh components",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := cmd.Flags().GetString("config")
@@ -45,14 +46,13 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 			o.ConfigDir = c
-			if len(args) != 1 {
-				return fmt.Errorf("expected only 1 argument")
+			broker := viper.GetString("context")
+			if len(args) == 1 {
+				broker = args[0]
 			}
-
-			return o.stop(args[0])
+			return o.stop(broker)
 		},
 	}
-	// createCmd.Flags().StringVarP(&o.Context, "broker", "b", "", "Connect components to this broker")
 
 	return stopCmd
 }

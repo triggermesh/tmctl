@@ -92,7 +92,7 @@ func (t *Target) GetPort(ctx context.Context, client *client.Client) (string, er
 		return "", fmt.Errorf("container object: %w", err)
 	}
 	if container, err = container.LookupHostConfig(ctx, client); err != nil {
-		return "", fmt.Errorf("container config: %w", err)
+		return "", fmt.Errorf("container runtime config: %w", err)
 	}
 	return container.HostPort(), nil
 }

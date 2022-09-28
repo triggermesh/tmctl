@@ -254,14 +254,17 @@ func readLogs(output io.ReadCloser, done chan struct{}) chan []byte {
 	logs := make(chan []byte)
 	scanner := bufio.NewScanner(output)
 	go func() {
+		defer close(logs)
 		for scanner.Scan() {
 			select {
 			case <-done:
-				close(logs)
 				return
 			default:
 				if l := len(scanner.Bytes()); l > 8 {
 					logs <- scanner.Bytes()[8:]
+					// CLI sets adapter's log level to "error", so one log entry is usually enough.
+					// experimental, reduces container startup time.
+					return
 				}
 			}
 		}

@@ -46,9 +46,13 @@ type StartOptions struct {
 func NewCmd() *cobra.Command {
 	o := &StartOptions{}
 	createCmd := &cobra.Command{
-		Use:   "start <broker>",
+		Use:   "start [broker]",
 		Short: "starts TriggerMesh components",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			broker := viper.GetString("context")
+			if len(args) == 1 {
+				broker = args[0]
+			}
 			c, err := cmd.Flags().GetString("config")
 			if err != nil {
 				return err
@@ -57,14 +61,10 @@ func NewCmd() *cobra.Command {
 			o.Version = viper.GetString("triggermesh.version")
 			o.CRD = viper.GetString("triggermesh.servedCRD")
 
-			if len(args) != 1 {
-				return fmt.Errorf("expected only 1 argument")
-			}
-
-			return o.start(args[0])
+			return o.start(broker)
 		},
 	}
-	createCmd.Flags().BoolVar(&o.Restart, "restart", false, "Restart components")
+	createCmd.Flags().BoolVar(&o.Restart, "restart", true, "Restart components")
 
 	return createCmd
 }
@@ -89,7 +89,7 @@ func (o *StartOptions) start(broker string) error {
 				return fmt.Errorf("creating broker object: %v", err)
 			}
 			log.Println("Starting broker")
-			container, err := triggermesh.Start(ctx, broker, true)
+			container, err := triggermesh.Start(ctx, broker, o.Restart)
 			if err != nil {
 				return fmt.Errorf("starting broker container: %v", err)
 			}
@@ -121,7 +121,7 @@ func (o *StartOptions) start(broker string) error {
 				return fmt.Errorf("creating object: %w", err)
 			}
 			log.Printf("Starting %s\n", object.Metadata.Name)
-			if _, err := triggermesh.Start(ctx, c, true); err != nil {
+			if _, err := triggermesh.Start(ctx, c, o.Restart); err != nil {
 				return fmt.Errorf("starting container: %w", err)
 			}
 		case strings.HasSuffix(object.Kind, "Target") ||
@@ -138,7 +138,7 @@ func (o *StartOptions) start(broker string) error {
 				return fmt.Errorf("creating object: %w", err)
 			}
 			log.Printf("Starting %s\n", object.Metadata.Name)
-			container, err := triggermesh.Start(ctx, c.(triggermesh.Runnable), true)
+			container, err := triggermesh.Start(ctx, c.(triggermesh.Runnable), o.Restart)
 			if err != nil {
 				return fmt.Errorf("starting container: %w", err)
 			}
