@@ -54,8 +54,6 @@ func NewCmd() *cobra.Command {
 	createCmd.AddCommand(o.NewTargetCmd())
 	createCmd.AddCommand(o.NewTransformationCmd())
 
-	// createCmd.Flags().StringVarP(&o.Context, "broker", "b", "", "Connect components to this broker")
-
 	return createCmd
 }
 

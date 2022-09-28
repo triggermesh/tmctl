@@ -97,7 +97,7 @@ func (o *CreateOptions) transformation(name, eventSourceFilter string, eventType
 		}
 		producer, ok := c.(triggermesh.Producer)
 		if !ok {
-			return fmt.Errorf("%q is not an event producer", eventSourceFilter)
+			return fmt.Errorf("event producer %q is not available", eventSourceFilter)
 		}
 		et, err := producer.GetEventTypes()
 		if err != nil {

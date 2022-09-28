@@ -27,12 +27,14 @@ import (
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
 
-	configcmd "github.com/triggermesh/tmcli/cmd/config"
-	createcmd "github.com/triggermesh/tmcli/cmd/create"
-	dumpcmd "github.com/triggermesh/tmcli/cmd/dump"
-	startcmd "github.com/triggermesh/tmcli/cmd/start"
-	stopcmd "github.com/triggermesh/tmcli/cmd/stop"
-	watchcmd "github.com/triggermesh/tmcli/cmd/watch"
+	"github.com/triggermesh/tmcli/cmd/config"
+	"github.com/triggermesh/tmcli/cmd/create"
+	"github.com/triggermesh/tmcli/cmd/describe"
+	"github.com/triggermesh/tmcli/cmd/dump"
+	"github.com/triggermesh/tmcli/cmd/list"
+	"github.com/triggermesh/tmcli/cmd/start"
+	"github.com/triggermesh/tmcli/cmd/stop"
+	"github.com/triggermesh/tmcli/cmd/watch"
 )
 
 var (
@@ -77,12 +79,14 @@ func NewRootCommand() *cobra.Command {
 	viper.BindPFlag("triggermesh.version", rootCmd.PersistentFlags().Lookup("version"))
 
 	// commands
-	rootCmd.AddCommand(createcmd.NewCmd())
-	rootCmd.AddCommand(configcmd.NewCmd())
-	rootCmd.AddCommand(dumpcmd.NewCmd())
-	rootCmd.AddCommand(startcmd.NewCmd())
-	rootCmd.AddCommand(stopcmd.NewCmd())
-	rootCmd.AddCommand(watchcmd.NewCmd())
+	rootCmd.AddCommand(create.NewCmd())
+	rootCmd.AddCommand(config.NewCmd())
+	rootCmd.AddCommand(dump.NewCmd())
+	rootCmd.AddCommand(describe.NewCmd())
+	rootCmd.AddCommand(list.NewCmd())
+	rootCmd.AddCommand(start.NewCmd())
+	rootCmd.AddCommand(stop.NewCmd())
+	rootCmd.AddCommand(watch.NewCmd())
 
 	return rootCmd
 }

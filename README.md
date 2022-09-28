@@ -7,6 +7,32 @@ Working name is `tmcli`.
 
 ## Available commands and scenarios
 
+Commands without the context:
+
+```
+tmcli config *
+tmcli list
+tmcli create broker <broker>
+```
+
+Commands with optional context:
+
+```
+tmcli dump [broker]
+tmcli describe [broker]
+tmcli start [broker]
+tmcli stop [broker]
+tmcli watch [broker]
+```
+
+Commands with context from config:
+
+```
+tmcli create source *
+tmcli create target *
+tmcli create transformation *
+```
+
 ### Installation
 
 Checkout the code:

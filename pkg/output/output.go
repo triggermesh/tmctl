@@ -18,8 +18,11 @@ package output
 
 import (
 	"fmt"
+	"os"
 	"strings"
+	"text/tabwriter"
 
+	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 )
 
@@ -28,7 +31,14 @@ const (
 
 	successColorCode = "\033[92m"
 	defaultColorCode = "\033[39m"
+	offlineColorCode = "\u001b[31m"
 )
+
+var w *tabwriter.Writer
+
+func init() {
+	w = tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
+}
 
 func PrintStatus(kind string, object triggermesh.Component, sourceName string, eventTypesFilter []string) {
 	var result string
@@ -68,3 +78,64 @@ func PrintStatus(kind string, object triggermesh.Component, sourceName string, e
 
 // func Draw() {}
 // func Dump() {}
+
+func status(container *docker.Container) string {
+	status := fmt.Sprintf("%soffline%s", offlineColorCode, defaultColorCode)
+	if container != nil {
+		status = fmt.Sprintf("%sonline(http://localhost:%s)%s", successColorCode, container.HostPort(), defaultColorCode)
+	}
+	return status
+}
+
+func DescribeBroker(brokers []triggermesh.Component, containers []*docker.Container) {
+	defer w.Flush()
+	fmt.Fprintln(w, "Broker\tStatus")
+	for i, broker := range brokers {
+		fmt.Fprintf(w, "%s\t%s\n", broker.GetName(), status(containers[i]))
+	}
+	fmt.Fprintln(w)
+}
+
+func DescribeSource(sources []triggermesh.Component, containers []*docker.Container) {
+	if len(sources) == 0 {
+		return
+	}
+	defer w.Flush()
+	fmt.Fprintln(w, "Source\tKind\tEventTypes\tStatus")
+	for i, source := range sources {
+		et, err := source.(triggermesh.Producer).GetEventTypes()
+		if err != nil {
+			et = []string{"-"}
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", source.GetName(), source.GetKind(), strings.Join(et, ","), status(containers[i]))
+	}
+	fmt.Fprintln(w)
+}
+
+func DescribeTransformation(transformations []triggermesh.Component, containers []*docker.Container) {
+	if len(transformations) == 0 {
+		return
+	}
+	defer w.Flush()
+	fmt.Fprintln(w, "Transformation\tEventTypes\tStatus")
+	for i, transformation := range transformations {
+		et, err := transformation.(triggermesh.Producer).GetEventTypes()
+		if err != nil {
+			et = []string{"-"}
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\n", transformation.GetName(), strings.Join(et, ","), status(containers[i]))
+	}
+	fmt.Fprintln(w)
+}
+
+func DescribeTarget(targets []triggermesh.Component, containers []*docker.Container) {
+	if len(targets) == 0 {
+		return
+	}
+	defer w.Flush()
+	fmt.Fprintln(w, "Target\tKind\tStatus")
+	for i, target := range targets {
+		fmt.Fprintf(w, "%s\t%s\t%s\n", target.GetName(), target.GetKind(), status(containers[i]))
+	}
+	fmt.Fprintln(w)
+}

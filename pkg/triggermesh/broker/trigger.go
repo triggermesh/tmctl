@@ -23,7 +23,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	eventingv1 "knative.dev/eventing/pkg/apis/eventing/v1"
 
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/manifest"
@@ -48,13 +47,13 @@ type TriggerSpec struct {
 }
 
 type Filter struct {
-	All    []eventingv1.SubscriptionsAPIFilter `yaml:"all,omitempty"`
-	Any    []eventingv1.SubscriptionsAPIFilter `yaml:"any,omitempty"`
-	Not    *eventingv1.SubscriptionsAPIFilter  `yaml:"not,omitempty"`
-	Exact  map[string]string                   `yaml:"exact,omitempty"`
-	Prefix map[string]string                   `yaml:"prefix,omitempty"`
-	Suffix map[string]string                   `yaml:"suffix,omitempty"`
-	CESQL  string                              `yaml:"cesql,omitempty"`
+	All    []Filter          `yaml:"all,omitempty"`
+	Any    []Filter          `yaml:"any,omitempty"`
+	Not    *Filter           `yaml:"not,omitempty"`
+	Exact  map[string]string `yaml:"exact,omitempty"`
+	Prefix map[string]string `yaml:"prefix,omitempty"`
+	Suffix map[string]string `yaml:"suffix,omitempty"`
+	CESQL  string            `yaml:"cesql,omitempty"`
 }
 
 type Target struct {

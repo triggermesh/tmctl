@@ -22,6 +22,7 @@ import (
 	"path"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/triggermesh/tmcli/pkg/manifest"
 	"gopkg.in/yaml.v3"
 )
@@ -30,27 +31,25 @@ const manifestFile = "manifest.yaml"
 
 type DumpOptions struct {
 	ConfigDir string
-	Context   string
 	Format    string
 }
 
 func NewCmd() *cobra.Command {
 	o := &DumpOptions{}
 	dumpCmd := &cobra.Command{
-		Use:   "dump <broker>",
+		Use:   "dump [broker]",
 		Short: "Generate Kubernetes manifest",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := cmd.Flags().GetString("config")
+			broker := viper.GetString("context")
+			if len(args) == 1 {
+				broker = args[0]
+			}
+			configDir, err := cmd.Flags().GetString("config")
 			if err != nil {
 				return err
 			}
-			broker, err := parseArgs(args)
-			if err != nil {
-				return err
-			}
-			o.ConfigDir = c
-			o.Context = broker
-			return o.Dump()
+			o.ConfigDir = configDir
+			return o.dump(broker)
 		},
 	}
 
@@ -59,15 +58,8 @@ func NewCmd() *cobra.Command {
 	return dumpCmd
 }
 
-func parseArgs(args []string) (string, error) {
-	if l := len(args); l != 1 {
-		return "", fmt.Errorf("expected 1 arguments, got %d", l)
-	}
-	return args[0], nil
-}
-
-func (o *DumpOptions) Dump() error {
-	manifest := manifest.New(path.Join(o.ConfigDir, o.Context, manifestFile))
+func (o *DumpOptions) dump(broker string) error {
+	manifest := manifest.New(path.Join(o.ConfigDir, broker, manifestFile))
 	if err := manifest.Read(); err != nil {
 		return err
 	}

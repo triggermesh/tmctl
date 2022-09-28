@@ -78,11 +78,23 @@ func Start(ctx context.Context, object Runnable, restart bool) (*docker.Containe
 func Stop(ctx context.Context, object Runnable) error {
 	client, err := docker.NewClient()
 	if err != nil {
-		return fmt.Errorf("creating docker client: %w", err)
+		return fmt.Errorf("docker client: %w", err)
 	}
 	container, err := object.AsContainer()
 	if err != nil {
-		return fmt.Errorf("creating container object: %w", err)
+		return fmt.Errorf("container object: %w", err)
 	}
 	return container.Remove(ctx, client)
+}
+
+func Info(ctx context.Context, object Runnable) (*docker.Container, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("docker client: %w", err)
+	}
+	container, err := object.AsContainer()
+	if err != nil {
+		return nil, fmt.Errorf("container object: %w", err)
+	}
+	return container.LookupHostConfig(ctx, client)
 }

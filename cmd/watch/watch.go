@@ -35,7 +35,6 @@ import (
 
 type WatchOptions struct {
 	ConfigDir  string
-	Context    string
 	EventTypes string
 	Source     string
 }
@@ -43,16 +42,20 @@ type WatchOptions struct {
 func NewCmd() *cobra.Command {
 	o := WatchOptions{}
 	watchCmd := &cobra.Command{
-		Use:   "watch <broker>",
+		Use:   "watch [broker]",
 		Short: "Watch events flowing through the broker",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			broker := viper.GetString("context")
+			if len(args) == 1 {
+				broker = args[0]
+			}
 			c, err := cmd.Flags().GetString("config")
 			if err != nil {
 				return err
 			}
 			o.ConfigDir = c
-			o.Context = viper.GetString("context")
-			return o.watch()
+
+			return o.watch(broker)
 		},
 	}
 
@@ -61,13 +64,13 @@ func NewCmd() *cobra.Command {
 	return watchCmd
 }
 
-func (o *WatchOptions) watch() error {
+func (o *WatchOptions) watch(broker string) error {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
 	ctx := context.Background()
 
-	w := wiretap.New(o.Context, o.ConfigDir)
+	w := wiretap.New(broker, o.ConfigDir)
 	defer func() {
 		if err := w.Cleanup(ctx); err != nil {
 			log.Printf("Cleanup: %v", err)
