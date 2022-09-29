@@ -30,6 +30,7 @@ Commands with context from config:
 ```
 tmcli create source *
 tmcli create target *
+tmcli create trigger *
 tmcli create transformation *
 ```
 
@@ -68,16 +69,17 @@ Watch incoming events:
 tmcli watch
 ```
 
-Create trigger:
+Create target and trigger:
 
 ```
-tmcli create trigger bar --eventType com.amazon.sqs.message
+tmcli create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io
+tmcli create trigger --source foo-awssqssource --target foo-cloudeventstarget
 ```
 
-Create target:
+Or, in one command:
 
 ```
-tmcli create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io --trigger bar 
+tmcli create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io --source foo-awssqssource
 ```
 
 Open sockeye [web-interface](https://sockeye-tzununbekov.dev.triggermesh.io), send the message to SQS queue specified in the source creation step and observe the received CloudEvent in the sockeye tab.
@@ -85,17 +87,29 @@ Open sockeye [web-interface](https://sockeye-tzununbekov.dev.triggermesh.io), se
 Stop event flow:
 
 ```
-tmcli stop foo
+tmcli stop
 ```
 
 Start event flow:
 
 ```
-tmcli start foo
+tmcli start
 ```
 
 Print Kubernetes manifest (not applicable at the moment):
 
 ```
-tmcli dump foo
+tmcli dump
+```
+
+Describe the integration:
+
+```
+tmcli describe
+```
+
+List existing brokers:
+
+```
+tmcli list
 ```

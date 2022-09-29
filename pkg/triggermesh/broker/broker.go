@@ -23,7 +23,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/docker/docker/client"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/triggermesh/tmcli/pkg/docker"
@@ -113,7 +112,11 @@ func (b *Broker) GetImage() string {
 	return b.image
 }
 
-func (b *Broker) GetPort(ctx context.Context, client *client.Client) (string, error) {
+func (b *Broker) GetPort(ctx context.Context) (string, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return "", fmt.Errorf("docker client: %w", err)
+	}
 	container, err := b.AsContainer()
 	if err != nil {
 		return "", fmt.Errorf("container object: %w", err)

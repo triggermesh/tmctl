@@ -30,7 +30,6 @@ import (
 
 	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/transformation"
 )
 
@@ -73,9 +72,6 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 			name, args := parameterFromArgs("name", args)
 			eventSourceFilter, args := parameterFromArgs("source", args)
 			eventTypesFilter, _ := parameterFromArgs("eventTypes", args)
-			if eventSourceFilter == "" && eventTypesFilter == "" {
-				return fmt.Errorf("\"--source=<kind>\" or \"--eventTypes=<a,b,c>\" is required")
-			}
 			var eventFilter []string
 			if eventTypesFilter != "" {
 				eventFilter = strings.Split(eventTypesFilter, ",")
@@ -91,20 +87,9 @@ func (o *CreateOptions) transformation(name, eventSourceFilter string, eventType
 	manifest := path.Join(configDir, manifestFile)
 
 	if eventSourceFilter != "" {
-		c, err := o.getObject(eventSourceFilter, manifest)
+		et, err := o.producersEventTypes(eventSourceFilter)
 		if err != nil {
-			return fmt.Errorf("%q does not exist", eventSourceFilter)
-		}
-		producer, ok := c.(triggermesh.Producer)
-		if !ok {
-			return fmt.Errorf("event producer %q is not available", eventSourceFilter)
-		}
-		et, err := producer.GetEventTypes()
-		if err != nil {
-			return fmt.Errorf("%q event types: %w", eventSourceFilter, err)
-		}
-		if len(et) == 0 {
-			return fmt.Errorf("%q does not expose its event types", eventSourceFilter)
+			return fmt.Errorf("event types filter: %w", err)
 		}
 		eventTypesFilter = append(eventTypesFilter, et...)
 	}
@@ -140,13 +125,11 @@ func (o *CreateOptions) transformation(name, eventSourceFilter string, eventType
 		return err
 	}
 
-	tr := tmbroker.NewTrigger(fmt.Sprintf("%s-trigger", t.GetName()), o.Context, configDir, eventTypesFilter)
-	tr.SetTarget(container.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
-	if err := tr.UpdateBrokerConfig(); err != nil {
-		return fmt.Errorf("broker config: %w", err)
-	}
-	if err := tr.UpdateManifest(); err != nil {
-		return fmt.Errorf("broker manifest: %w", err)
+	if len(eventTypesFilter) != 0 {
+		log.Println("Creating trigger")
+		if err := o.createTrigger(fmt.Sprintf("%s-trigger", t.GetName()), eventTypesFilter, container.Name, container.HostPort()); err != nil {
+			return err
+		}
 	}
 	output.PrintStatus("consumer", t, eventSourceFilter, eventTypesFilter)
 	return nil

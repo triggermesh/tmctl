@@ -19,8 +19,6 @@ package triggermesh
 import (
 	"context"
 
-	"github.com/docker/docker/client"
-
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -47,5 +45,5 @@ type Producer interface {
 
 type Consumer interface {
 	ConsumedEventTypes() ([]string, error)
-	GetPort(context.Context, *client.Client) (string, error)
+	GetPort(context.Context) (string, error)
 }

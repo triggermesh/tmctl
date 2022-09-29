@@ -18,6 +18,7 @@ package create
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/triggermesh/tmcli/pkg/manifest"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/source"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/target"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/transformation"
@@ -53,6 +55,7 @@ func NewCmd() *cobra.Command {
 	createCmd.AddCommand(o.NewSourceCmd())
 	createCmd.AddCommand(o.NewTargetCmd())
 	createCmd.AddCommand(o.NewTransformationCmd())
+	createCmd.AddCommand(o.NewTriggerCmd())
 
 	return createCmd
 }
@@ -110,4 +113,33 @@ func parameterFromArgs(parameter string, args []string) (string, []string) {
 		}
 	}
 	return value, args
+}
+
+func (o *CreateOptions) producersEventTypes(source string) ([]string, error) {
+	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
+	c, err := o.getObject(source, manifest)
+	if err != nil {
+		return []string{}, fmt.Errorf("%q does not exist", source)
+	}
+	producer, ok := c.(triggermesh.Producer)
+	if !ok {
+		return []string{}, fmt.Errorf("event producer %q is not available", source)
+	}
+	et, err := producer.GetEventTypes()
+	if err != nil {
+		return []string{}, fmt.Errorf("%q event types: %w", source, err)
+	}
+	if len(et) == 0 {
+		return []string{}, fmt.Errorf("%q does not expose its event types", source)
+	}
+	return et, nil
+}
+
+func (o *CreateOptions) createTrigger(name string, eventTypesFilter []string, targetName, port string) error {
+	tr := tmbroker.NewTrigger(name, o.Context, path.Join(o.ConfigBase, o.Context), eventTypesFilter)
+	tr.SetTarget(targetName, fmt.Sprintf("http://host.docker.internal:%s", port))
+	if err := tr.UpdateBrokerConfig(); err != nil {
+		return fmt.Errorf("broker config: %w", err)
+	}
+	return tr.UpdateManifest()
 }
