@@ -25,47 +25,37 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/target"
 )
 
-func (o *CreateOptions) NewTargetCmd() *cobra.Command {
+func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:                "target <kind> <args>",
-		Short:              "TriggerMesh target",
+		Use:                "trigger --source <source> [--eventType <event type>] --target <target>",
+		Short:              "TriggerMesh trigger",
 		DisableFlagParsing: true,
 		SilenceErrors:      true,
 		SilenceUsage:       true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
-			if len(args) == 0 {
-				sources, err := crd.ListTargets(o.CRD)
-				if err != nil {
-					return fmt.Errorf("list sources: %w", err)
-				}
-				fmt.Printf("Available targets:\n---\n%s\n", strings.Join(sources, "\n"))
-				return nil
-			}
-			kind, args, err := parse(args)
-			if err != nil {
-				return err
-			}
-			name, args := parameterFromArgs("name", args)
 			eventSourceFilter, args := parameterFromArgs("source", args)
 			eventTypesFilter, args := parameterFromArgs("eventTypes", args)
+			target, args := parameterFromArgs("target", args)
+			if target == "" {
+				return fmt.Errorf("\"--target <name>\" argument is required")
+			}
+			if eventSourceFilter == "" && eventTypesFilter == "" {
+				return fmt.Errorf("\"--source <name>\" or \"--eventTypes <type>\" argument is required")
+			}
 			var eventFilter []string
 			if eventTypesFilter != "" {
 				eventFilter = strings.Split(eventTypesFilter, ",")
 			}
-			return o.target(name, kind, args, eventSourceFilter, eventFilter)
+			return o.trigger(eventSourceFilter, eventFilter, target)
 		},
 	}
 }
 
-func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilter string, eventTypesFilter []string) error {
-	ctx := context.Background()
+func (o *CreateOptions) trigger(eventSourceFilter string, eventTypesFilter []string, target string) error {
 	configDir := path.Join(o.ConfigBase, o.Context)
 	manifest := path.Join(configDir, manifestFile)
 
@@ -77,25 +67,24 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilt
 		eventTypesFilter = append(eventTypesFilter, et...)
 	}
 
-	t := target.New(name, o.CRD, kind, o.Context, o.Version, args)
-	log.Println("Updating manifest")
-	restart, err := triggermesh.WriteObject(ctx, t, manifest)
+	component, err := o.getObject(target, manifest)
 	if err != nil {
-		return err
-	}
-	log.Println("Starting container")
-	container, err := triggermesh.Start(ctx, t, restart)
-	if err != nil {
-		return err
+		return fmt.Errorf("%q not found: %w", target, err)
 	}
 
-	if len(eventTypesFilter) != 0 {
-		log.Println("Creating trigger")
-		if err := o.createTrigger(fmt.Sprintf("%s-trigger", t.GetName()), eventTypesFilter, container.Name, container.HostPort()); err != nil {
-			return err
-		}
+	consumer, ok := component.(triggermesh.Consumer)
+	if !ok {
+		return fmt.Errorf("%q is not an event target", target)
 	}
 
-	output.PrintStatus("consumer", t, eventSourceFilter, eventTypesFilter)
+	port, err := consumer.GetPort(context.Background())
+	if err != nil {
+		return fmt.Errorf("target port: %w", err)
+	}
+
+	log.Println("Creating trigger")
+	if err := o.createTrigger(fmt.Sprintf("%s-trigger", target), eventTypesFilter, component.GetName(), port); err != nil {
+		return err
+	}
 	return nil
 }

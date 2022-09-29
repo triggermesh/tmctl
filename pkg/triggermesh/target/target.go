@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/docker/client"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/triggermesh/tmcli/pkg/docker"
@@ -86,7 +85,11 @@ func (t *Target) GetImage() string {
 	return t.image
 }
 
-func (t *Target) GetPort(ctx context.Context, client *client.Client) (string, error) {
+func (t *Target) GetPort(ctx context.Context) (string, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return "", fmt.Errorf("docker client: %w", err)
+	}
 	container, err := t.AsContainer()
 	if err != nil {
 		return "", fmt.Errorf("container object: %w", err)
