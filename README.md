@@ -69,20 +69,31 @@ Watch incoming events:
 tmcli watch
 ```
 
+Create transformation:
+```
+tmcli create transformation --source foo-awssqssource
+```
+
 Create target and trigger:
 
 ```
 tmcli create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io
-tmcli create trigger --source foo-awssqssource --target foo-cloudeventstarget
+tmcli create trigger --source foo-transformation --target foo-cloudeventstarget
 ```
 
 Or, in one command:
 
 ```
-tmcli create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io --source foo-awssqssource
+tmcli create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io --source foo-transformation
 ```
 
 Open sockeye [web-interface](https://sockeye-tzununbekov.dev.triggermesh.io), send the message to SQS queue specified in the source creation step and observe the received CloudEvent in the sockeye tab.
+
+Or send test event manually:
+
+```
+tmcli send-event --eventType com.amazon.sqs.message '{"hello":"world"}'
+```
 
 Stop event flow:
 
