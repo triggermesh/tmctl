@@ -24,6 +24,8 @@ import (
 
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -138,4 +140,34 @@ func DescribeTarget(targets []triggermesh.Component, containers []*docker.Contai
 		fmt.Fprintf(w, "%s\t%s\t%s\n", target.GetName(), target.GetKind(), status(containers[i]))
 	}
 	fmt.Fprintln(w)
+}
+
+func DescribeTrigger(triggers []*tmbroker.Trigger) {
+	if len(triggers) == 0 {
+		return
+	}
+	defer w.Flush()
+	fmt.Fprintln(w, "Trigger\tTarget\tFilter")
+	for _, trigger := range triggers {
+		var targets []string
+		var filters []string
+		for _, filter := range trigger.GetFilters() {
+			filters = append(filters, triggerFilterToString(filter))
+		}
+		for _, target := range trigger.GetTargets() {
+			targets = append(targets, target.Component)
+		}
+		fmt.Fprintf(w, "%s\t%v\t%v\n", trigger.Name, strings.Join(targets, ","), strings.Join(filters, ","))
+	}
+	fmt.Fprintln(w)
+}
+
+func triggerFilterToString(filter tmbroker.Filter) string {
+	// that works with "exact type" filtering
+	// needs to be tested for other cases
+	f, _ := yaml.Marshal(filter)
+	result := strings.ReplaceAll(string(f), "\n", " ")
+	result = strings.ReplaceAll(result, " ", "")
+	result = strings.ReplaceAll(result, ":", " ")
+	return result
 }

@@ -105,6 +105,10 @@ func (t *Trigger) GetTargets() []Target {
 	return t.spec.Targets
 }
 
+func (t *Trigger) GetFilters() []Filter {
+	return t.spec.Filters
+}
+
 func NewTrigger(name, broker, configDir string, eventType []string) *Trigger {
 	var filters []Filter
 	for _, v := range eventType {

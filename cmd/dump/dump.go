@@ -53,9 +53,7 @@ func NewCmd() *cobra.Command {
 			return o.dump(broker)
 		},
 	}
-
 	dumpCmd.Flags().StringVarP(&o.Format, "output", "o", "yaml", "Output format")
-
 	return dumpCmd
 }
 

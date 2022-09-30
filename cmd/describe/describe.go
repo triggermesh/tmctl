@@ -37,13 +37,15 @@ import (
 const manifestFile = "manifest.yaml"
 
 type integration struct {
-	Broker         component
-	Source         component
-	Transformation component
-	Target         component
+	Broker          components
+	Sources         components
+	Transformations components
+	Targets         components
+
+	Triggers []*tmbroker.Trigger
 }
 
-type component struct {
+type components struct {
 	object    []triggermesh.Component
 	container []*docker.Container
 }
@@ -78,8 +80,8 @@ func NewCmd() *cobra.Command {
 
 func (o DescribeOptions) describe(broker string) error {
 	ctx := context.Background()
-	configDir := path.Join(o.ConfigDir, broker)
-	manifestFile := path.Join(configDir, manifestFile)
+	brokerConfigDir := path.Join(o.ConfigDir, broker)
+	manifestFile := path.Join(brokerConfigDir, manifestFile)
 	manifest := manifest.New(manifestFile)
 	if err := manifest.Read(); err != nil {
 		return fmt.Errorf("cannot parse manifest: %w", err)
@@ -89,7 +91,7 @@ func (o DescribeOptions) describe(broker string) error {
 	for _, object := range manifest.Objects {
 		switch {
 		case object.Kind == "Broker":
-			co, err := tmbroker.New(object.Metadata.Name, configDir)
+			co, err := tmbroker.New(object.Metadata.Name, brokerConfigDir)
 			if err != nil {
 				return fmt.Errorf("creating broker object: %v", err)
 			}
@@ -98,10 +100,16 @@ func (o DescribeOptions) describe(broker string) error {
 				// ignore the error
 				cc = nil
 			}
-			intg.Broker = component{
+			intg.Broker = components{
 				object:    []triggermesh.Component{co},
 				container: []*docker.Container{cc},
 			}
+		case object.Kind == "Trigger":
+			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, brokerConfigDir, []string{})
+			if err := trigger.LookupTrigger(); err != nil {
+				return fmt.Errorf("trigger config: %w", err)
+			}
+			intg.Triggers = append(intg.Triggers, trigger)
 		case object.Kind == "Transformation":
 			co := transformation.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
 			cc, err := triggermesh.Info(ctx, co)
@@ -109,8 +117,8 @@ func (o DescribeOptions) describe(broker string) error {
 				// ignore the error
 				cc = nil
 			}
-			intg.Transformation.object = append(intg.Transformation.object, co)
-			intg.Transformation.container = append(intg.Transformation.container, cc)
+			intg.Transformations.object = append(intg.Transformations.object, co)
+			intg.Transformations.container = append(intg.Transformations.container, cc)
 		case object.APIVersion == "sources.triggermesh.io/v1alpha1":
 			co := source.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
 			cc, err := triggermesh.Info(ctx, co)
@@ -118,8 +126,8 @@ func (o DescribeOptions) describe(broker string) error {
 				// ignore the error
 				cc = nil
 			}
-			intg.Source.object = append(intg.Source.object, co)
-			intg.Source.container = append(intg.Source.container, cc)
+			intg.Sources.object = append(intg.Sources.object, co)
+			intg.Sources.container = append(intg.Sources.container, cc)
 		case object.APIVersion == "targets.triggermesh.io/v1alpha1":
 			co := target.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
 			cc, err := triggermesh.Info(ctx, co)
@@ -127,17 +135,18 @@ func (o DescribeOptions) describe(broker string) error {
 				// ignore the error
 				cc = nil
 			}
-			intg.Target.object = append(intg.Target.object, co)
-			intg.Target.container = append(intg.Target.container, cc)
+			intg.Targets.object = append(intg.Targets.object, co)
+			intg.Targets.container = append(intg.Targets.container, cc)
 		default:
 			continue
 		}
 	}
 
 	output.DescribeBroker(intg.Broker.object, intg.Broker.container)
-	output.DescribeSource(intg.Source.object, intg.Source.container)
-	output.DescribeTransformation(intg.Transformation.object, intg.Transformation.container)
-	output.DescribeTarget(intg.Target.object, intg.Target.container)
+	output.DescribeTrigger(intg.Triggers)
+	output.DescribeSource(intg.Sources.object, intg.Sources.container)
+	output.DescribeTransformation(intg.Transformations.object, intg.Transformations.container)
+	output.DescribeTarget(intg.Targets.object, intg.Targets.container)
 
 	return nil
 }
