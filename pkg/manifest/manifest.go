@@ -47,25 +47,16 @@ func (m *Manifest) Read() error {
 }
 
 func (m *Manifest) Write() error {
-	f, err := os.OpenFile(m.Path, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
+	var output []byte
 	for _, object := range m.Objects {
 		body, err := yaml.Marshal(object)
 		if err != nil {
 			return err
 		}
-		if _, err := f.WriteString("---\n"); err != nil {
-			return err
-		}
-		if _, err := f.Write(body); err != nil {
-			return err
-		}
+		body = append([]byte("---\n"), body...)
+		output = append(output, body...)
 	}
-	return nil
+	return os.WriteFile(m.Path, output, os.ModePerm)
 }
 
 func (m *Manifest) Add(object kubernetes.Object) (bool, error) {
@@ -80,6 +71,17 @@ func (m *Manifest) Add(object kubernetes.Object) (bool, error) {
 	}
 	m.Objects = append(m.Objects, object)
 	return true, nil
+}
+
+func (m *Manifest) Remove(name string) {
+	objects := []kubernetes.Object{}
+	for _, o := range m.Objects {
+		if o.Metadata.Name == name {
+			continue
+		}
+		objects = append(objects, o)
+	}
+	m.Objects = objects
 }
 
 func parseYAML(path string) ([]kubernetes.Object, error) {
