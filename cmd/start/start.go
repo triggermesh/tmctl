@@ -47,7 +47,7 @@ func NewCmd() *cobra.Command {
 	o := &StartOptions{}
 	createCmd := &cobra.Command{
 		Use:   "start [broker]",
-		Short: "starts TriggerMesh components",
+		Short: "Starts TriggerMesh components",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			broker := viper.GetString("context")
 			if len(args) == 1 {
