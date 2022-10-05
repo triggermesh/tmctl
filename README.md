@@ -99,3 +99,17 @@ Print Kubernetes manifest (not applicable at the moment):
 ```
 tmcli dump foo
 ```
+
+## Contributing
+
+We are happy to review and accept pull requests.
+
+## Commercial Support
+
+TriggerMesh Inc. offers commercial support for the TriggerMesh platform. Email us at <info@triggermesh.com> to get more details.
+
+## License
+
+This software is licensed under the [Apache License, Version 2.0][asl2].
+
+[asl2]: https://www.apache.org/licenses/LICENSE-2.0
