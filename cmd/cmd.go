@@ -45,9 +45,11 @@ var (
 
 func NewRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
-		Use:   "",
-		Short: "",
-		Long:  ``,
+		Use:   "tmctl",
+		Short: "A command line interface to configure your event bridges",
+		Long:  `tmctl is a CLI to help you create event flows.
+
+Find more information at: https://docs.triggermesh.io`,
 
 		PersistentPreRunE: func(ccmd *cobra.Command, args []string) error {
 			// check docker server
