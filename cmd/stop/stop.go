@@ -39,7 +39,7 @@ func NewCmd() *cobra.Command {
 	o := &StopOptions{}
 	stopCmd := &cobra.Command{
 		Use:   "stop [broker]",
-		Short: "stops TriggerMesh components",
+		Short: "Stops TriggerMesh components",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := cmd.Flags().GetString("config")
 			if err != nil {

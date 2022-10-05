@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package list
+package brokers
 
 import (
 	"fmt"
@@ -29,8 +29,8 @@ const manifestFile = "manifest.yaml"
 
 func NewCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list",
-		Short: "Show brokers list",
+		Use:   "brokers",
+		Short: "Show the list of brokers",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configDir, err := cmd.Flags().GetString("config")
 			if err != nil {

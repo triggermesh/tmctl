@@ -45,7 +45,7 @@ func NewCmd() *cobra.Command {
 	o := &CreateOptions{}
 	createCmd := &cobra.Command{
 		Use:   "create <resource>",
-		Short: "create TriggerMesh objects",
+		Short: "Create TriggerMesh objects",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.HelpFunc()(cmd, args)
 		},
