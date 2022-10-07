@@ -27,9 +27,9 @@ import (
 
 	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
+	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/components/source"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/source"
 )
 
 func (o *CreateOptions) NewSourceCmd() *cobra.Command {
@@ -75,6 +75,17 @@ func (o *CreateOptions) source(name, kind string, args []string) error {
 	spec := append(args, fmt.Sprintf("--sink.uri=http://host.docker.internal:%s", port))
 
 	s := source.New(name, o.CRD, kind, o.Context, o.Version, spec)
+
+	// extract secrets {
+	// extract passed values from spec
+	// wrap them into secret objects
+	// set refs in parent object
+	// return secret objects that need to be created
+	// }
+	// write secrets to manifest
+	// set container env vars
+
+	// secrets := triggermesh.ExtractSecrets(s)
 
 	log.Println("Updating manifest")
 	restart, err := triggermesh.WriteObject(ctx, s, path.Join(configDir, manifestFile))

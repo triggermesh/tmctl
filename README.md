@@ -20,6 +20,7 @@ Commands with optional context:
 ```
 tmcli dump [broker]
 tmcli describe [broker]
+tmcli remove [--broker <broker>] <component>
 tmcli start [broker]
 tmcli stop [broker]
 tmcli watch [broker]

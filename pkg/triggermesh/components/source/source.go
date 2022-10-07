@@ -25,6 +25,7 @@ import (
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/pkg"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -34,6 +35,7 @@ var (
 	_ triggermesh.Component = (*Source)(nil)
 	_ triggermesh.Producer  = (*Source)(nil)
 	_ triggermesh.Runnable  = (*Source)(nil)
+	_ triggermesh.Parent    = (*Source)(nil)
 )
 
 type Source struct {
@@ -48,28 +50,28 @@ type Source struct {
 	spec  map[string]interface{}
 }
 
-func (s *Source) AsUnstructured() (*unstructured.Unstructured, error) {
+func (s *Source) AsUnstructured() (unstructured.Unstructured, error) {
 	return kubernetes.CreateUnstructured(s.GetKind(), s.GetName(), s.Broker, s.CRDFile, s.spec)
 }
 
-func (s *Source) AsK8sObject() (*kubernetes.Object, error) {
+func (s *Source) AsK8sObject() (kubernetes.Object, error) {
 	return kubernetes.CreateObject(s.GetKind(), s.GetName(), s.Broker, s.CRDFile, s.spec)
 }
 
-func (s *Source) AsContainer() (*docker.Container, error) {
+func (s *Source) AsContainer(opts ...docker.ContainerOption) (*docker.Container, error) {
 	o, err := s.AsUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
 	s.image = adapter.Image(o, s.Version)
-	co, ho, err := adapter.RuntimeParams(o, s.image, "")
+	co, ho, err := adapter.RuntimeParams(o, s.image)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
 	return &docker.Container{
 		Name:                   s.GetName(),
 		CreateHostOptions:      ho,
-		CreateContainerOptions: co,
+		CreateContainerOptions: append(co, opts...),
 	}, nil
 }
 
@@ -83,6 +85,10 @@ func (s *Source) GetKind() string {
 
 func (s *Source) GetImage() string {
 	return s.image
+}
+
+func (s *Source) GetSpec() map[string]interface{} {
+	return s.spec
 }
 
 func (s *Source) GetEventTypes() ([]string, error) {
@@ -108,6 +114,18 @@ func (s *Source) GetEventTypes() ([]string, error) {
 	var result []string
 	for _, v := range et {
 		result = append(result, v.Type)
+	}
+	return result, nil
+}
+
+func (s *Source) GetChildren() ([]triggermesh.Component, error) {
+	var result []triggermesh.Component
+	secrets, err := kubernetes.ExtractSecrets(s.Name, s.Kind, s.CRDFile, s.spec)
+	if err != nil {
+		return nil, fmt.Errorf("extracting target secrets: %w", err)
+	}
+	for k, v := range secrets {
+		result = append(result, secret.New(k, s.Broker, v.(map[string]interface{})))
 	}
 	return result, nil
 }

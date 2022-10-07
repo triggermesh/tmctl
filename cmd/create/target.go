@@ -25,10 +25,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/components/target"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/target"
 )
 
 func (o *CreateOptions) NewTargetCmd() *cobra.Command {
@@ -78,13 +79,37 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilt
 	}
 
 	t := target.New(name, o.CRD, kind, o.Context, o.Version, args)
+
+	secrets, err := t.GetChildren()
+	if err != nil {
+		return fmt.Errorf("target secrets: %w", err)
+	}
+
+	var dockerEnv []string
+	for _, s := range secrets {
+		if _, err := triggermesh.WriteObject(ctx, s, manifest); err != nil {
+			return fmt.Errorf("write secret object: %w", err)
+		}
+		env, err := triggermesh.ToEnv(s)
+		if err != nil {
+			return fmt.Errorf("secret env: %w", err)
+		}
+		for _, e := range env {
+			dockerEnv = append(dockerEnv, fmt.Sprintf("%s=%s", e.Name, e.Value))
+		}
+	}
+
+	// fmt.Println(dockerEnv)
+	// fmt.Println(t.GetSpec())
+	// os.Exit(1)
+
 	log.Println("Updating manifest")
 	restart, err := triggermesh.WriteObject(ctx, t, manifest)
 	if err != nil {
 		return err
 	}
 	log.Println("Starting container")
-	container, err := triggermesh.Start(ctx, t, restart)
+	container, err := triggermesh.Start(ctx, t, restart, docker.WithEnv(dockerEnv))
 	if err != nil {
 		return err
 	}

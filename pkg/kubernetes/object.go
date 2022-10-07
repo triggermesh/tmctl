@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/triggermesh/tmcli/pkg/openapi"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
 )
 
@@ -33,30 +32,42 @@ type Object struct {
 	APIVersion string                 `yaml:"apiVersion"`
 	Kind       string                 `yaml:"kind"`
 	Metadata   Metadata               `yaml:"metadata"`
-	Spec       map[string]interface{} `yaml:"spec"`
+	Spec       map[string]interface{} `yaml:"spec,omitempty"`
+
+	// for Secrets
+	Data map[string]interface{} `yaml:"data,omitempty"`
+	Type string                 `yaml:"type,omitempty"`
 }
 
 type Metadata struct {
-	Name   string            `yaml:"name"`
-	Labels map[string]string `yaml:"labels"`
+	Name            string            `yaml:"name"`
+	Namespace       string            `yaml:"namespace,omitempty"`
+	Labels          map[string]string `yaml:"labels"`
+	OwnerReferences []struct {
+		APIVersion         string `yaml:"apiVersion"`
+		BlockOwnerDeletion bool   `yaml:"blockOwnerDeletion"`
+		Kind               string `yaml:"kind"`
+		Name               string `yaml:"name"`
+		UID                string `yaml:"uid"`
+	} `yaml:"ownerReferences,omitempty"`
 }
 
-func CreateObject(resource, name, broker, crdFile string, spec map[string]interface{}) (*Object, error) {
+func CreateObject(resource, name, broker, crdFile string, spec map[string]interface{}) (Object, error) {
 	crdObject, err := crd.GetResourceCRD(resource, crdFile)
 	if err != nil {
-		return nil, fmt.Errorf("CRD schema not found: %w", err)
+		return Object{}, fmt.Errorf("CRD schema not found: %w", err)
 	}
 	schema, version, err := getObjectCRD(crdObject)
 	if err != nil {
-		return nil, fmt.Errorf("object schema: %w", err)
+		return Object{}, fmt.Errorf("object schema: %w", err)
 	}
 	if spec, err = schema.Process(spec); err != nil {
-		return nil, fmt.Errorf("spec processing: %w", err)
+		return Object{}, fmt.Errorf("spec processing: %w", err)
 	}
 	if err := schema.Validate(spec); err != nil {
-		return nil, fmt.Errorf("CR validation: %w", err)
+		return Object{}, fmt.Errorf("CR validation: %w", err)
 	}
-	return &Object{
+	return Object{
 		APIVersion: fmt.Sprintf("%s/%s", crdObject.Spec.Group, version),
 		Kind:       crdObject.Spec.Names.Kind,
 		Metadata: Metadata{
@@ -69,22 +80,22 @@ func CreateObject(resource, name, broker, crdFile string, spec map[string]interf
 	}, nil
 }
 
-func CreateUnstructured(resource, name, broker, crdFile string, spec map[string]interface{}) (*unstructured.Unstructured, error) {
+func CreateUnstructured(resource, name, broker, crdFile string, spec map[string]interface{}) (unstructured.Unstructured, error) {
 	crdObject, err := crd.GetResourceCRD(resource, crdFile)
 	if err != nil {
-		return nil, fmt.Errorf("CRD schema not found: %w", err)
+		return unstructured.Unstructured{}, fmt.Errorf("CRD schema not found: %w", err)
 	}
 	schema, version, err := getObjectCRD(crdObject)
 	if err != nil {
-		return nil, fmt.Errorf("object schema: %w", err)
+		return unstructured.Unstructured{}, fmt.Errorf("object schema: %w", err)
 	}
 	if spec, err = schema.Process(spec); err != nil {
-		return nil, fmt.Errorf("spec processing: %w", err)
+		return unstructured.Unstructured{}, fmt.Errorf("spec processing: %w", err)
 	}
 	if err := schema.Validate(spec); err != nil {
-		return nil, fmt.Errorf("CR validation: %w", err)
+		return unstructured.Unstructured{}, fmt.Errorf("CR validation: %w", err)
 	}
-	u := &unstructured.Unstructured{}
+	u := unstructured.Unstructured{}
 	u.SetAPIVersion(fmt.Sprintf("%s/%s", crdObject.Spec.Group, version))
 	u.SetKind(crdObject.Spec.Names.Kind)
 	u.SetName(name)
@@ -92,10 +103,10 @@ func CreateUnstructured(resource, name, broker, crdFile string, spec map[string]
 	return u, unstructured.SetNestedField(u.Object, spec, "spec")
 }
 
-func getObjectCRD(crdObject crd.CRD) (*openapi.Schema, string, error) {
+func getObjectCRD(crdObject crd.CRD) (*crd.Schema, string, error) {
 	for _, v := range crdObject.Spec.Versions {
 		if v.Served {
-			schema, err := openapi.GetSchema(v.Schema.OpenAPIV3Schema.Properties.Spec)
+			schema, err := crd.GetSchema(v.Schema.OpenAPIV3Schema.Properties.Spec)
 			if err != nil {
 				return nil, "", fmt.Errorf("CRD schema: %w", err)
 			}
@@ -103,4 +114,16 @@ func getObjectCRD(crdObject crd.CRD) (*openapi.Schema, string, error) {
 		}
 	}
 	return nil, "", fmt.Errorf("CRD schema not found")
+}
+
+func ExtractSecrets(componentName, resource, crdFile string, spec map[string]interface{}) (map[string]interface{}, error) {
+	crdObject, err := crd.GetResourceCRD(resource, crdFile)
+	if err != nil {
+		return nil, err
+	}
+	schema, _, err := getObjectCRD(crdObject)
+	if err != nil {
+		return nil, err
+	}
+	return crd.ExtractSecrets(componentName, *schema, spec), nil
 }

@@ -32,7 +32,7 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/flow/reconciler/xslttransformation"
 )
 
-func flow(object *unstructured.Unstructured) ([]corev1.EnvVar, error) {
+func flow(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 	switch object.GetKind() {
 	// Flow API group
 	case "Transformation":

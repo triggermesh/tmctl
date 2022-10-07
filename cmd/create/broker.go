@@ -27,7 +27,7 @@ import (
 
 	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
+	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
 )
 
 func (o *CreateOptions) NewBrokerCmd() *cobra.Command {

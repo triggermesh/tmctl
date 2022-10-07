@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/manifest"
 )
@@ -33,25 +35,18 @@ func WriteObject(ctx context.Context, object Component, manifestFile string) (bo
 	if err != nil {
 		return false, fmt.Errorf("creating object: %w", err)
 	}
-	dirty, err := manifest.Add(*k8sObject)
-	if err != nil {
-		return false, fmt.Errorf("adding to manifest: %w", err)
+	if dirty := manifest.Add(k8sObject); !dirty {
+		return false, nil
 	}
-	if dirty {
-		if err := manifest.Write(); err != nil {
-			return false, fmt.Errorf("writing manifest: %w", err)
-		}
-		return true, nil
-	}
-	return false, nil
+	return true, manifest.Write()
 }
 
-func Start(ctx context.Context, object Runnable, restart bool) (*docker.Container, error) {
+func Start(ctx context.Context, object Runnable, restart bool, opts ...docker.ContainerOption) (*docker.Container, error) {
 	client, err := docker.NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("creating docker client: %w", err)
 	}
-	container, err := object.AsContainer()
+	container, err := object.AsContainer(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating container object: %w", err)
 	}
@@ -85,4 +80,15 @@ func Info(ctx context.Context, object Runnable) (*docker.Container, error) {
 		return nil, fmt.Errorf("container object: %w", err)
 	}
 	return container.LookupHostConfig(ctx, client)
+}
+
+func ToEnv(secret Component) ([]corev1.EnvVar, error) {
+	if kind := secret.GetKind(); kind != "Secret" {
+		return []corev1.EnvVar{}, fmt.Errorf("%q is not convertable to env variables", kind)
+	}
+	var result []corev1.EnvVar
+	for k, v := range secret.GetSpec() {
+		result = append(result, corev1.EnvVar{Name: k, Value: v.(string)})
+	}
+	return result, nil
 }

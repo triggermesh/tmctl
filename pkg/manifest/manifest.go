@@ -59,18 +59,18 @@ func (m *Manifest) Write() error {
 	return os.WriteFile(m.Path, output, os.ModePerm)
 }
 
-func (m *Manifest) Add(object kubernetes.Object) (bool, error) {
+func (m *Manifest) Add(object kubernetes.Object) bool {
 	for i, o := range m.Objects {
 		if matchObjects(object, o) {
 			if !reflect.DeepEqual(o, object) {
 				m.Objects[i] = object
-				return true, nil
+				return true
 			}
-			return false, nil
+			return false
 		}
 	}
 	m.Objects = append(m.Objects, object)
-	return true, nil
+	return true
 }
 
 func (m *Manifest) Remove(name string) {

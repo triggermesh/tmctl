@@ -30,7 +30,7 @@ import (
 
 	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/transformation"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/components/transformation"
 )
 
 const (

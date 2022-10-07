@@ -45,28 +45,28 @@ type Transformation struct {
 	spec  map[string]interface{}
 }
 
-func (t *Transformation) AsUnstructured() (*unstructured.Unstructured, error) {
+func (t *Transformation) AsUnstructured() (unstructured.Unstructured, error) {
 	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
 }
 
-func (t *Transformation) AsK8sObject() (*kubernetes.Object, error) {
+func (t *Transformation) AsK8sObject() (kubernetes.Object, error) {
 	return kubernetes.CreateObject(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
 }
 
-func (t *Transformation) AsContainer() (*docker.Container, error) {
+func (t *Transformation) AsContainer(opts ...docker.ContainerOption) (*docker.Container, error) {
 	o, err := t.AsUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
 	t.image = adapter.Image(o, t.Version)
-	co, ho, err := adapter.RuntimeParams(o, t.image, "")
+	co, ho, err := adapter.RuntimeParams(o, t.image)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
 	return &docker.Container{
 		Name:                   t.GetName(),
 		CreateHostOptions:      ho,
-		CreateContainerOptions: co,
+		CreateContainerOptions: append(co, opts...),
 	}, nil
 }
 
@@ -80,6 +80,10 @@ func (t *Transformation) GetKind() string {
 
 func (t *Transformation) GetImage() string {
 	return t.image
+}
+
+func (t *Transformation) GetSpec() map[string]interface{} {
+	return t.spec
 }
 
 func (t *Transformation) GetEventTypes() ([]string, error) {

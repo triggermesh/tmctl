@@ -48,7 +48,7 @@ type Broker struct {
 	Name       string
 
 	image string
-	// spec  map[string]interface{}
+	spec  map[string]interface{}
 	// Configuration Configuration
 }
 
@@ -56,8 +56,8 @@ type Configuration struct {
 	Triggers []TriggerSpec `yaml:"triggers"`
 }
 
-func (b *Broker) AsUnstructured() (*unstructured.Unstructured, error) {
-	u := &unstructured.Unstructured{}
+func (b *Broker) AsUnstructured() (unstructured.Unstructured, error) {
+	u := unstructured.Unstructured{}
 	u.SetAPIVersion("eventing.triggermesh.io/v1alpha1")
 	u.SetKind("Broker")
 	u.SetName(b.Name)
@@ -65,30 +65,34 @@ func (b *Broker) AsUnstructured() (*unstructured.Unstructured, error) {
 	return u, unstructured.SetNestedField(u.Object, nil, "spec")
 }
 
-func (b *Broker) AsK8sObject() (*kubernetes.Object, error) {
-	return &kubernetes.Object{
+func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
+	return kubernetes.Object{
 		APIVersion: "eventing.triggermesh.io/v1alpha1",
 		Kind:       "Broker",
 		Metadata: kubernetes.Metadata{
 			Name: b.Name,
-			// Labels: map[string]string{
-			// "triggermesh.io/context": b.Name,
-			// },
+			Labels: map[string]string{
+				"triggermesh.io/context": b.Name,
+			},
 		},
 		Spec: map[string]interface{}{"storage": "inmemory"},
 	}, nil
 }
 
-func (b *Broker) AsContainer() (*docker.Container, error) {
+func (b *Broker) AsContainer(opts ...docker.ContainerOption) (*docker.Container, error) {
 	o, err := b.AsUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
 	b.image = image
-	co, ho, err := adapter.RuntimeParams(o, b.image, b.ConfigFile)
+	co, ho, err := adapter.RuntimeParams(o, b.image)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
+
+	bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", b.ConfigFile)
+	ho = append(ho, docker.WithVolumeBind(bind))
+
 	name := o.GetName()
 	if !strings.HasSuffix(name, "-broker") {
 		name = name + "-broker"
@@ -96,7 +100,7 @@ func (b *Broker) AsContainer() (*docker.Container, error) {
 	return &docker.Container{
 		Name:                   name,
 		CreateHostOptions:      ho,
-		CreateContainerOptions: co,
+		CreateContainerOptions: append(co, opts...),
 	}, nil
 }
 
@@ -110,6 +114,10 @@ func (b *Broker) GetName() string {
 
 func (b *Broker) GetImage() string {
 	return b.image
+}
+
+func (b *Broker) GetSpec() map[string]interface{} {
+	return b.spec
 }
 
 func (b *Broker) GetPort(ctx context.Context) (string, error) {

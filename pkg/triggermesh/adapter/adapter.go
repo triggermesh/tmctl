@@ -31,11 +31,11 @@ const (
 	adapterPort = "8080/tcp"
 )
 
-func Image(object *unstructured.Unstructured, version string) string {
+func Image(object unstructured.Unstructured, version string) string {
 	return fmt.Sprintf("%s/%s-adapter:%s", registry, strings.ToLower(object.GetKind()), version)
 }
 
-func RuntimeParams(object *unstructured.Unstructured, image, brokerConfigFile string) ([]docker.ContainerOption, []docker.HostOption, error) {
+func RuntimeParams(object unstructured.Unstructured, image string) ([]docker.ContainerOption, []docker.HostOption, error) {
 	co := []docker.ContainerOption{
 		docker.WithImage(image),
 		docker.WithPort(adapterPort),
@@ -46,34 +46,18 @@ func RuntimeParams(object *unstructured.Unstructured, image, brokerConfigFile st
 		docker.WithExtraHost(),
 	}
 
-	switch object.GetKind() {
-	case "Broker":
-		bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", brokerConfigFile)
-		ho = append(ho, docker.WithVolumeBind(bind))
-	// case "Function":
-	// 	configFile := path.Join("/Users/tzununbekov/.triggermesh/cli", viper.GetString("context"), object.Metadata.Name)
-	// 	if err := writeFile(configFile, []byte(function.Code(object))); err != nil {
-	// 		return nil, nil, fmt.Errorf("writing function: %w", err)
-	// 	}
-	// 	bind := fmt.Sprintf("%s:/opt/source.%s", configFile, function.FileExtension(object))
-	// 	ho = append(ho, docker.WithVolumeBind(bind))
-	// 	co = append(co, docker.WithEntrypoint("/opt/aws-custom-runtime"))
-	// 	// yikes
-	// 	fallthrough
-	default:
-		kenv, err := buildEnv(object)
-		if err != nil {
-			return nil, nil, fmt.Errorf("adapter environment: %w", err)
-		}
-		sinkURI, set, err := unstructured.NestedString(object.Object, "spec", "sink", "uri")
-		if err != nil {
-			return nil, nil, fmt.Errorf("sink URI type: %w", err)
-		}
-		if set {
-			kenv = append(kenv, corev1.EnvVar{Name: "K_SINK", Value: sinkURI})
-		}
-		co = append(co, docker.WithEnv(envsToString(kenv)))
+	kenv, err := buildEnv(object)
+	if err != nil {
+		return nil, nil, fmt.Errorf("adapter environment: %w", err)
 	}
+	sinkURI, set, err := unstructured.NestedString(object.Object, "spec", "sink", "uri")
+	if err != nil {
+		return nil, nil, fmt.Errorf("sink URI type: %w", err)
+	}
+	if set {
+		kenv = append(kenv, corev1.EnvVar{Name: "K_SINK", Value: sinkURI})
+	}
+	co = append(co, docker.WithEnv(envsToString(kenv)))
 
 	return co, ho, nil
 }

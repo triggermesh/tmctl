@@ -29,7 +29,7 @@ import (
 
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/manifest"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
+	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
 )
 
 const manifestFile = "manifest.yaml"

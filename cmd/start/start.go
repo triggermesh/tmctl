@@ -28,10 +28,10 @@ import (
 
 	"github.com/triggermesh/tmcli/pkg/manifest"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/source"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/target"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/transformation"
+	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/components/source"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/components/target"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/components/transformation"
 )
 
 const manifestFile = "manifest.yaml"

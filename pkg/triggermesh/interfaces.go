@@ -25,15 +25,16 @@ import (
 )
 
 type Component interface {
-	AsUnstructured() (*unstructured.Unstructured, error)
-	AsK8sObject() (*kubernetes.Object, error)
+	AsUnstructured() (unstructured.Unstructured, error)
+	AsK8sObject() (kubernetes.Object, error)
 
 	GetName() string
 	GetKind() string
+	GetSpec() map[string]interface{}
 }
 
 type Runnable interface {
-	AsContainer() (*docker.Container, error)
+	AsContainer(...docker.ContainerOption) (*docker.Container, error)
 
 	GetImage() string
 }
@@ -46,4 +47,8 @@ type Producer interface {
 type Consumer interface {
 	ConsumedEventTypes() ([]string, error)
 	GetPort(context.Context) (string, error)
+}
+
+type Parent interface {
+	GetChildren() ([]Component, error)
 }
