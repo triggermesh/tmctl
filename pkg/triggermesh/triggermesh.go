@@ -41,12 +41,12 @@ func WriteObject(ctx context.Context, object Component, manifestFile string) (bo
 	return true, manifest.Write()
 }
 
-func Start(ctx context.Context, object Runnable, restart bool, opts ...docker.ContainerOption) (*docker.Container, error) {
+func Start(ctx context.Context, object Runnable, restart bool, additionalEnv map[string]string) (*docker.Container, error) {
 	client, err := docker.NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("creating docker client: %w", err)
 	}
-	container, err := object.AsContainer(opts...)
+	container, err := object.AsContainer(additionalEnv)
 	if err != nil {
 		return nil, fmt.Errorf("creating container object: %w", err)
 	}
@@ -75,7 +75,7 @@ func Info(ctx context.Context, object Runnable) (*docker.Container, error) {
 	if err != nil {
 		return nil, fmt.Errorf("docker client: %w", err)
 	}
-	container, err := object.AsContainer()
+	container, err := object.AsContainer(nil)
 	if err != nil {
 		return nil, fmt.Errorf("container object: %w", err)
 	}

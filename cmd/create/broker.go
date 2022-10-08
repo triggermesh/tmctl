@@ -60,7 +60,7 @@ func (o *CreateOptions) broker(name string) error {
 	}
 
 	log.Println("Starting container")
-	if _, err := triggermesh.Start(ctx, broker, restart); err != nil {
+	if _, err := triggermesh.Start(ctx, broker, restart, nil); err != nil {
 		return err
 	}
 

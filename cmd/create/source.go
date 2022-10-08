@@ -93,7 +93,7 @@ func (o *CreateOptions) source(name, kind string, args []string) error {
 		return err
 	}
 	log.Println("Starting container")
-	if _, err := triggermesh.Start(ctx, s, restart); err != nil {
+	if _, err := triggermesh.Start(ctx, s, restart, nil); err != nil {
 		return err
 	}
 	output.PrintStatus("producer", s, "", []string{})

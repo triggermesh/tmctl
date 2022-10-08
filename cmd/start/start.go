@@ -89,7 +89,7 @@ func (o *StartOptions) start(broker string) error {
 				return fmt.Errorf("creating broker object: %v", err)
 			}
 			log.Println("Starting broker")
-			container, err := triggermesh.Start(ctx, broker, o.Restart)
+			container, err := triggermesh.Start(ctx, broker, o.Restart, nil)
 			if err != nil {
 				return fmt.Errorf("starting broker container: %v", err)
 			}
@@ -121,7 +121,7 @@ func (o *StartOptions) start(broker string) error {
 				return fmt.Errorf("creating object: %w", err)
 			}
 			log.Printf("Starting %s\n", object.Metadata.Name)
-			if _, err := triggermesh.Start(ctx, c, o.Restart); err != nil {
+			if _, err := triggermesh.Start(ctx, c, o.Restart, nil); err != nil {
 				return fmt.Errorf("starting container: %w", err)
 			}
 		case strings.HasSuffix(object.Kind, "Target") ||
@@ -138,7 +138,7 @@ func (o *StartOptions) start(broker string) error {
 				return fmt.Errorf("creating object: %w", err)
 			}
 			log.Printf("Starting %s\n", object.Metadata.Name)
-			container, err := triggermesh.Start(ctx, c.(triggermesh.Runnable), o.Restart)
+			container, err := triggermesh.Start(ctx, c.(triggermesh.Runnable), o.Restart, nil)
 			if err != nil {
 				return fmt.Errorf("starting container: %w", err)
 			}

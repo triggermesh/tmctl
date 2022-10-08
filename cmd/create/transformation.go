@@ -120,7 +120,7 @@ func (o *CreateOptions) transformation(name, eventSourceFilter string, eventType
 		return err
 	}
 	log.Println("Starting container")
-	container, err := triggermesh.Start(ctx, t, restart)
+	container, err := triggermesh.Start(ctx, t, restart, nil)
 	if err != nil {
 		return err
 	}

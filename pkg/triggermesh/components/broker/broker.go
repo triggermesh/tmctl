@@ -79,13 +79,13 @@ func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
 	}, nil
 }
 
-func (b *Broker) AsContainer(opts ...docker.ContainerOption) (*docker.Container, error) {
+func (b *Broker) AsContainer(additionalEnvs map[string]string) (*docker.Container, error) {
 	o, err := b.AsUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
 	b.image = image
-	co, ho, err := adapter.RuntimeParams(o, b.image)
+	co, ho, err := adapter.RuntimeParams(o, b.image, additionalEnvs)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
@@ -100,7 +100,7 @@ func (b *Broker) AsContainer(opts ...docker.ContainerOption) (*docker.Container,
 	return &docker.Container{
 		Name:                   name,
 		CreateHostOptions:      ho,
-		CreateContainerOptions: append(co, opts...),
+		CreateContainerOptions: co,
 	}, nil
 }
 
@@ -125,7 +125,7 @@ func (b *Broker) GetPort(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("docker client: %w", err)
 	}
-	container, err := b.AsContainer()
+	container, err := b.AsContainer(nil)
 	if err != nil {
 		return "", fmt.Errorf("container object: %w", err)
 	}

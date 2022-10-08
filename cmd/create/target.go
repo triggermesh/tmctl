@@ -25,7 +25,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/components/target"
@@ -85,7 +84,7 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilt
 		return fmt.Errorf("target secrets: %w", err)
 	}
 
-	var dockerEnv []string
+	secretEnv := make(map[string]string)
 	for _, s := range secrets {
 		if _, err := triggermesh.WriteObject(ctx, s, manifest); err != nil {
 			return fmt.Errorf("write secret object: %w", err)
@@ -94,8 +93,8 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilt
 		if err != nil {
 			return fmt.Errorf("secret env: %w", err)
 		}
-		for _, e := range env {
-			dockerEnv = append(dockerEnv, fmt.Sprintf("%s=%s", e.Name, e.Value))
+		for _, v := range env {
+			secretEnv[v.Name] = v.Value
 		}
 	}
 
@@ -109,7 +108,7 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilt
 		return err
 	}
 	log.Println("Starting container")
-	container, err := triggermesh.Start(ctx, t, restart, docker.WithEnv(dockerEnv))
+	container, err := triggermesh.Start(ctx, t, restart, secretEnv)
 	if err != nil {
 		return err
 	}

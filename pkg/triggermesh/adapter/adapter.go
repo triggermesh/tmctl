@@ -35,7 +35,7 @@ func Image(object unstructured.Unstructured, version string) string {
 	return fmt.Sprintf("%s/%s-adapter:%s", registry, strings.ToLower(object.GetKind()), version)
 }
 
-func RuntimeParams(object unstructured.Unstructured, image string) ([]docker.ContainerOption, []docker.HostOption, error) {
+func RuntimeParams(object unstructured.Unstructured, image string, additionalEnvs map[string]string) ([]docker.ContainerOption, []docker.HostOption, error) {
 	co := []docker.ContainerOption{
 		docker.WithImage(image),
 		docker.WithPort(adapterPort),
@@ -45,11 +45,21 @@ func RuntimeParams(object unstructured.Unstructured, image string) ([]docker.Con
 		docker.WithHostPortBinding(adapterPort),
 		docker.WithExtraHost(),
 	}
-
 	kenv, err := buildEnv(object)
 	if err != nil {
 		return nil, nil, fmt.Errorf("adapter environment: %w", err)
 	}
+
+	if additionalEnvs != nil {
+		for i, v := range kenv {
+			if v.ValueFrom != nil {
+				if secret, ok := additionalEnvs[v.ValueFrom.SecretKeyRef.Key]; ok {
+					kenv[i] = corev1.EnvVar{Name: v.Name, Value: secret}
+				}
+			}
+		}
+	}
+
 	sinkURI, set, err := unstructured.NestedString(object.Object, "spec", "sink", "uri")
 	if err != nil {
 		return nil, nil, fmt.Errorf("sink URI type: %w", err)

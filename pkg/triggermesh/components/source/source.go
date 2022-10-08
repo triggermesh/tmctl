@@ -58,20 +58,20 @@ func (s *Source) AsK8sObject() (kubernetes.Object, error) {
 	return kubernetes.CreateObject(s.GetKind(), s.GetName(), s.Broker, s.CRDFile, s.spec)
 }
 
-func (s *Source) AsContainer(opts ...docker.ContainerOption) (*docker.Container, error) {
+func (s *Source) AsContainer(additionalEnvs map[string]string) (*docker.Container, error) {
 	o, err := s.AsUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
 	s.image = adapter.Image(o, s.Version)
-	co, ho, err := adapter.RuntimeParams(o, s.image)
+	co, ho, err := adapter.RuntimeParams(o, s.image, additionalEnvs)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
 	return &docker.Container{
 		Name:                   s.GetName(),
 		CreateHostOptions:      ho,
-		CreateContainerOptions: append(co, opts...),
+		CreateContainerOptions: co,
 	}, nil
 }
 

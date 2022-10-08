@@ -19,9 +19,10 @@ package triggermesh
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type Component interface {
@@ -34,7 +35,7 @@ type Component interface {
 }
 
 type Runnable interface {
-	AsContainer(...docker.ContainerOption) (*docker.Container, error)
+	AsContainer(additionalEnvs map[string]string) (*docker.Container, error)
 
 	GetImage() string
 }
