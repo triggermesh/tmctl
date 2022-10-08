@@ -18,6 +18,7 @@ package crd
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -39,7 +40,7 @@ func ExtractSecrets(componentName string, schema Schema, spec map[string]interfa
 	for k, v := range spec {
 		if nestedSchema, ok := schema.schema.Properties[k]; ok {
 			if key, ok := isSecretRef(nestedSchema); ok {
-				secretName := fmt.Sprintf("%s-%s", componentName, k)
+				secretName := strings.ToLower(fmt.Sprintf("%s-%s", componentName, k))
 				if secretValue, ok := v.(string); ok {
 					result[secretName] = map[string]interface{}{k: secretValue}
 				} else {
@@ -53,8 +54,12 @@ func ExtractSecrets(componentName string, schema Schema, spec map[string]interfa
 				}
 			}
 			if nestedSpec, ok := v.(map[string]interface{}); ok {
-				result[k] = ExtractSecrets(componentName, Schema{nestedSchema}, nestedSpec)
+				for nestedKey, nestedValue := range ExtractSecrets(componentName, Schema{nestedSchema}, nestedSpec) {
+					result[strings.ToLower(nestedKey)] = nestedValue
+				}
 			}
+		} else {
+			// spec mismatch
 		}
 	}
 	return result

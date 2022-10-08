@@ -45,6 +45,11 @@ func RuntimeParams(object unstructured.Unstructured, image string, additionalEnv
 		docker.WithHostPortBinding(adapterPort),
 		docker.WithExtraHost(),
 	}
+
+	if object.GetKind() == "Broker" {
+		return co, ho, nil
+	}
+
 	kenv, err := buildEnv(object)
 	if err != nil {
 		return nil, nil, fmt.Errorf("adapter environment: %w", err)

@@ -70,7 +70,7 @@ func (o *StopOptions) stop(broker string) error {
 	}
 
 	for _, object := range manifest.Objects {
-		if object.Kind == "Trigger" {
+		if object.Kind == "Trigger" || object.Kind == "Secret" {
 			continue
 		}
 		if object.Kind == "Broker" {

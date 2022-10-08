@@ -84,10 +84,15 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilt
 		return fmt.Errorf("target secrets: %w", err)
 	}
 
+	secretsChanged := false
 	secretEnv := make(map[string]string)
 	for _, s := range secrets {
-		if _, err := triggermesh.WriteObject(ctx, s, manifest); err != nil {
+		dirty, err := triggermesh.WriteObject(ctx, s, manifest)
+		if err != nil {
 			return fmt.Errorf("write secret object: %w", err)
+		}
+		if dirty {
+			secretsChanged = true
 		}
 		env, err := triggermesh.ToEnv(s)
 		if err != nil {
@@ -98,17 +103,13 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilt
 		}
 	}
 
-	// fmt.Println(dockerEnv)
-	// fmt.Println(t.GetSpec())
-	// os.Exit(1)
-
 	log.Println("Updating manifest")
 	restart, err := triggermesh.WriteObject(ctx, t, manifest)
 	if err != nil {
 		return err
 	}
 	log.Println("Starting container")
-	container, err := triggermesh.Start(ctx, t, restart, secretEnv)
+	container, err := triggermesh.Start(ctx, t, (restart || secretsChanged), secretEnv)
 	if err != nil {
 		return err
 	}
