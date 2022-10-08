@@ -18,6 +18,7 @@ package crd
 
 import (
 	"encoding/base64"
+	"fmt"
 	"strings"
 
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -35,7 +36,7 @@ func isSecretRef(s spec.Schema) (string, bool) {
 	return "", false
 }
 
-func ExtractSecrets(componentName string, schema Schema, spec map[string]interface{}) map[string]string {
+func ExtractSecrets(componentName string, schema Schema, spec map[string]interface{}) (map[string]string, error) {
 	result := make(map[string]string)
 	for k, v := range spec {
 		if nestedSchema, ok := schema.schema.Properties[k]; ok {
@@ -43,7 +44,7 @@ func ExtractSecrets(componentName string, schema Schema, spec map[string]interfa
 				if secretValue, ok := v.(string); ok {
 					result[k] = base64.StdEncoding.EncodeToString([]byte(secretValue))
 				} else {
-					// error, we want a secret value here
+					return nil, fmt.Errorf("%q is expected to contain secret string, got %T", k, v)
 				}
 				spec[k] = map[string]interface{}{
 					key: map[string]interface{}{
@@ -53,13 +54,15 @@ func ExtractSecrets(componentName string, schema Schema, spec map[string]interfa
 				}
 			}
 			if nestedSpec, ok := v.(map[string]interface{}); ok {
-				for nestedKey, nestedValue := range ExtractSecrets(componentName, Schema{nestedSchema}, nestedSpec) {
+				nestedSecrets, err := ExtractSecrets(componentName, Schema{nestedSchema}, nestedSpec)
+				if err != nil {
+					return nil, err
+				}
+				for nestedKey, nestedValue := range nestedSecrets {
 					result[nestedKey] = nestedValue
 				}
 			}
-		} else {
-			// spec mismatch
 		}
 	}
-	return result
+	return result, nil
 }

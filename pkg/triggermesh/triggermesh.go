@@ -96,14 +96,14 @@ func secretToEnv(secret Component) ([]corev1.EnvVar, error) {
 func ProcessSecrets(ctx context.Context, p Parent, manifestFile string) (map[string]string, bool, error) {
 	secrets, err := p.GetChildren()
 	if err != nil {
-		return nil, false, fmt.Errorf("target secrets: %w", err)
+		return nil, false, fmt.Errorf("component nested objects: %w", err)
 	}
 	secretsChanged := false
 	secretEnv := make(map[string]string)
 	for _, s := range secrets {
 		dirty, err := WriteObject(ctx, s, manifestFile)
 		if err != nil {
-			return nil, false, fmt.Errorf("write secret object: %w", err)
+			return nil, false, fmt.Errorf("write nested object: %w", err)
 		}
 		if dirty {
 			secretsChanged = true

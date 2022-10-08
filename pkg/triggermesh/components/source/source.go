@@ -121,7 +121,7 @@ func (s *Source) GetEventTypes() ([]string, error) {
 func (s *Source) GetChildren() ([]triggermesh.Component, error) {
 	secrets, err := kubernetes.ExtractSecrets(s.Name, s.Kind, s.CRDFile, s.spec)
 	if err != nil {
-		return nil, fmt.Errorf("extracting target secrets: %w", err)
+		return nil, fmt.Errorf("extracting secrets: %w", err)
 	}
 	return []triggermesh.Component{secret.New(strings.ToLower(s.Name), s.Broker, secrets)}, nil
 }

@@ -22,6 +22,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/docker/docker/client"
 	"github.com/spf13/cobra"
@@ -98,7 +99,7 @@ func (o *DeleteOptions) deleteComponents(components []string) error {
 		if skip {
 			continue
 		}
-		log.Printf("Deleting %q", object.Metadata.Name)
+		log.Printf("Deleting %q %s", object.Metadata.Name, strings.ToLower(object.Kind))
 		if object.Kind == "Broker" {
 			object.Metadata.Name += "-broker"
 		}

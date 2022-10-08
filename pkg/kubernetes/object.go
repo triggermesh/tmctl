@@ -125,5 +125,5 @@ func ExtractSecrets(componentName, resource, crdFile string, spec map[string]int
 	if err != nil {
 		return nil, err
 	}
-	return crd.ExtractSecrets(componentName, *schema, spec), nil
+	return crd.ExtractSecrets(componentName, *schema, spec)
 }

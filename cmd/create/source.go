@@ -79,7 +79,7 @@ func (o *CreateOptions) source(name, kind string, args []string) error {
 
 	secretEnv, secretsChanged, err := triggermesh.ProcessSecrets(ctx, s, manifest)
 	if err != nil {
-		return fmt.Errorf("component secrets: %w", err)
+		return fmt.Errorf("spec processing: %w", err)
 	}
 
 	log.Println("Updating manifest")
