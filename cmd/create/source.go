@@ -81,7 +81,6 @@ func (o *CreateOptions) source(name, kind string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("source secrets: %w", err)
 	}
-
 	secretsChanged := false
 	secretEnv := make(map[string]string)
 	for _, s := range secrets {

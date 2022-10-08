@@ -107,15 +107,11 @@ func (t *Target) GetPort(ctx context.Context) (string, error) {
 }
 
 func (t *Target) GetChildren() ([]triggermesh.Component, error) {
-	var result []triggermesh.Component
 	secrets, err := kubernetes.ExtractSecrets(t.Name, t.Kind, t.CRDFile, t.spec)
 	if err != nil {
 		return nil, fmt.Errorf("extracting secrets: %w", err)
 	}
-	for k, v := range secrets {
-		result = append(result, secret.New(k, t.Broker, v.(map[string]interface{})))
-	}
-	return result, nil
+	return []triggermesh.Component{secret.New(strings.ToLower(t.Name), t.Broker, secrets)}, nil
 }
 
 func (t *Target) ConsumedEventTypes() ([]string, error) {

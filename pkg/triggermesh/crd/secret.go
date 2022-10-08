@@ -17,7 +17,7 @@ limitations under the License.
 package crd
 
 import (
-	"fmt"
+	"encoding/base64"
 	"strings"
 
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -35,27 +35,26 @@ func isSecretRef(s spec.Schema) (string, bool) {
 	return "", false
 }
 
-func ExtractSecrets(componentName string, schema Schema, spec map[string]interface{}) map[string]interface{} {
-	result := make(map[string]interface{})
+func ExtractSecrets(componentName string, schema Schema, spec map[string]interface{}) map[string]string {
+	result := make(map[string]string)
 	for k, v := range spec {
 		if nestedSchema, ok := schema.schema.Properties[k]; ok {
 			if key, ok := isSecretRef(nestedSchema); ok {
-				secretName := strings.ToLower(fmt.Sprintf("%s-%s", componentName, k))
 				if secretValue, ok := v.(string); ok {
-					result[secretName] = map[string]interface{}{k: secretValue}
+					result[k] = base64.StdEncoding.EncodeToString([]byte(secretValue))
 				} else {
 					// error, we want a secret value here
 				}
 				spec[k] = map[string]interface{}{
 					key: map[string]interface{}{
-						"name": secretName,
+						"name": strings.ToLower(componentName),
 						"key":  k,
 					},
 				}
 			}
 			if nestedSpec, ok := v.(map[string]interface{}); ok {
 				for nestedKey, nestedValue := range ExtractSecrets(componentName, Schema{nestedSchema}, nestedSpec) {
-					result[strings.ToLower(nestedKey)] = nestedValue
+					result[nestedKey] = nestedValue
 				}
 			}
 		} else {

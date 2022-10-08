@@ -35,8 +35,8 @@ type Object struct {
 	Spec       map[string]interface{} `yaml:"spec,omitempty"`
 
 	// for Secrets
-	Data map[string]interface{} `yaml:"data,omitempty"`
-	Type string                 `yaml:"type,omitempty"`
+	Data map[string]string `yaml:"data,omitempty"`
+	Type string            `yaml:"type,omitempty"`
 }
 
 type Metadata struct {
@@ -116,7 +116,7 @@ func getObjectCRD(crdObject crd.CRD) (*crd.Schema, string, error) {
 	return nil, "", fmt.Errorf("CRD schema not found")
 }
 
-func ExtractSecrets(componentName, resource, crdFile string, spec map[string]interface{}) (map[string]interface{}, error) {
+func ExtractSecrets(componentName, resource, crdFile string, spec map[string]interface{}) (map[string]string, error) {
 	crdObject, err := crd.GetResourceCRD(resource, crdFile)
 	if err != nil {
 		return nil, err

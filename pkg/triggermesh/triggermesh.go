@@ -18,6 +18,7 @@ package triggermesh
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -88,7 +89,11 @@ func ToEnv(secret Component) ([]corev1.EnvVar, error) {
 	}
 	var result []corev1.EnvVar
 	for k, v := range secret.GetSpec() {
-		result = append(result, corev1.EnvVar{Name: k, Value: v.(string)})
+		value, err := base64.StdEncoding.DecodeString(v.(string))
+		if err != nil {
+			return []corev1.EnvVar{}, fmt.Errorf("decoding secret value: %w", err)
+		}
+		result = append(result, corev1.EnvVar{Name: k, Value: string(value)})
 	}
 	return result, nil
 }

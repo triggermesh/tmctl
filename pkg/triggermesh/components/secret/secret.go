@@ -29,7 +29,7 @@ type Secret struct {
 	Name    string
 	Context string
 
-	data map[string]interface{}
+	data map[string]string
 }
 
 func (s *Secret) AsUnstructured() (unstructured.Unstructured, error) {
@@ -41,7 +41,7 @@ func (s *Secret) AsUnstructured() (unstructured.Unstructured, error) {
 	if err := unstructured.SetNestedField(u.Object, "Opaque", "type"); err != nil {
 		return unstructured.Unstructured{}, err
 	}
-	return u, unstructured.SetNestedMap(u.Object, s.data, "data")
+	return u, unstructured.SetNestedStringMap(u.Object, s.data, "data")
 }
 
 func (s *Secret) AsK8sObject() (kubernetes.Object, error) {
@@ -68,10 +68,14 @@ func (s *Secret) GetKind() string {
 }
 
 func (s *Secret) GetSpec() map[string]interface{} {
-	return s.data
+	spec := make(map[string]interface{}, len(s.data))
+	for k, v := range s.data {
+		spec[k] = v
+	}
+	return spec
 }
 
-func New(name, context string, data map[string]interface{}) *Secret {
+func New(name, context string, data map[string]string) *Secret {
 	return &Secret{
 		Name:    name,
 		Context: context,

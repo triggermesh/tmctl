@@ -83,7 +83,6 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilt
 	if err != nil {
 		return fmt.Errorf("target secrets: %w", err)
 	}
-
 	secretsChanged := false
 	secretEnv := make(map[string]string)
 	for _, s := range secrets {

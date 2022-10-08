@@ -119,15 +119,11 @@ func (s *Source) GetEventTypes() ([]string, error) {
 }
 
 func (s *Source) GetChildren() ([]triggermesh.Component, error) {
-	var result []triggermesh.Component
 	secrets, err := kubernetes.ExtractSecrets(s.Name, s.Kind, s.CRDFile, s.spec)
 	if err != nil {
 		return nil, fmt.Errorf("extracting target secrets: %w", err)
 	}
-	for k, v := range secrets {
-		result = append(result, secret.New(k, s.Broker, v.(map[string]interface{})))
-	}
-	return result, nil
+	return []triggermesh.Component{secret.New(strings.ToLower(s.Name), s.Broker, secrets)}, nil
 }
 
 func (s *Source) SetEventType(string) error {
