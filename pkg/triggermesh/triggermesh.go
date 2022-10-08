@@ -18,7 +18,6 @@ package triggermesh
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -83,17 +82,39 @@ func Info(ctx context.Context, object Runnable) (*docker.Container, error) {
 	return container.LookupHostConfig(ctx, client)
 }
 
-func ToEnv(secret Component) ([]corev1.EnvVar, error) {
+func secretToEnv(secret Component) ([]corev1.EnvVar, error) {
 	if kind := secret.GetKind(); kind != "Secret" {
 		return []corev1.EnvVar{}, fmt.Errorf("%q is not convertable to env variables", kind)
 	}
 	var result []corev1.EnvVar
 	for k, v := range secret.GetSpec() {
-		value, err := base64.StdEncoding.DecodeString(v.(string))
-		if err != nil {
-			return []corev1.EnvVar{}, fmt.Errorf("decoding secret value: %w", err)
-		}
-		result = append(result, corev1.EnvVar{Name: k, Value: string(value)})
+		result = append(result, corev1.EnvVar{Name: k, Value: v.(string)})
 	}
 	return result, nil
+}
+
+func ProcessSecrets(ctx context.Context, p Parent, manifestFile string) (map[string]string, bool, error) {
+	secrets, err := p.GetChildren()
+	if err != nil {
+		return nil, false, fmt.Errorf("target secrets: %w", err)
+	}
+	secretsChanged := false
+	secretEnv := make(map[string]string)
+	for _, s := range secrets {
+		dirty, err := WriteObject(ctx, s, manifestFile)
+		if err != nil {
+			return nil, false, fmt.Errorf("write secret object: %w", err)
+		}
+		if dirty {
+			secretsChanged = true
+		}
+		env, err := secretToEnv(s)
+		if err != nil {
+			return nil, false, fmt.Errorf("secret env: %w", err)
+		}
+		for _, v := range env {
+			secretEnv[v.Name] = v.Value
+		}
+	}
+	return secretEnv, secretsChanged, nil
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package adapter
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strings"
 
@@ -59,7 +60,11 @@ func RuntimeParams(object unstructured.Unstructured, image string, additionalEnv
 		for i, v := range kenv {
 			if v.ValueFrom != nil {
 				if secret, ok := additionalEnvs[v.ValueFrom.SecretKeyRef.Key]; ok {
-					kenv[i] = corev1.EnvVar{Name: v.Name, Value: secret}
+					plainSecret, err := base64.StdEncoding.DecodeString(secret)
+					if err != nil {
+						return nil, nil, fmt.Errorf("decoding secret value: %w", err)
+					}
+					kenv[i] = corev1.EnvVar{Name: v.Name, Value: string(plainSecret)}
 				}
 			}
 		}

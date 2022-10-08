@@ -79,6 +79,7 @@ func (o *StartOptions) start(broker string) error {
 	}
 
 	componentTriggers := make(map[string]*tmbroker.Trigger)
+	secrets := make(map[string]map[string]string)
 	var brokerPort string
 	// start eventing first
 	for _, object := range manifest.Objects {
@@ -86,25 +87,27 @@ func (o *StartOptions) start(broker string) error {
 		case "Broker":
 			broker, err := tmbroker.New(object.Metadata.Name, configDir)
 			if err != nil {
-				return fmt.Errorf("creating broker object: %v", err)
+				return fmt.Errorf("creating broker object: %w", err)
 			}
 			log.Println("Starting broker")
 			container, err := triggermesh.Start(ctx, broker, o.Restart, nil)
 			if err != nil {
-				return fmt.Errorf("starting broker container: %v", err)
+				return fmt.Errorf("starting broker container: %w", err)
 			}
 			brokerPort = container.HostPort()
 		case "Trigger":
 			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, configDir, []string{})
 			if err := trigger.LookupTrigger(); err != nil {
-				return fmt.Errorf("trigger configuration: %v", err)
+				return fmt.Errorf("trigger configuration: %w", err)
 			}
 			for _, target := range trigger.GetTargets() {
 				componentTriggers[target.Component] = trigger
 			}
 			if _, err := triggermesh.WriteObject(ctx, trigger, manifestFile); err != nil {
-				return fmt.Errorf("creating trigger: %v", err)
+				return fmt.Errorf("creating trigger: %w", err)
 			}
+		case "Secret":
+			secrets[strings.ToLower(object.Metadata.Name)] = object.Data
 		}
 	}
 
@@ -113,32 +116,31 @@ func (o *StartOptions) start(broker string) error {
 	}
 
 	for i, object := range manifest.Objects {
+		var objectSecrets map[string]string
+		var c triggermesh.Runnable
 		switch {
 		case strings.HasSuffix(object.Kind, "Source"):
 			manifest.Objects[i].Spec["sink"] = map[string]interface{}{"uri": fmt.Sprintf("http://host.docker.internal:%s", brokerPort)}
-			c := source.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-			if _, err := triggermesh.WriteObject(ctx, c, manifestFile); err != nil {
-				return fmt.Errorf("creating object: %w", err)
+			c = source.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
+			if s, ok := secrets[strings.ToLower(object.Metadata.Name)]; ok {
+				objectSecrets = s
 			}
 			log.Printf("Starting %s\n", object.Metadata.Name)
-			if _, err := triggermesh.Start(ctx, c, o.Restart, nil); err != nil {
+			if _, err := triggermesh.Start(ctx, c, o.Restart, objectSecrets); err != nil {
 				return fmt.Errorf("starting container: %w", err)
 			}
 		case strings.HasSuffix(object.Kind, "Target") ||
 			strings.HasSuffix(object.Kind, "Transformation"):
-
-			var c triggermesh.Component
 			if object.Kind == "Transformation" {
 				c = transformation.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
 			} else {
 				c = target.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
 			}
-
-			if _, err := triggermesh.WriteObject(ctx, c, manifestFile); err != nil {
-				return fmt.Errorf("creating object: %w", err)
+			if s, ok := secrets[strings.ToLower(object.Metadata.Name)]; ok {
+				objectSecrets = s
 			}
 			log.Printf("Starting %s\n", object.Metadata.Name)
-			container, err := triggermesh.Start(ctx, c.(triggermesh.Runnable), o.Restart, nil)
+			container, err := triggermesh.Start(ctx, c, o.Restart, objectSecrets)
 			if err != nil {
 				return fmt.Errorf("starting container: %w", err)
 			}
@@ -151,6 +153,12 @@ func (o *StartOptions) start(broker string) error {
 					return fmt.Errorf("broker manifest: %w", err)
 				}
 			}
+		}
+		if c == nil {
+			continue
+		}
+		if _, err := triggermesh.WriteObject(ctx, c.(triggermesh.Component), manifestFile); err != nil {
+			return fmt.Errorf("updating manifest: %w", err)
 		}
 	}
 	return nil

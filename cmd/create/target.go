@@ -79,27 +79,9 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilt
 
 	t := target.New(name, o.CRD, kind, o.Context, o.Version, args)
 
-	secrets, err := t.GetChildren()
+	secretEnv, secretsChanged, err := triggermesh.ProcessSecrets(ctx, t, manifest)
 	if err != nil {
-		return fmt.Errorf("target secrets: %w", err)
-	}
-	secretsChanged := false
-	secretEnv := make(map[string]string)
-	for _, s := range secrets {
-		dirty, err := triggermesh.WriteObject(ctx, s, manifest)
-		if err != nil {
-			return fmt.Errorf("write secret object: %w", err)
-		}
-		if dirty {
-			secretsChanged = true
-		}
-		env, err := triggermesh.ToEnv(s)
-		if err != nil {
-			return fmt.Errorf("secret env: %w", err)
-		}
-		for _, v := range env {
-			secretEnv[v.Name] = v.Value
-		}
+		return fmt.Errorf("component secrets: %w", err)
 	}
 
 	log.Println("Updating manifest")
