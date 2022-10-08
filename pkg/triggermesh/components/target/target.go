@@ -27,6 +27,7 @@ import (
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/pkg"
 )
 
@@ -34,6 +35,7 @@ var (
 	_ triggermesh.Component = (*Target)(nil)
 	_ triggermesh.Consumer  = (*Target)(nil)
 	_ triggermesh.Runnable  = (*Target)(nil)
+	_ triggermesh.Parent    = (*Target)(nil)
 )
 
 type Target struct {
@@ -48,21 +50,21 @@ type Target struct {
 	spec  map[string]interface{}
 }
 
-func (t *Target) AsUnstructured() (*unstructured.Unstructured, error) {
+func (t *Target) AsUnstructured() (unstructured.Unstructured, error) {
 	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
 }
 
-func (t *Target) AsK8sObject() (*kubernetes.Object, error) {
+func (t *Target) AsK8sObject() (kubernetes.Object, error) {
 	return kubernetes.CreateObject(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
 }
 
-func (t *Target) AsContainer() (*docker.Container, error) {
+func (t *Target) AsContainer(additionalEnvs map[string]string) (*docker.Container, error) {
 	o, err := t.AsUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
 	t.image = adapter.Image(o, t.Version)
-	co, ho, err := adapter.RuntimeParams(o, t.image, "")
+	co, ho, err := adapter.RuntimeParams(o, t.image, additionalEnvs)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
@@ -85,12 +87,16 @@ func (t *Target) GetImage() string {
 	return t.image
 }
 
+func (t *Target) GetSpec() map[string]interface{} {
+	return t.spec
+}
+
 func (t *Target) GetPort(ctx context.Context) (string, error) {
 	client, err := docker.NewClient()
 	if err != nil {
 		return "", fmt.Errorf("docker client: %w", err)
 	}
-	container, err := t.AsContainer()
+	container, err := t.AsContainer(nil)
 	if err != nil {
 		return "", fmt.Errorf("container object: %w", err)
 	}
@@ -98,6 +104,14 @@ func (t *Target) GetPort(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("container runtime config: %w", err)
 	}
 	return container.HostPort(), nil
+}
+
+func (t *Target) GetChildren() ([]triggermesh.Component, error) {
+	secrets, err := kubernetes.ExtractSecrets(t.Name, t.Kind, t.CRDFile, t.spec)
+	if err != nil {
+		return nil, fmt.Errorf("extracting secrets: %w", err)
+	}
+	return []triggermesh.Component{secret.New(strings.ToLower(t.Name), t.Broker, secrets)}, nil
 }
 
 func (t *Target) ConsumedEventTypes() ([]string, error) {

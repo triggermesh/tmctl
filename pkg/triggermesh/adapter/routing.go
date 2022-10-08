@@ -23,6 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func routing(object *unstructured.Unstructured) ([]corev1.EnvVar, error) {
+func routing(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 	return nil, fmt.Errorf("kind %q is not supported", object.GetKind())
 }

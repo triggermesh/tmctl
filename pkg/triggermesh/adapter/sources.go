@@ -60,7 +60,7 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/webhooksource"
 )
 
-func sources(object *unstructured.Unstructured) ([]corev1.EnvVar, error) {
+func sources(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 	switch object.GetKind() {
 	// Flow API group
 	case "AWSCloudWatchLogsSource":

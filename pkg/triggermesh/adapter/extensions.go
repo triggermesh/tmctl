@@ -27,7 +27,7 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/extensions/reconciler/function"
 )
 
-func extensions(object *unstructured.Unstructured) ([]corev1.EnvVar, error) {
+func extensions(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 	switch object.GetKind() {
 	// Extensions API group
 	case "Function":

@@ -24,7 +24,7 @@ import (
 
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
+	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
 	"gopkg.in/yaml.v3"
 )
 
@@ -50,14 +50,16 @@ func PrintStatus(kind string, object triggermesh.Component, sourceName string, e
 	case "broker":
 		result = fmt.Sprintf("%s\nCurrent context is set to %q", result, object.GetName())
 		result = fmt.Sprintf("%s\nTo change the context use \"tmcli config set context <context name>\"", result)
-		result = fmt.Sprintf("%s\n\nNext steps:", result)
+		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
+		result = fmt.Sprintf("%s\nNext steps:", result)
 		result = fmt.Sprintf("%s\n\ttmcli create source\t - create source that will produce events", result)
 	case "producer":
 		et, _ := object.(triggermesh.Producer).GetEventTypes()
 		if len(et) != 0 {
 			result = fmt.Sprintf("%s\nComponent produces:\t%s", result, strings.Join(et, ", "))
 		}
-		result = fmt.Sprintf("%s\n\nNext steps:", result)
+		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
+		result = fmt.Sprintf("%s\nNext steps:", result)
 		result = fmt.Sprintf("%s\n\ttmcli create target <kind> --source %s [--eventTypes <types>]\t - create target that will consume events from this source", result, object.GetName())
 		result = fmt.Sprintf("%s\n\ttmcli watch\t\t\t\t\t\t\t\t\t - show events flowing through the broker in the real time", result)
 	case "consumer":
@@ -69,13 +71,15 @@ func PrintStatus(kind string, object triggermesh.Component, sourceName string, e
 		if sourceName != "" {
 			srcMsg = fmt.Sprintf("%s(%s)", sourceName, srcMsg)
 		}
-		result = fmt.Sprintf("%s\nSubscribed to:\t\t%s", result, srcMsg)
-		result = fmt.Sprintf("%s\n\nNext steps:", result)
+		if srcMsg != "" {
+			result = fmt.Sprintf("%s\nSubscribed to:\t\t%s", result, srcMsg)
+		}
+		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
+		result = fmt.Sprintf("%s\nNext steps:", result)
 		result = fmt.Sprintf("%s\n\ttmcli watch\t - show events flowing through the broker in the real time", result)
 		result = fmt.Sprintf("%s\n\ttmcli dump\t - dump Kubernetes manifest", result)
 	}
-
-	fmt.Printf("%s%s\n%s\n%s", successColorCode, result, delimeter, defaultColorCode)
+	fmt.Println(result)
 }
 
 // func Draw() {}

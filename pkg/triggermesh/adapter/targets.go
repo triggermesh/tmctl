@@ -62,7 +62,7 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/zendesktarget"
 )
 
-func targets(object *unstructured.Unstructured) ([]corev1.EnvVar, error) {
+func targets(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 	switch object.GetKind() {
 	// Flow API group
 	case "AlibabaOSSTarget":

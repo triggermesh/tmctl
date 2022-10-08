@@ -29,7 +29,7 @@ import (
 
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/manifest"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/broker"
+	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
 )
 
 const manifestFile = "manifest.yaml"
@@ -102,9 +102,7 @@ func (o *DeleteOptions) deleteComponents(components []string) error {
 		if object.Kind == "Broker" {
 			object.Metadata.Name += "-broker"
 		}
-		if err := o.stopContainer(ctx, object.Metadata.Name, client); err != nil {
-			log.Printf("Stopping container: %v", err)
-		}
+		o.stopContainer(ctx, object.Metadata.Name, client)
 		o.removeObject(object.Metadata.Name, currentManifest)
 	}
 	return currentManifest.Write()

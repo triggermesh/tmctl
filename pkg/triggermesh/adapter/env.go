@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func buildEnv(o *unstructured.Unstructured) ([]corev1.EnvVar, error) {
+func buildEnv(o unstructured.Unstructured) ([]corev1.EnvVar, error) {
 	switch o.GetAPIVersion() {
 	case "sources.triggermesh.io/v1alpha1":
 		return sources(o)

@@ -19,21 +19,23 @@ package triggermesh
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/kubernetes"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type Component interface {
-	AsUnstructured() (*unstructured.Unstructured, error)
-	AsK8sObject() (*kubernetes.Object, error)
+	AsUnstructured() (unstructured.Unstructured, error)
+	AsK8sObject() (kubernetes.Object, error)
 
 	GetName() string
 	GetKind() string
+	GetSpec() map[string]interface{}
 }
 
 type Runnable interface {
-	AsContainer() (*docker.Container, error)
+	AsContainer(additionalEnvs map[string]string) (*docker.Container, error)
 
 	GetImage() string
 }
@@ -46,4 +48,8 @@ type Producer interface {
 type Consumer interface {
 	ConsumedEventTypes() ([]string, error)
 	GetPort(context.Context) (string, error)
+}
+
+type Parent interface {
+	GetChildren() ([]Component, error)
 }

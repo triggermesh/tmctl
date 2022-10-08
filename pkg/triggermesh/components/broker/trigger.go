@@ -67,8 +67,8 @@ type Target struct {
 	} `yaml:"deliveryOptions,omitempty"`
 }
 
-func (t *Trigger) AsUnstructured() (*unstructured.Unstructured, error) {
-	u := &unstructured.Unstructured{}
+func (t *Trigger) AsUnstructured() (unstructured.Unstructured, error) {
+	u := unstructured.Unstructured{}
 	u.SetAPIVersion("eventing.triggermesh.io/v1alpha1")
 	u.SetKind("Trigger")
 	u.SetName(t.Name)
@@ -76,8 +76,8 @@ func (t *Trigger) AsUnstructured() (*unstructured.Unstructured, error) {
 	return u, unstructured.SetNestedField(u.Object, t.spec, "spec")
 }
 
-func (t *Trigger) AsK8sObject() (*kubernetes.Object, error) {
-	return &kubernetes.Object{
+func (t *Trigger) AsK8sObject() (kubernetes.Object, error) {
+	return kubernetes.Object{
 		APIVersion: "eventing.triggermesh.io/v1alpha1",
 		Kind:       "Trigger",
 		Metadata: kubernetes.Metadata{
@@ -107,6 +107,13 @@ func (t *Trigger) GetTargets() []Target {
 
 func (t *Trigger) GetFilters() []Filter {
 	return t.spec.Filters
+}
+
+func (t *Trigger) GetSpec() map[string]interface{} {
+	return map[string]interface{}{
+		"filters": t.spec.Filters,
+		"targets": t.spec.Targets,
+	}
 }
 
 func NewTrigger(name, broker, configDir string, eventType []string) *Trigger {
@@ -210,10 +217,10 @@ func (t *Trigger) UpdateManifest() error {
 	if err != nil {
 		return fmt.Errorf("trigger object: %w", err)
 	}
-	if _, err := m.Add(*o); err != nil {
-		return fmt.Errorf("adding trigger: %w", err)
+	if dirty := m.Add(o); dirty {
+		return m.Write()
 	}
-	return m.Write()
+	return nil
 }
 
 func readBrokerConfig(path string) (Configuration, error) {

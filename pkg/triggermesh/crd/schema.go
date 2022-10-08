@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package crd
 
 import (
 	"encoding/json"
@@ -56,14 +56,14 @@ func (s *Schema) Process(spec map[string]interface{}) (map[string]interface{}, e
 		}
 
 		// plain secret value only supported right now
-		if isSecret(schemaKey.Properties) {
-			if _, ok := v.(map[string]interface{}); !ok {
-				v = map[string]interface{}{
-					"value": v,
-				}
-				spec[k] = v
-			}
-		}
+		// if isSecretRef(schemaKey.Properties) {
+		// if _, ok := v.(map[string]interface{}); !ok {
+		// v = map[string]interface{}{
+		// "value": v,
+		// }
+		// spec[k] = v
+		// }
+		// }
 
 		switch value := v.(type) {
 		case string:
@@ -98,16 +98,4 @@ func propertyKeysAsString(s map[string]spec.Schema) string {
 		keys = append(keys, k)
 	}
 	return strings.Join(keys, ", ")
-}
-
-// secret property structure reflected in all our CRDs
-func isSecret(s map[string]spec.Schema) bool {
-	if len(s) == 2 {
-		if _, refExists := s["valueFromSecret"]; refExists {
-			if _, valExists := s["valueFromSecret"]; valExists {
-				return true
-			}
-		}
-	}
-	return false
 }
