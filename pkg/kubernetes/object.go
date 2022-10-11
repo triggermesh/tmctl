@@ -100,7 +100,24 @@ func CreateUnstructured(resource, name, broker, crdFile string, spec map[string]
 	u.SetKind(crdObject.Spec.Names.Kind)
 	u.SetName(name)
 	u.SetLabels(map[string]string{labelKey: broker})
-	return u, unstructured.SetNestedField(u.Object, spec, "spec")
+	for k, v := range spec {
+		switch val := v.(type) {
+		case []string:
+			if err := unstructured.SetNestedStringSlice(u.Object, val, "spec", k); err != nil {
+				return unstructured.Unstructured{}, fmt.Errorf("object key %q: %w", k, err)
+			}
+		case map[string]interface{}:
+			if err := unstructured.SetNestedMap(u.Object, val, "spec", k); err != nil {
+				return unstructured.Unstructured{}, fmt.Errorf("object key %q: %w", k, err)
+			}
+		default:
+			if err := unstructured.SetNestedField(u.Object, val, "spec", k); err != nil {
+				return unstructured.Unstructured{}, fmt.Errorf("object key %q: %w", k, err)
+			}
+		}
+	}
+	unstructured.SetNestedMap(u.Object, map[string]interface{}{}, "status")
+	return u, nil
 }
 
 func getObjectCRD(crdObject crd.CRD) (*crd.Schema, string, error) {
