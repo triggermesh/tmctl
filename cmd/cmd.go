@@ -47,7 +47,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "tmctl",
 		Short: "A command line interface to build event-driven applications",
-		Long:  `tmctl is a CLI to help you create event flows.
+		Long:  `tmctl is a CLI to help you create event brokers, sources, targets and transformations.
 
 Find more information at: https://docs.triggermesh.io`,
 
