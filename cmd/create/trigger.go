@@ -37,30 +37,34 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 		SilenceUsage:       true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
-			eventSourceFilter, args := parameterFromArgs("source", args)
+			name, args := parameterFromArgs("name", args)
+			eventSourcesFilter, args := parameterFromArgs("sources", args)
 			eventTypesFilter, args := parameterFromArgs("eventTypes", args)
 			target, _ := parameterFromArgs("target", args)
 			if target == "" {
 				return fmt.Errorf("\"--target <name>\" argument is required")
 			}
-			if eventSourceFilter == "" && eventTypesFilter == "" {
-				return fmt.Errorf("\"--source <name>\" or \"--eventTypes <type>\" argument is required")
+			if eventSourcesFilter == "" && eventTypesFilter == "" {
+				return fmt.Errorf("\"--sources <name>\" or \"--eventTypes <type>\" argument is required")
 			}
-			var eventFilter []string
+			var typeFilter, sourceFilter []string
 			if eventTypesFilter != "" {
-				eventFilter = strings.Split(eventTypesFilter, ",")
+				typeFilter = strings.Split(eventTypesFilter, ",")
 			}
-			return o.trigger(eventSourceFilter, eventFilter, target)
+			if eventSourcesFilter != "" {
+				sourceFilter = strings.Split(eventSourcesFilter, ",")
+			}
+			return o.trigger(name, sourceFilter, typeFilter, target)
 		},
 	}
 }
 
-func (o *CreateOptions) trigger(eventSourceFilter string, eventTypesFilter []string, target string) error {
+func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilter []string, target string) error {
 	configDir := path.Join(o.ConfigBase, o.Context)
 	manifest := path.Join(configDir, manifestFile)
 
-	if eventSourceFilter != "" {
-		et, err := o.producersEventTypes(eventSourceFilter)
+	for _, source := range eventSourcesFilter {
+		et, err := o.producersEventTypes(source)
 		if err != nil {
 			return fmt.Errorf("event types filter: %w", err)
 		}
@@ -83,7 +87,7 @@ func (o *CreateOptions) trigger(eventSourceFilter string, eventTypesFilter []str
 	}
 
 	log.Println("Creating trigger")
-	if err := o.createTrigger(eventTypesFilter, component.GetName(), port); err != nil {
+	if err := o.createTrigger(name, eventTypesFilter, component.GetName(), port); err != nil {
 		return err
 	}
 	return nil

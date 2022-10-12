@@ -91,6 +91,6 @@ func (o *CreateOptions) source(name, kind string, args []string) error {
 	if _, err := triggermesh.Start(ctx, s, (restart || secretsChanged), secretEnv); err != nil {
 		return err
 	}
-	output.PrintStatus("producer", s, "", []string{})
+	output.PrintStatus("producer", s, []string{}, []string{})
 	return nil
 }

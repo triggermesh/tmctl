@@ -42,7 +42,7 @@ func init() {
 	w = tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
 }
 
-func PrintStatus(kind string, object triggermesh.Component, sourceName string, eventTypesFilter []string) {
+func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, eventTypesFilter []string) {
 	var result string
 	result = fmt.Sprintf("%s\nCreated object name:\t%s", delimeter, object.GetName())
 
@@ -68,8 +68,8 @@ func PrintStatus(kind string, object triggermesh.Component, sourceName string, e
 			result = fmt.Sprintf("%s\nComponent consumes:\t%s", result, strings.Join(et, ", "))
 		}
 		srcMsg := strings.Join(eventTypesFilter, ", ")
-		if sourceName != "" {
-			srcMsg = fmt.Sprintf("%s(%s)", sourceName, srcMsg)
+		if len(eventSourcesFilter) != 0 {
+			srcMsg = fmt.Sprintf("%s(%s)", strings.Join(eventSourcesFilter, ", "), srcMsg)
 		}
 		if srcMsg != "" {
 			result = fmt.Sprintf("%s\nSubscribed to:\t\t%s", result, srcMsg)
@@ -161,7 +161,7 @@ func DescribeTrigger(triggers []*tmbroker.Trigger) {
 		for _, target := range trigger.GetTargets() {
 			targets = append(targets, target.Component)
 		}
-		fmt.Fprintf(w, "%s\t%v\t%v\n", trigger.Name, strings.Join(targets, ","), strings.Join(filters, ","))
+		fmt.Fprintf(w, "%s\t%v\t%v\n", trigger.Name, strings.Join(targets, ", "), strings.Join(filters, ", "))
 	}
 	fmt.Fprintln(w)
 }

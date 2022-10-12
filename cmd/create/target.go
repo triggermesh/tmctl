@@ -53,26 +53,29 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 				return err
 			}
 			name, args := parameterFromArgs("name", args)
-			eventSourceFilter, args := parameterFromArgs("source", args)
+			eventSourcesFilter, args := parameterFromArgs("sources", args)
 			eventTypesFilter, args := parameterFromArgs("eventTypes", args)
-			var eventFilter []string
+			var typeFilter, sourceFilter []string
 			if eventTypesFilter != "" {
-				eventFilter = strings.Split(eventTypesFilter, ",")
+				typeFilter = strings.Split(eventTypesFilter, ",")
 			}
-			return o.target(name, kind, args, eventSourceFilter, eventFilter)
+			if eventSourcesFilter != "" {
+				sourceFilter = strings.Split(eventSourcesFilter, ",")
+			}
+			return o.target(name, kind, args, sourceFilter, typeFilter)
 		},
 	}
 }
 
-func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilter string, eventTypesFilter []string) error {
+func (o *CreateOptions) target(name, kind string, args []string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
 	configDir := path.Join(o.ConfigBase, o.Context)
 	manifest := path.Join(configDir, manifestFile)
 
-	if eventSourceFilter != "" {
-		et, err := o.producersEventTypes(eventSourceFilter)
+	for _, source := range eventSourcesFilter {
+		et, err := o.producersEventTypes(source)
 		if err != nil {
-			return fmt.Errorf("event types filter: %w", err)
+			return fmt.Errorf("%q event types: %w", source, err)
 		}
 		eventTypesFilter = append(eventTypesFilter, et...)
 	}
@@ -97,11 +100,11 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourceFilt
 
 	if len(eventTypesFilter) != 0 {
 		log.Println("Creating trigger")
-		if err := o.createTrigger(eventTypesFilter, container.Name, container.HostPort()); err != nil {
+		if err := o.createTrigger("", eventTypesFilter, container.Name, container.HostPort()); err != nil {
 			return err
 		}
 	}
 
-	output.PrintStatus("consumer", t, eventSourceFilter, eventTypesFilter)
+	output.PrintStatus("consumer", t, eventSourcesFilter, eventTypesFilter)
 	return nil
 }

@@ -69,6 +69,6 @@ func (o *CreateOptions) broker(name string) error {
 		return fmt.Errorf("write config: %w", err)
 	}
 
-	output.PrintStatus("broker", broker, "", []string{})
+	output.PrintStatus("broker", broker, []string{}, []string{})
 	return nil
 }
