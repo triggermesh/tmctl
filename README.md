@@ -20,7 +20,7 @@ Commands with optional context:
 ```
 tmcli dump [broker]
 tmcli describe [broker]
-tmcli remove [--broker <broker>] <component>
+tmcli delete [--broker <broker>] <component>
 tmcli start [broker]
 tmcli stop [broker]
 tmcli watch [broker]
@@ -72,20 +72,20 @@ tmcli watch
 
 Create transformation:
 ```
-tmcli create transformation --source foo-awssqssource
+tmcli create transformation --sources foo-awssqssource
 ```
 
 Create target and trigger:
 
 ```
 tmcli create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io
-tmcli create trigger --source foo-transformation --target foo-cloudeventstarget
+tmcli create trigger --sources foo-transformation --target foo-cloudeventstarget
 ```
 
 Or, in one command:
 
 ```
-tmcli create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io --source foo-transformation
+tmcli create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io --sources foo-transformation
 ```
 
 Open sockeye [web-interface](https://sockeye-tzununbekov.dev.triggermesh.io), send the message to SQS queue specified in the source creation step and observe the received CloudEvent in the sockeye tab.
