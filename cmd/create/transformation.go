@@ -70,26 +70,29 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
 			name, args := parameterFromArgs("name", args)
-			eventSourceFilter, args := parameterFromArgs("source", args)
+			eventSourcesFilter, args := parameterFromArgs("sources", args)
 			eventTypesFilter, _ := parameterFromArgs("eventTypes", args)
-			var eventFilter []string
+			var typeFilter, sourceFilter []string
 			if eventTypesFilter != "" {
-				eventFilter = strings.Split(eventTypesFilter, ",")
+				typeFilter = strings.Split(eventTypesFilter, ",")
 			}
-			return o.transformation(name, eventSourceFilter, eventFilter)
+			if eventSourcesFilter != "" {
+				sourceFilter = strings.Split(eventSourcesFilter, ",")
+			}
+			return o.transformation(name, sourceFilter, typeFilter)
 		},
 	}
 }
 
-func (o *CreateOptions) transformation(name, eventSourceFilter string, eventTypesFilter []string) error {
+func (o *CreateOptions) transformation(name string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
 	configDir := path.Join(o.ConfigBase, o.Context)
 	manifest := path.Join(configDir, manifestFile)
 
-	if eventSourceFilter != "" {
-		et, err := o.producersEventTypes(eventSourceFilter)
+	for _, source := range eventSourcesFilter {
+		et, err := o.producersEventTypes(source)
 		if err != nil {
-			return fmt.Errorf("event types filter: %w", err)
+			return fmt.Errorf("%q event types: %w", source, err)
 		}
 		eventTypesFilter = append(eventTypesFilter, et...)
 	}
@@ -110,7 +113,7 @@ func (o *CreateOptions) transformation(name, eventSourceFilter string, eventType
 
 	t := transformation.New(name, o.CRD, "transformation", o.Context, o.Version, spec)
 	if et, _ := t.GetEventTypes(); len(et) == 0 {
-		if err := t.SetEventType(eventSourceFilter + "-transformed-event"); err != nil {
+		if err := t.SetEventType(fmt.Sprintf("%s.output", t.Name)); err != nil {
 			return fmt.Errorf("setting event type: %w", err)
 		}
 	}
@@ -127,11 +130,11 @@ func (o *CreateOptions) transformation(name, eventSourceFilter string, eventType
 
 	if len(eventTypesFilter) != 0 {
 		log.Println("Creating trigger")
-		if err := o.createTrigger(fmt.Sprintf("%s-trigger", t.GetName()), eventTypesFilter, container.Name, container.HostPort()); err != nil {
+		if err := o.createTrigger("", eventTypesFilter, container.Name, container.HostPort()); err != nil {
 			return err
 		}
 	}
-	output.PrintStatus("consumer", t, eventSourceFilter, eventTypesFilter)
+	output.PrintStatus("consumer", t, eventSourcesFilter, eventTypesFilter)
 	return nil
 }
 
