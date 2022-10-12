@@ -127,7 +127,7 @@ func (o *CreateOptions) transformation(name, eventSourceFilter string, eventType
 
 	if len(eventTypesFilter) != 0 {
 		log.Println("Creating trigger")
-		if err := o.createTrigger(fmt.Sprintf("%s-trigger", t.GetName()), eventTypesFilter, container.Name, container.HostPort()); err != nil {
+		if err := o.createTrigger(eventTypesFilter, container.Name, container.HostPort()); err != nil {
 			return err
 		}
 	}

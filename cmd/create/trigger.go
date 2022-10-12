@@ -39,7 +39,7 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 			o.initializeOptions(cmd)
 			eventSourceFilter, args := parameterFromArgs("source", args)
 			eventTypesFilter, args := parameterFromArgs("eventTypes", args)
-			target, args := parameterFromArgs("target", args)
+			target, _ := parameterFromArgs("target", args)
 			if target == "" {
 				return fmt.Errorf("\"--target <name>\" argument is required")
 			}
@@ -83,7 +83,7 @@ func (o *CreateOptions) trigger(eventSourceFilter string, eventTypesFilter []str
 	}
 
 	log.Println("Creating trigger")
-	if err := o.createTrigger(fmt.Sprintf("%s-trigger", target), eventTypesFilter, component.GetName(), port); err != nil {
+	if err := o.createTrigger(eventTypesFilter, component.GetName(), port); err != nil {
 		return err
 	}
 	return nil
