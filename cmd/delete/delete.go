@@ -115,7 +115,7 @@ func (o *DeleteOptions) removeObject(component string, manifest *manifest.Manife
 			continue
 		}
 		if object.Kind == "Trigger" {
-			trigger := tmbroker.NewTrigger(object.Metadata.Name, o.Context, path.Join(o.ConfigDir, o.Context), []string{})
+			trigger := tmbroker.NewTrigger(object.Metadata.Name, o.Context, path.Join(o.ConfigDir, o.Context))
 			if err := trigger.RemoveTriggerFromConfig(); err != nil {
 				log.Printf("Deleting %q: %v", object.Metadata.Name, err)
 				continue
