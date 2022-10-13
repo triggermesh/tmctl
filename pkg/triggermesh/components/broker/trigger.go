@@ -32,10 +32,10 @@ import (
 var _ triggermesh.Component = (*Trigger)(nil)
 
 type Trigger struct {
-	Broker          string
-	BrokerConfigDir string
+	Broker          string `yaml:"-"`
+	BrokerConfigDir string `yaml:"-"`
+	Name            string `yaml:"-"`
 
-	Name    string   `yaml:"name"`
 	Filters []Filter `yaml:"filters,omitempty"`
 	Target  Target   `yaml:"target"`
 }
@@ -71,6 +71,12 @@ func (t *Trigger) AsUnstructured() (unstructured.Unstructured, error) {
 }
 
 func (t *Trigger) AsK8sObject() (kubernetes.Object, error) {
+	spec := map[string]interface{}{
+		"target": t.Target,
+	}
+	if len(t.Filters) != 0 {
+		spec["filters"] = t.Filters
+	}
 	return kubernetes.Object{
 		APIVersion: "eventing.triggermesh.io/v1alpha1",
 		Kind:       "Trigger",
@@ -80,10 +86,7 @@ func (t *Trigger) AsK8sObject() (kubernetes.Object, error) {
 				"triggermesh.io/context": t.Broker,
 			},
 		},
-		Spec: map[string]interface{}{
-			"filter": t.Filters,
-			"target": t.Target,
-		},
+		Spec: spec,
 	}, nil
 }
 
@@ -110,11 +113,11 @@ func (t *Trigger) GetSpec() map[string]interface{} {
 	}
 }
 
-func NewTrigger(name, broker, configDir string, eventType []string) *Trigger {
+func NewTrigger(name, broker, configDir string, eventTypes ...string) *Trigger {
 	var filters []Filter
-	for _, v := range eventType {
+	for _, eventType := range eventTypes {
 		filters = append(filters, Filter{
-			Exact: map[string]string{"type": v},
+			Exact: map[string]string{"type": eventType},
 		})
 	}
 	return &Trigger{
@@ -146,14 +149,13 @@ func (t *Trigger) LookupTrigger() error {
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
 	}
-	for _, trigger := range configuration.Triggers {
-		if trigger.Name == t.Name {
-			t.Filters = trigger.Filters
-			t.Target = trigger.Target
-			return nil
-		}
+	trigger, exists := configuration.Triggers[t.Name]
+	if !exists {
+		return fmt.Errorf("trigger %q not found", t.Name)
 	}
-	return fmt.Errorf("trigger %q not found", t.Name)
+	t.Filters = trigger.Filters
+	t.Target = trigger.Target
+	return nil
 }
 
 func (t *Trigger) RemoveTriggerFromConfig() error {
@@ -162,17 +164,7 @@ func (t *Trigger) RemoveTriggerFromConfig() error {
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
 	}
-
-	for i, trigger := range configuration.Triggers {
-		if trigger.Name == t.Name {
-			if len(configuration.Triggers) > i+1 {
-				configuration.Triggers = append(configuration.Triggers[:i], configuration.Triggers[i+1:]...)
-			} else {
-				configuration.Triggers = configuration.Triggers[:i]
-			}
-			return writeBrokerConfig(configFile, &configuration)
-		}
-	}
+	delete(configuration.Triggers, t.Name)
 	return nil
 }
 
@@ -183,16 +175,16 @@ func (t *Trigger) UpdateBrokerConfig() error {
 		return fmt.Errorf("broker config: %w", err)
 	}
 
-	var exists bool
-	for i, trigger := range configuration.Triggers {
-		if trigger.Name == t.Name {
-			configuration.Triggers[i].Filters = t.Filters
-			configuration.Triggers[i].Target = t.Target
-			exists = true
+	trigger, exists := configuration.Triggers[t.Name]
+	if exists {
+		trigger.Filters = t.Filters
+		trigger.Target = t.Target
+		configuration.Triggers[t.Name] = trigger
+	} else {
+		if configuration.Triggers == nil {
+			configuration.Triggers = make(map[string]Trigger, 1)
 		}
-	}
-	if !exists {
-		configuration.Triggers = append(configuration.Triggers, *t)
+		configuration.Triggers[t.Name] = *t
 	}
 	return writeBrokerConfig(configFile, &configuration)
 }

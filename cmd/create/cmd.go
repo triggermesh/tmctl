@@ -137,13 +137,13 @@ func (o *CreateOptions) producersEventTypes(source string) ([]string, error) {
 	return et, nil
 }
 
-func (o *CreateOptions) createTrigger(name string, eventTypesFilter []string, targetName, port string) error {
+func (o *CreateOptions) createTrigger(name, targetName, port string, eventTypes ...string) error {
 	if name == "" {
 		// in case of event types hash collision, replace with sha256
-		eventTypesHash := md5.Sum([]byte(strings.Join(append(eventTypesFilter, targetName), " ")))
+		eventTypesHash := md5.Sum([]byte(strings.Join(append(eventTypes, targetName), " ")))
 		name = fmt.Sprintf("%s-trigger-%s", o.Context, hex.EncodeToString(eventTypesHash[:4]))
 	}
-	tr := tmbroker.NewTrigger(name, o.Context, path.Join(o.ConfigBase, o.Context), eventTypesFilter)
+	tr := tmbroker.NewTrigger(name, o.Context, path.Join(o.ConfigBase, o.Context), eventTypes...)
 	tr.SetTarget(targetName, fmt.Sprintf("http://host.docker.internal:%s", port))
 	if err := tr.UpdateBrokerConfig(); err != nil {
 		return fmt.Errorf("broker config: %w", err)

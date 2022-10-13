@@ -65,7 +65,7 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 	var name, target, file string
 	var eventSourcesFilter, eventTypesFilter []string
 	transformationCmd := &cobra.Command{
-		Use:   "transformation <args>",
+		Use:   "transformation [--source <name>] [--target <name>] [--from <path>]",
 		Short: "TriggerMesh transformation",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
@@ -75,7 +75,7 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 	transformationCmd.Flags().StringVar(&name, "name", "", "Transformation name")
 	transformationCmd.Flags().StringVarP(&file, "from", "f", "", "Transformation specification file")
 	transformationCmd.Flags().StringVar(&target, "target", "", "Target name")
-	transformationCmd.Flags().StringSliceVar(&eventSourcesFilter, "sources", []string{}, "Event sources filter")
+	transformationCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Event sources filter")
 	transformationCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
 	return transformationCmd
 }
@@ -129,46 +129,12 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 
 	var targetFilters []tmbroker.Filter
 	if target != "" {
-		targetObject, err := o.getObject(target, manifest)
-		if err != nil {
-			return fmt.Errorf("transformation target: %w", err)
-		}
-		consumer, ok := targetObject.(triggermesh.Consumer)
-		if !ok {
-			return fmt.Errorf("%q is not an event consumer", target)
-		}
-		targetPort, err := consumer.GetPort(ctx)
-		if err != nil {
-			return fmt.Errorf("target port: %w", err)
-		}
-		broker, err := tmbroker.New(o.Context, path.Join(o.ConfigBase, o.Context))
-		if err != nil {
-			return fmt.Errorf("broker: %w", err)
-		}
-		triggers, err := broker.GetTriggers()
-		if err != nil {
-			return fmt.Errorf("triggers: %w", err)
-		}
 		transformationEventTypes, err := t.GetEventTypes()
 		if err != nil {
 			return fmt.Errorf("transformation event type: %w", err)
 		}
-		if l := len(transformationEventTypes); l != 1 {
-			return fmt.Errorf("unexpected event types len: %d", l)
-		}
-		var triggerExisted bool
-		for _, triggerToTarget := range triggers {
-			if target == triggerToTarget.GetTarget().Component {
-				targetFilters = triggerToTarget.GetFilters()
-				if err := o.createTrigger(triggerToTarget.GetName(), transformationEventTypes, target, targetPort); err != nil {
-					return fmt.Errorf("update trigger: %w", err)
-				}
-			}
-		}
-		if !triggerExisted {
-			if err := o.createTrigger("", transformationEventTypes, target, targetPort); err != nil {
-				return fmt.Errorf("create trigger: %w", err)
-			}
+		if targetFilters, err = o.updateTarget(ctx, target, transformationEventTypes); err != nil {
+			return fmt.Errorf("updating target: %w", err)
 		}
 	}
 
@@ -181,7 +147,7 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 	}
 	if len(eventTypesFilter) != 0 {
 		log.Println("Creating trigger")
-		if err := o.createTrigger("", eventTypesFilter, container.Name, container.HostPort()); err != nil {
+		if err := o.createTrigger("", container.Name, container.HostPort(), eventTypesFilter...); err != nil {
 			return err
 		}
 	}
@@ -212,4 +178,45 @@ func readInput() (string, error) {
 		lines = fmt.Sprintf("%s\n%s", lines, line)
 	}
 	return lines, scn.Err()
+}
+
+func (o *CreateOptions) updateTarget(ctx context.Context, target string, transformationEventTypes []string) ([]tmbroker.Filter, error) {
+	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
+	targetObject, err := o.getObject(target, manifest)
+	if err != nil {
+		return []tmbroker.Filter{}, fmt.Errorf("transformation target: %w", err)
+	}
+	consumer, ok := targetObject.(triggermesh.Consumer)
+	if !ok {
+		return []tmbroker.Filter{}, fmt.Errorf("%q is not an event consumer", target)
+	}
+	targetPort, err := consumer.GetPort(ctx)
+	if err != nil {
+		return []tmbroker.Filter{}, fmt.Errorf("target port: %w", err)
+	}
+	broker, err := tmbroker.New(o.Context, path.Join(o.ConfigBase, o.Context))
+	if err != nil {
+		return []tmbroker.Filter{}, fmt.Errorf("broker: %w", err)
+	}
+	triggers, err := broker.GetTriggers()
+	if err != nil {
+		return []tmbroker.Filter{}, fmt.Errorf("triggers: %w", err)
+	}
+	var triggerExisted bool
+	var targetFilters []tmbroker.Filter
+	for triggerName, triggerToTarget := range triggers {
+		if target == triggerToTarget.GetTarget().Component {
+			triggerExisted = true
+			targetFilters = triggerToTarget.GetFilters()
+			if err := o.createTrigger(triggerName, target, targetPort, transformationEventTypes...); err != nil {
+				return []tmbroker.Filter{}, fmt.Errorf("update trigger: %w", err)
+			}
+		}
+	}
+	if !triggerExisted {
+		if err := o.createTrigger("", target, targetPort, transformationEventTypes...); err != nil {
+			return []tmbroker.Filter{}, fmt.Errorf("create trigger: %w", err)
+		}
+	}
+	return targetFilters, nil
 }

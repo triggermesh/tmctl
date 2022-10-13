@@ -52,7 +52,7 @@ type Broker struct {
 }
 
 type Configuration struct {
-	Triggers []Trigger `yaml:"triggers"`
+	Triggers map[string]Trigger `yaml:"triggers"`
 }
 
 func (b *Broker) AsUnstructured() (unstructured.Unstructured, error) {
@@ -138,10 +138,10 @@ func (b *Broker) ConsumedEventTypes() ([]string, error) {
 	return []string{}, nil
 }
 
-func (b *Broker) GetTriggers() ([]Trigger, error) {
+func (b *Broker) GetTriggers() (map[string]Trigger, error) {
 	config, err := readBrokerConfig(b.ConfigFile)
 	if err != nil {
-		return []Trigger{}, fmt.Errorf("read broker config: %w", err)
+		return nil, fmt.Errorf("read broker config: %w", err)
 	}
 	return config.Triggers, nil
 }

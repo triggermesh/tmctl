@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"log"
 	"path"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -29,34 +28,22 @@ import (
 )
 
 func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:                "trigger --source <source> [--eventType <event type>] --target <target>",
-		Short:              "TriggerMesh trigger",
-		DisableFlagParsing: true,
-		SilenceErrors:      true,
-		SilenceUsage:       true,
+	var name, target string
+	var eventSourcesFilter, eventTypesFilter []string
+	triggerCmd := &cobra.Command{
+		Use:   "trigger --target <name> [--source <name>][--eventType <event type>]",
+		Short: "TriggerMesh trigger",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
-			name, args := parameterFromArgs("name", args)
-			eventSourcesFilter, args := parameterFromArgs("sources", args)
-			eventTypesFilter, args := parameterFromArgs("eventTypes", args)
-			target, _ := parameterFromArgs("target", args)
-			if target == "" {
-				return fmt.Errorf("\"--target <name>\" argument is required")
-			}
-			if eventSourcesFilter == "" && eventTypesFilter == "" {
-				return fmt.Errorf("\"--sources <name>\" or \"--eventTypes <type>\" argument is required")
-			}
-			var typeFilter, sourceFilter []string
-			if eventTypesFilter != "" {
-				typeFilter = strings.Split(eventTypesFilter, ",")
-			}
-			if eventSourcesFilter != "" {
-				sourceFilter = strings.Split(eventSourcesFilter, ",")
-			}
-			return o.trigger(name, sourceFilter, typeFilter, target)
+			return o.trigger(name, eventSourcesFilter, eventTypesFilter, target)
 		},
 	}
+	triggerCmd.Flags().StringVar(&name, "name", "", "Trigger name")
+	triggerCmd.Flags().StringVar(&target, "target", "", "Target name")
+	triggerCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Event sources filter")
+	triggerCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
+	triggerCmd.MarkFlagRequired("target")
+	return triggerCmd
 }
 
 func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilter []string, target string) error {
@@ -87,7 +74,7 @@ func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 	}
 
 	log.Println("Creating trigger")
-	if err := o.createTrigger(name, eventTypesFilter, component.GetName(), port); err != nil {
+	if err := o.createTrigger(name, component.GetName(), port, eventTypesFilter...); err != nil {
 		return err
 	}
 	return nil
