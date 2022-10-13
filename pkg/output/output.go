@@ -157,6 +157,9 @@ func DescribeTrigger(triggers []*tmbroker.Trigger) {
 		for _, filter := range trigger.GetFilters() {
 			filters = append(filters, triggerFilterToString(filter))
 		}
+		if len(filters) == 0 {
+			filters = []string{"*"}
+		}
 		fmt.Fprintf(w, "%s\t%v\t%v\n", trigger.Name, trigger.Target.Component, strings.Join(filters, ", "))
 	}
 	fmt.Fprintln(w)

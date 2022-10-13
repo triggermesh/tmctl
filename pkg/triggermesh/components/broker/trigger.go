@@ -165,7 +165,7 @@ func (t *Trigger) RemoveTriggerFromConfig() error {
 		return fmt.Errorf("broker config: %w", err)
 	}
 	delete(configuration.Triggers, t.Name)
-	return nil
+	return writeBrokerConfig(configFile, &configuration)
 }
 
 func (t *Trigger) UpdateBrokerConfig() error {
