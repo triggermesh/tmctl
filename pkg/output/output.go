@@ -48,8 +48,8 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 
 	switch kind {
 	case "broker":
-		result = fmt.Sprintf("%s\nCurrent context is set to %q", result, object.GetName())
-		result = fmt.Sprintf("%s\nTo change the context use \"tmcli config set context <context name>\"", result)
+		result = fmt.Sprintf("%s\nCurrent broker is set to %q", result, object.GetName())
+		result = fmt.Sprintf("%s\nTo change the current broker use \"tmcli brokers --set <broker name>\"", result)
 		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
 		result = fmt.Sprintf("%s\nNext steps:", result)
 		result = fmt.Sprintf("%s\n\ttmcli create source\t - create source that will produce events", result)
@@ -153,15 +153,11 @@ func DescribeTrigger(triggers []*tmbroker.Trigger) {
 	defer w.Flush()
 	fmt.Fprintln(w, "Trigger\tTarget\tFilter")
 	for _, trigger := range triggers {
-		var targets []string
 		var filters []string
 		for _, filter := range trigger.GetFilters() {
 			filters = append(filters, triggerFilterToString(filter))
 		}
-		for _, target := range trigger.GetTargets() {
-			targets = append(targets, target.Component)
-		}
-		fmt.Fprintf(w, "%s\t%v\t%v\n", trigger.Name, strings.Join(targets, ", "), strings.Join(filters, ", "))
+		fmt.Fprintf(w, "%s\t%v\t%v\n", trigger.Name, trigger.Target.Component, strings.Join(filters, ", "))
 	}
 	fmt.Fprintln(w)
 }

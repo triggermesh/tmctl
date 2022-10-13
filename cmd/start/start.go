@@ -100,9 +100,7 @@ func (o *StartOptions) start(broker string) error {
 			if err := trigger.LookupTrigger(); err != nil {
 				return fmt.Errorf("trigger configuration: %w", err)
 			}
-			for _, target := range trigger.GetTargets() {
-				componentTriggers[target.Component] = trigger
-			}
+			componentTriggers[trigger.GetTarget().Component] = trigger
 			if _, err := triggermesh.WriteObject(ctx, trigger, manifestFile); err != nil {
 				return fmt.Errorf("creating trigger: %w", err)
 			}
