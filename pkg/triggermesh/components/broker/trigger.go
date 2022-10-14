@@ -176,7 +176,7 @@ func (t *Trigger) UpdateBrokerConfig() error {
 }
 
 func (t *Trigger) UpdateManifest() error {
-	m := manifest.New(path.Join(t.BrokerConfigDir, "manifest.yaml"))
+	m := manifest.New(path.Join(t.BrokerConfigDir, manifestFile))
 	if err := m.Read(); err != nil {
 		return fmt.Errorf("manifest read: %w", err)
 	}

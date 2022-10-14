@@ -105,6 +105,7 @@ func (o *DeleteOptions) deleteComponents(components []string) error {
 		}
 		o.stopContainer(ctx, object.Metadata.Name, client)
 		o.removeObject(object.Metadata.Name, currentManifest)
+		o.cleanupTriggers(object.Metadata.Name, currentManifest)
 	}
 	return currentManifest.Write()
 }
@@ -127,4 +128,25 @@ func (o *DeleteOptions) removeObject(component string, manifest *manifest.Manife
 
 func (o *DeleteOptions) stopContainer(ctx context.Context, name string, client *client.Client) error {
 	return docker.ForceStop(ctx, name, client)
+}
+
+func (o *DeleteOptions) cleanupTriggers(component string, manifest *manifest.Manifest) {
+	for _, object := range manifest.Objects {
+		if object.Kind != "Trigger" {
+			continue
+		}
+		trigger := tmbroker.NewTrigger(object.Metadata.Name, o.Context, path.Join(o.ConfigDir, o.Context))
+		if err := trigger.LookupTrigger(); err != nil {
+			log.Printf("Trigger config %q: %v", object.Metadata.Name, err)
+			continue
+		}
+		if trigger.Target.Component != component {
+			continue
+		}
+		if err := trigger.RemoveTriggerFromConfig(); err != nil {
+			log.Printf("Deleting trigger %q: %v", object.Metadata.Name, err)
+			continue
+		}
+		manifest.Remove(object.Metadata.Name)
+	}
 }

@@ -105,7 +105,7 @@ func (o *StartOptions) start(broker string) error {
 			} else {
 				componentTriggers[trigger.GetTarget().Component] = []*tmbroker.Trigger{trigger}
 			}
-			if _, err := triggermesh.WriteObject(ctx, trigger, manifestFile); err != nil {
+			if _, err := triggermesh.WriteObject(trigger, manifestFile); err != nil {
 				return fmt.Errorf("creating trigger: %w", err)
 			}
 		case "Secret":
@@ -161,7 +161,7 @@ func (o *StartOptions) start(broker string) error {
 		if c == nil {
 			continue
 		}
-		if _, err := triggermesh.WriteObject(ctx, c.(triggermesh.Component), manifestFile); err != nil {
+		if _, err := triggermesh.WriteObject(c.(triggermesh.Component), manifestFile); err != nil {
 			return fmt.Errorf("updating manifest: %w", err)
 		}
 	}

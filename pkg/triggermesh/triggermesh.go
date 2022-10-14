@@ -26,7 +26,7 @@ import (
 	"github.com/triggermesh/tmcli/pkg/manifest"
 )
 
-func WriteObject(ctx context.Context, object Component, manifestFile string) (bool, error) {
+func WriteObject(object Component, manifestFile string) (bool, error) {
 	manifest := manifest.New(manifestFile)
 	if err := manifest.Read(); err != nil {
 		return false, fmt.Errorf("reading manifest: %w", err)
@@ -39,6 +39,15 @@ func WriteObject(ctx context.Context, object Component, manifestFile string) (bo
 		return false, nil
 	}
 	return true, manifest.Write()
+}
+
+func RemoveObject(name string, manifestFile string) error {
+	manifest := manifest.New(manifestFile)
+	if err := manifest.Read(); err != nil {
+		return fmt.Errorf("reading manifest: %w", err)
+	}
+	manifest.Remove(name)
+	return manifest.Write()
 }
 
 func Start(ctx context.Context, object Runnable, restart bool, additionalEnv map[string]string) (*docker.Container, error) {
@@ -101,7 +110,7 @@ func ProcessSecrets(ctx context.Context, p Parent, manifestFile string) (map[str
 	secretsChanged := false
 	secretEnv := make(map[string]string)
 	for _, s := range secrets {
-		dirty, err := WriteObject(ctx, s, manifestFile)
+		dirty, err := WriteObject(s, manifestFile)
 		if err != nil {
 			return nil, false, fmt.Errorf("write nested object: %w", err)
 		}

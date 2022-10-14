@@ -83,7 +83,7 @@ func (o *CreateOptions) source(name, kind string, args []string) error {
 	}
 
 	log.Println("Updating manifest")
-	restart, err := triggermesh.WriteObject(ctx, s, manifest)
+	restart, err := triggermesh.WriteObject(s, manifest)
 	if err != nil {
 		return err
 	}
