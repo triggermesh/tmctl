@@ -168,7 +168,10 @@ func DescribeTrigger(triggers []*tmbroker.Trigger) {
 func triggerFilterToString(filter tmbroker.Filter) string {
 	// that works with "exact type" filtering
 	// needs to be tested for other cases
-	f, _ := yaml.Marshal(filter)
+	f, err := yaml.Marshal(filter)
+	if err != nil {
+		return ""
+	}
 	result := strings.ReplaceAll(string(f), "\n", " ")
 	result = strings.ReplaceAll(result, " ", "")
 	result = strings.ReplaceAll(result, ":", " ")

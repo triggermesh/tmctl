@@ -138,16 +138,15 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 		}
 	}
 
-	if len(eventTypesFilter) == 0 && len(targetFilters) != 0 {
-		for _, filter := range targetFilters {
-			if eventType, ok := filter.Exact["type"]; ok {
-				eventTypesFilter = append(eventTypesFilter, eventType)
-			}
-		}
-	}
+	var filters []tmbroker.Filter
 	if len(eventTypesFilter) != 0 {
+		filters = []tmbroker.Filter{tmbroker.FilterType(eventTypesFilter)}
+	} else if len(targetFilters) != 0 {
+		filters = targetFilters
+	}
+	if len(filters) != 0 {
 		log.Println("Creating trigger")
-		if err := o.createTrigger("", container.Name, container.HostPort(), eventTypesFilter...); err != nil {
+		if err := o.createTrigger("", container.Name, container.HostPort(), filters...); err != nil {
 			return err
 		}
 	}
@@ -207,14 +206,14 @@ func (o *CreateOptions) updateTarget(ctx context.Context, target string, transfo
 	for triggerName, triggerToTarget := range triggers {
 		if target == triggerToTarget.GetTarget().Component {
 			triggerExisted = true
-			targetFilters = triggerToTarget.GetFilters()
-			if err := o.createTrigger(triggerName, target, targetPort, transformationEventTypes...); err != nil {
+			targetFilters = append(targetFilters, triggerToTarget.GetFilters()...)
+			if err := o.createTrigger(triggerName, target, targetPort, tmbroker.FilterType(transformationEventTypes)); err != nil {
 				return []tmbroker.Filter{}, fmt.Errorf("update trigger: %w", err)
 			}
 		}
 	}
 	if !triggerExisted {
-		if err := o.createTrigger("", target, targetPort, transformationEventTypes...); err != nil {
+		if err := o.createTrigger("", target, targetPort, tmbroker.FilterType(transformationEventTypes)); err != nil {
 			return []tmbroker.Filter{}, fmt.Errorf("create trigger: %w", err)
 		}
 	}

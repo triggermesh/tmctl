@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
 )
 
 func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
@@ -74,7 +75,7 @@ func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 	}
 
 	log.Println("Creating trigger")
-	if err := o.createTrigger(name, component.GetName(), port, eventTypesFilter...); err != nil {
+	if err := o.createTrigger(name, component.GetName(), port, tmbroker.FilterType(eventTypesFilter)); err != nil {
 		return err
 	}
 	return nil

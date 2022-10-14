@@ -27,6 +27,7 @@ import (
 
 	"github.com/triggermesh/tmcli/pkg/output"
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/components/target"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
 )
@@ -100,7 +101,7 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourcesFil
 
 	if len(eventTypesFilter) != 0 {
 		log.Println("Creating trigger")
-		if err := o.createTrigger("", container.Name, container.HostPort(), eventTypesFilter...); err != nil {
+		if err := o.createTrigger("", container.Name, container.HostPort(), tmbroker.FilterType(eventTypesFilter)); err != nil {
 			return err
 		}
 	}

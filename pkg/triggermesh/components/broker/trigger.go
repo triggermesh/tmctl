@@ -113,13 +113,7 @@ func (t *Trigger) GetSpec() map[string]interface{} {
 	}
 }
 
-func NewTrigger(name, broker, configDir string, eventTypes ...string) *Trigger {
-	var filters []Filter
-	for _, eventType := range eventTypes {
-		filters = append(filters, Filter{
-			Exact: map[string]string{"type": eventType},
-		})
-	}
+func NewTrigger(name, broker, configDir string, filters ...Filter) *Trigger {
 	return &Trigger{
 		Name:            name,
 		Broker:          broker,
@@ -132,14 +126,6 @@ func (t *Trigger) SetTarget(component, destination string) {
 	t.Target = Target{
 		Component: component,
 		URL:       destination,
-	}
-}
-
-func (t *Trigger) SetFilter(eventType string) {
-	t.Filters = []Filter{
-		{
-			Exact: map[string]string{"type": eventType},
-		},
 	}
 }
 
@@ -202,6 +188,27 @@ func (t *Trigger) UpdateManifest() error {
 		return m.Write()
 	}
 	return nil
+}
+
+func (f *Filter) String() (string, error) {
+	output, err := yaml.Marshal(f)
+	return string(output), err
+}
+
+func FilterType(eventTypes []string) Filter {
+	var filter Filter
+	switch len(eventTypes) {
+	case 0:
+	case 1:
+		filter.Exact = map[string]string{"type": eventTypes[0]}
+	default:
+		for _, eventType := range eventTypes {
+			filter.Any = append(filter.Any, Filter{Exact: map[string]string{
+				"type": eventType,
+			}})
+		}
+	}
+	return filter
 }
 
 func readBrokerConfig(path string) (Configuration, error) {
