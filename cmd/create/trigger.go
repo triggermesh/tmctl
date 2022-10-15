@@ -75,8 +75,10 @@ func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 	}
 
 	log.Println("Creating trigger")
-	if err := o.createTrigger(name, component.GetName(), port, tmbroker.FilterType(eventTypesFilter)); err != nil {
-		return err
+	for _, et := range eventTypesFilter {
+		if err := o.createTrigger(name, component.GetName(), port, tmbroker.FilterExactType(et)); err != nil {
+			return err
+		}
 	}
 	return nil
 }

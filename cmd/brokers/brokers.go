@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -29,39 +30,50 @@ const manifestFile = "manifest.yaml"
 
 func NewCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "brokers",
-		Short: "Show the list of brokers",
+		Use:     "brokers",
+		Aliases: []string{"list"},
+		Short:   "Show the list of brokers",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configDir, err := cmd.Flags().GetString("config")
 			if err != nil {
 				return err
 			}
-			return list(configDir, viper.GetString("context"))
+			list, err := List(configDir, viper.GetString("context"))
+			if err != nil {
+				return err
+			}
+			if len(list) == 0 {
+				return nil
+			}
+			fmt.Println(strings.Join(list, "\n"))
+			return nil
 		},
 	}
 }
 
-func list(configDir, currentContext string) error {
+func List(configDir, currentContext string) ([]string, error) {
 	dirs, err := os.ReadDir(configDir)
 	if err != nil {
-		return fmt.Errorf("listing dirs: %w", err)
+		return nil, fmt.Errorf("listing dirs: %w", err)
 	}
+	var output []string
 	for _, dir := range dirs {
 		if !dir.IsDir() {
 			continue
 		}
 		files, err := os.ReadDir(path.Join(configDir, dir.Name()))
 		if err != nil {
-			return fmt.Errorf("listing files: %w", err)
+			return nil, fmt.Errorf("listing files: %w", err)
 		}
 		for _, file := range files {
 			if file.Name() == manifestFile {
 				if dir.Name() == currentContext {
-					fmt.Printf("*")
+					output = append(output, fmt.Sprintf("*%s", dir.Name()))
+					continue
 				}
-				fmt.Println(dir.Name())
+				output = append(output, dir.Name())
 			}
 		}
 	}
-	return nil
+	return output, nil
 }

@@ -138,10 +138,22 @@ func (b *Broker) ConsumedEventTypes() ([]string, error) {
 	return []string{}, nil
 }
 
-func (b *Broker) GetTriggers() (map[string]Trigger, error) {
-	config, err := readBrokerConfig(b.ConfigFile)
+func GetTargetTriggers(configDir, target string) (map[string]Trigger, error) {
+	config, err := readBrokerConfig(path.Join(configDir, brokerConfigFile))
 	if err != nil {
 		return nil, fmt.Errorf("read broker config: %w", err)
+	}
+	for name, trigger := range config.Triggers {
+		if trigger.GetTarget().Component != target {
+			delete(config.Triggers, name)
+			continue
+		}
+		config.Triggers[name] = Trigger{
+			BrokerConfigDir: configDir,
+			Name:            name,
+			Filters:         trigger.Filters,
+			Target:          trigger.Target,
+		}
 	}
 	return config.Triggers, nil
 }

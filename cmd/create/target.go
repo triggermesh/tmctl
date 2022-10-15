@@ -34,11 +34,10 @@ import (
 
 func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:                "target <kind> <args>",
+		Use:                "target <kind> [--name <name>][--source <name>,<name>...][--eventTypes <type>,<type>...] <spec>",
 		Short:              "TriggerMesh target",
 		DisableFlagParsing: true,
-		SilenceErrors:      true,
-		SilenceUsage:       true,
+		Args:               cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
 			if len(args) == 0 {
@@ -99,9 +98,8 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourcesFil
 		return err
 	}
 
-	if len(eventTypesFilter) != 0 {
-		log.Println("Creating trigger")
-		if err := o.createTrigger("", container.Name, container.HostPort(), tmbroker.FilterType(eventTypesFilter)); err != nil {
+	for _, et := range eventTypesFilter {
+		if err := o.createTrigger("", container.Name, container.HostPort(), tmbroker.FilterExactType(et)); err != nil {
 			return err
 		}
 	}

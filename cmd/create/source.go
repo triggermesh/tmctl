@@ -34,11 +34,10 @@ import (
 
 func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:                "source <kind> <args>",
+		Use:                "source <kind> [--name <name>] <spec>",
 		Short:              "TriggerMesh source",
 		DisableFlagParsing: true,
-		SilenceErrors:      true,
-		SilenceUsage:       true,
+		Args:               cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
 			if len(args) == 0 {

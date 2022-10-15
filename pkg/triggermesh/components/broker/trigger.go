@@ -113,12 +113,12 @@ func (t *Trigger) GetSpec() map[string]interface{} {
 	}
 }
 
-func NewTrigger(name, broker, configDir string, filters ...Filter) *Trigger {
+func NewTrigger(name, broker, configDir string, filter Filter) *Trigger {
 	return &Trigger{
 		Name:            name,
 		Broker:          broker,
 		BrokerConfigDir: configDir,
-		Filters:         filters,
+		Filters:         []Filter{filter},
 	}
 }
 
@@ -195,20 +195,10 @@ func (f *Filter) String() (string, error) {
 	return string(output), err
 }
 
-func FilterType(eventTypes []string) Filter {
-	var filter Filter
-	switch len(eventTypes) {
-	case 0:
-	case 1:
-		filter.Exact = map[string]string{"type": eventTypes[0]}
-	default:
-		for _, eventType := range eventTypes {
-			filter.Any = append(filter.Any, Filter{Exact: map[string]string{
-				"type": eventType,
-			}})
-		}
+func FilterExactType(eventType string) Filter {
+	return Filter{
+		Exact: map[string]string{"type": eventType},
 	}
-	return filter
 }
 
 func readBrokerConfig(path string) (Configuration, error) {

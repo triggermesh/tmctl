@@ -172,7 +172,7 @@ func triggerFilterToString(filter tmbroker.Filter) string {
 	if err != nil {
 		return ""
 	}
-	result := strings.ReplaceAll(string(f), "\n", ":")
+	result := strings.ReplaceAll(string(f), "\n", "")
 	result = strings.ReplaceAll(result, " ", "")
 	result = strings.ReplaceAll(result, ":", " ")
 	return result

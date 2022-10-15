@@ -111,6 +111,9 @@ func (t *Target) GetChildren() ([]triggermesh.Component, error) {
 	if err != nil {
 		return nil, fmt.Errorf("extracting secrets: %w", err)
 	}
+	if len(secrets) == 0 {
+		return nil, nil
+	}
 	return []triggermesh.Component{secret.New(strings.ToLower(t.Name), t.Broker, secrets)}, nil
 }
 

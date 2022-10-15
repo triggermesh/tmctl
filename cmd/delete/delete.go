@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmcli/cmd/brokers"
 	"github.com/triggermesh/tmcli/pkg/docker"
 	"github.com/triggermesh/tmcli/pkg/manifest"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
@@ -44,7 +45,7 @@ func NewCmd() *cobra.Command {
 	o := &DeleteOptions{}
 	var deleteBroker string
 	deleteCmd := &cobra.Command{
-		Use:   "delete <component1, component2...>",
+		Use:   "delete <component1, component2...> [--broker <name>]",
 		Short: "Delete components",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configDir, err := cmd.Flags().GetString("config")
@@ -71,6 +72,9 @@ func (o *DeleteOptions) deleteBroker(broker string) error {
 	}
 	if err := os.RemoveAll(path.Join(o.ConfigDir, broker)); err != nil {
 		return fmt.Errorf("delete broker %q: %v", broker, err)
+	}
+	if broker == o.Context {
+		return o.switchContext()
 	}
 	return nil
 }
@@ -101,6 +105,10 @@ func (o *DeleteOptions) deleteComponents(components []string) error {
 		}
 		log.Printf("Deleting %q %s", object.Metadata.Name, strings.ToLower(object.Kind))
 		if object.Kind == "Broker" {
+			if len(components) > 0 {
+				log.Printf("skipping %q, use \"--broker <name>\" to delete the broker", object.Metadata.Name)
+				continue
+			}
 			object.Metadata.Name += "-broker"
 		}
 		o.stopContainer(ctx, object.Metadata.Name, client)
@@ -116,7 +124,7 @@ func (o *DeleteOptions) removeObject(component string, manifest *manifest.Manife
 			continue
 		}
 		if object.Kind == "Trigger" {
-			trigger := tmbroker.NewTrigger(object.Metadata.Name, o.Context, path.Join(o.ConfigDir, o.Context))
+			trigger := tmbroker.NewTrigger(object.Metadata.Name, o.Context, path.Join(o.ConfigDir, o.Context), tmbroker.Filter{})
 			if err := trigger.RemoveTriggerFromConfig(); err != nil {
 				log.Printf("Deleting %q: %v", object.Metadata.Name, err)
 				continue
@@ -131,22 +139,29 @@ func (o *DeleteOptions) stopContainer(ctx context.Context, name string, client *
 }
 
 func (o *DeleteOptions) cleanupTriggers(component string, manifest *manifest.Manifest) {
-	for _, object := range manifest.Objects {
-		if object.Kind != "Trigger" {
-			continue
-		}
-		trigger := tmbroker.NewTrigger(object.Metadata.Name, o.Context, path.Join(o.ConfigDir, o.Context))
-		if err := trigger.LookupTrigger(); err != nil {
-			log.Printf("Trigger config %q: %v", object.Metadata.Name, err)
-			continue
-		}
-		if trigger.Target.Component != component {
-			continue
-		}
-		if err := trigger.RemoveTriggerFromConfig(); err != nil {
-			log.Printf("Deleting trigger %q: %v", object.Metadata.Name, err)
-			continue
-		}
-		manifest.Remove(object.Metadata.Name)
+	triggers, err := tmbroker.GetTargetTriggers(path.Join(o.ConfigDir, o.Context), component)
+	if err != nil {
+		return
 	}
+	for name, trigger := range triggers {
+		if err := trigger.RemoveTriggerFromConfig(); err != nil {
+			log.Printf("Deleting trigger %q: %v", trigger.Name, err)
+			continue
+		}
+		manifest.Remove(name)
+	}
+}
+
+func (o *DeleteOptions) switchContext() error {
+	list, err := brokers.List(o.ConfigDir, o.Context)
+	if err != nil {
+		return fmt.Errorf("list brokers: %w", err)
+	}
+	var context string
+	if len(list) > 0 {
+		context = list[0]
+		log.Printf("Active broker is %q", context)
+	}
+	viper.Set("context", context)
+	return viper.WriteConfig()
 }
