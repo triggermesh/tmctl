@@ -37,7 +37,7 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 		Use:                "target <kind> [--name <name>][--source <name>,<name>...][--eventTypes <type>,<type>...] <spec>",
 		Short:              "TriggerMesh target",
 		DisableFlagParsing: true,
-		Args:               cobra.MinimumNArgs(2),
+		Args:               cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
 			if len(args) == 0 {
