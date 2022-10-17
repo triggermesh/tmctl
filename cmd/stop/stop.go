@@ -41,16 +41,11 @@ func NewCmd() *cobra.Command {
 		Use:   "stop [broker]",
 		Short: "Stops TriggerMesh components",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			o.ConfigDir = c
-			broker := viper.GetString("context")
+			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 			if len(args) == 1 {
-				broker = args[0]
+				return o.stop(args[0])
 			}
-			return o.stop(broker)
+			return o.stop(viper.GetString("context"))
 		},
 	}
 

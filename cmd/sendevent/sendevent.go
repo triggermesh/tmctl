@@ -19,6 +19,7 @@ package sendevent
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -46,11 +47,7 @@ func NewCmd() *cobra.Command {
 		Short: "Send CloudEvent to the broker",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Context = viper.GetString("context")
-			configDir, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			o.ConfigDir = configDir
+			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 			return o.send(strings.Join(args, " "))
 		},
 	}

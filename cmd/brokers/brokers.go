@@ -34,11 +34,7 @@ func NewCmd() *cobra.Command {
 		Aliases: []string{"list"},
 		Short:   "Show the list of brokers",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			configDir, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			list, err := List(configDir, viper.GetString("context"))
+			list, err := List(path.Dir(viper.ConfigFileUsed()), viper.GetString("context"))
 			if err != nil {
 				return err
 			}

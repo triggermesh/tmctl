@@ -62,15 +62,20 @@ func Start(ctx context.Context, object Runnable, restart bool, additionalEnv map
 	if err := container.PullImage(ctx, client, object.GetImage()); err != nil {
 		return nil, fmt.Errorf("pulling image: %w", err)
 	}
-	if restart {
-		// skip errors
-		container.Remove(ctx, client)
-	}
-	if existingContainer, err := container.LookupHostConfig(ctx, client); err == nil {
-		if err := existingContainer.Connect(ctx); err == nil {
-			// container is up
-			return existingContainer, nil
+	var containerIsRunning bool
+	existingContainer, _ := container.LookupHostConfig(ctx, client)
+	if existingContainer != nil {
+		if object.GetImage() != existingContainer.Image() {
+			restart = true
 		}
+		if err := existingContainer.Connect(ctx); err == nil {
+			containerIsRunning = true
+		}
+	}
+	if restart {
+		container.Remove(ctx, client)
+	} else if containerIsRunning {
+		return existingContainer, nil
 	}
 	container, err = container.Start(ctx, client)
 	if err != nil {

@@ -68,7 +68,6 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 		Use:   "transformation [--source <name>] [--target <name>] [--from <path>]",
 		Short: "TriggerMesh transformation",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.initializeOptions(cmd)
 			return o.transformation(name, target, file, eventSourcesFilter, eventTypesFilter)
 		},
 	}

@@ -35,7 +35,6 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 		Use:   "trigger --target <name> [--source <name>][--eventType <event type>]",
 		Short: "TriggerMesh trigger",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.initializeOptions(cmd)
 			return o.trigger(name, eventSourcesFilter, eventTypesFilter, target)
 		},
 	}

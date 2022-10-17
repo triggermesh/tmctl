@@ -34,18 +34,17 @@ import (
 
 func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:                "source <kind> [--name <name>] <spec>",
+		Use:                "source <kind> [--name <name>]",
 		Short:              "TriggerMesh source",
 		DisableFlagParsing: true,
-		Args:               cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.initializeOptions(cmd)
-			if len(args) == 0 {
+			if len(args) == 0 || args[0] == "--help" {
 				sources, err := crd.ListSources(o.CRD)
 				if err != nil {
 					return fmt.Errorf("list sources: %w", err)
 				}
-				fmt.Printf("Available sources:\n---\n%s\n", strings.Join(sources, "\n"))
+				cmd.Help()
+				fmt.Printf("\nAvailable source kinds:\n---\n%s\n", strings.Join(sources, "\n"))
 				return nil
 			}
 			kind, args, err := parse(args)
@@ -53,6 +52,10 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 				return err
 			}
 			name, args := parameterFromArgs("name", args)
+			version, args := parameterFromArgs("version", args)
+			if version != "" {
+				o.Version = version
+			}
 			return o.source(name, kind, args)
 		},
 	}

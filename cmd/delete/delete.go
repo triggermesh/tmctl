@@ -48,11 +48,7 @@ func NewCmd() *cobra.Command {
 		Use:   "delete <component1, component2...> [--broker <name>]",
 		Short: "Delete components",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			configDir, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			o.ConfigDir = configDir
+			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 			o.Context = viper.GetString("context")
 			if deleteBroker != "" {
 				return o.deleteBroker(deleteBroker)
