@@ -95,7 +95,7 @@ func (o *StartOptions) start(broker string) error {
 			}
 			brokerPort = container.HostPort()
 		case "Trigger":
-			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, configDir, tmbroker.Filter{})
+			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, configDir, nil)
 			if err := trigger.LookupTrigger(); err != nil {
 				return fmt.Errorf("trigger configuration: %w", err)
 			}

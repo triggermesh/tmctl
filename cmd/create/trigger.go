@@ -26,6 +26,7 @@ import (
 
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
 )
 
 func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
@@ -35,6 +36,11 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 		Use:   "trigger --target <name> [--source <name>][--eventType <event type>]",
 		Short: "TriggerMesh trigger",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			crds, err := crd.Fetch(o.ConfigBase, o.Version)
+			if err != nil {
+				return err
+			}
+			o.CRD = crds
 			return o.trigger(name, eventSourcesFilter, eventTypesFilter, target)
 		},
 	}
@@ -74,6 +80,9 @@ func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 	}
 
 	log.Println("Creating trigger")
+	if len(eventTypesFilter) == 0 {
+		return o.createTrigger(name, component.GetName(), port, nil)
+	}
 	for _, et := range eventTypesFilter {
 		if err := o.createTrigger(name, component.GetName(), port, tmbroker.FilterExactType(et)); err != nil {
 			return err

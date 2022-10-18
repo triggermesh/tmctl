@@ -134,7 +134,7 @@ func (o *CreateOptions) producersEventTypes(source string) ([]string, error) {
 	return et, nil
 }
 
-func (o *CreateOptions) createTrigger(name, targetName, port string, filter tmbroker.Filter) error {
+func (o *CreateOptions) createTrigger(name, targetName, port string, filter *tmbroker.Filter) error {
 	if name == "" {
 		filterString, err := filter.String()
 		if err != nil {
