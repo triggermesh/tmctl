@@ -56,6 +56,11 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 			if version != "" {
 				o.Version = version
 			}
+			crds, err := crd.Fetch(o.ConfigBase, o.Version)
+			if err != nil {
+				return err
+			}
+			o.CRD = crds
 			eventSourcesFilter, args := parameterFromArgs("source", args)
 			eventTypesFilter, args := parameterFromArgs("eventTypes", args)
 			var typeFilter, sourceFilter []string

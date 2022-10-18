@@ -56,6 +56,11 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 			if version != "" {
 				o.Version = version
 			}
+			crds, err := crd.Fetch(o.ConfigBase, o.Version)
+			if err != nil {
+				return err
+			}
+			o.CRD = crds
 			return o.source(name, kind, args)
 		},
 	}

@@ -32,6 +32,7 @@ import (
 	"github.com/triggermesh/tmcli/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/components/transformation"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
 )
 
 const (
@@ -68,6 +69,11 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 		Use:   "transformation [--source <name>] [--target <name>] [--from <path>]",
 		Short: "TriggerMesh transformation",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			crds, err := crd.Fetch(o.ConfigBase, o.Version)
+			if err != nil {
+				return err
+			}
+			o.CRD = crds
 			return o.transformation(name, target, file, eventSourcesFilter, eventTypesFilter)
 		},
 	}

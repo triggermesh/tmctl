@@ -32,7 +32,6 @@ import (
 	"github.com/triggermesh/tmcli/pkg/triggermesh/components/source"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/components/target"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/components/transformation"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
 )
 
 const manifestFile = "manifest.yaml"
@@ -68,14 +67,6 @@ func (o *CreateOptions) initialize(args []string) error {
 	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
-	if version, _ := parameterFromArgs("version", args); version != "" {
-		o.Version = version
-	}
-	crds, err := crd.Fetch(o.ConfigBase, o.Version)
-	if err != nil {
-		return err
-	}
-	o.CRD = crds
 	return nil
 }
 

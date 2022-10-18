@@ -115,10 +115,10 @@ func Fetch(configDir, version string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("CRD request failed: %s", resp.Status)
 	}
-	defer resp.Body.Close()
 	_, err = io.Copy(out, resp.Body)
 	return crdFile, err
 }
