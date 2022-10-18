@@ -29,11 +29,17 @@ import (
 const manifestFile = "manifest.yaml"
 
 func NewCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:     "brokers",
-		Aliases: []string{"list"},
-		Short:   "Show the list of brokers",
+	var broker string
+	brokersCmd := &cobra.Command{
+		Use:   "brokers [--set <broker>]",
+		Short: "Show the list of brokers",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if broker != "" {
+				viper.Set("context", broker)
+				if err := viper.WriteConfig(); err != nil {
+					return err
+				}
+			}
 			list, err := List(path.Dir(viper.ConfigFileUsed()), viper.GetString("context"))
 			if err != nil {
 				return err
@@ -45,6 +51,8 @@ func NewCmd() *cobra.Command {
 			return nil
 		},
 	}
+	brokersCmd.Flags().StringVar(&broker, "set", "", "Change the current broker")
+	return brokersCmd
 }
 
 func List(configDir, currentContext string) ([]string, error) {
