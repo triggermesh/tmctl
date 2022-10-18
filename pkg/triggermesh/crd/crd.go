@@ -81,9 +81,12 @@ type release struct {
 func latest() (string, error) {
 	r, err := http.Get(ghLatestRelease)
 	if err != nil {
-		return "", fmt.Errorf("cannot detect latest release tag: %w", err)
+		return "", fmt.Errorf("latest release request: %w", err)
 	}
 	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("latest release status: %w", err)
+	}
 	var j release
 	return j.TagName, json.NewDecoder(r.Body).Decode(&j)
 }
