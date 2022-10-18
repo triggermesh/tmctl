@@ -53,7 +53,7 @@ func NewCmd() *cobra.Command {
 			if deleteBroker != "" {
 				return o.deleteBroker(deleteBroker)
 			}
-			return o.deleteComponents(args)
+			return o.deleteComponents(args, false)
 		},
 	}
 	deleteCmd.Flags().StringVar(&deleteBroker, "broker", "", "Delete the broker")
@@ -63,7 +63,7 @@ func NewCmd() *cobra.Command {
 func (o *DeleteOptions) deleteBroker(broker string) error {
 	oo := *o
 	oo.Context = broker
-	if err := oo.deleteComponents([]string{}); err != nil {
+	if err := oo.deleteComponents([]string{}, true); err != nil {
 		return fmt.Errorf("deleting component: %w", err)
 	}
 	if err := os.RemoveAll(path.Join(o.ConfigDir, broker)); err != nil {
@@ -75,7 +75,7 @@ func (o *DeleteOptions) deleteBroker(broker string) error {
 	return nil
 }
 
-func (o *DeleteOptions) deleteComponents(components []string) error {
+func (o *DeleteOptions) deleteComponents(components []string, force bool) error {
 	ctx := context.Background()
 	client, err := docker.NewClient()
 	if err != nil {
@@ -99,14 +99,13 @@ func (o *DeleteOptions) deleteComponents(components []string) error {
 		if skip {
 			continue
 		}
-		log.Printf("Deleting %q %s", object.Metadata.Name, strings.ToLower(object.Kind))
 		if object.Kind == "Broker" {
-			if len(components) > 0 {
-				log.Printf("skipping %q, use \"--broker <name>\" to delete the broker", object.Metadata.Name)
+			if !force {
 				continue
 			}
 			object.Metadata.Name += "-broker"
 		}
+		log.Printf("Deleting %q %s", object.Metadata.Name, strings.ToLower(object.Kind))
 		o.stopContainer(ctx, object.Metadata.Name, client)
 		o.removeObject(object.Metadata.Name, currentManifest)
 		o.cleanupTriggers(object.Metadata.Name, currentManifest)
