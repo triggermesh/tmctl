@@ -34,11 +34,8 @@ func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "broker <name>",
 		Short: "TriggerMesh broker",
+		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.initializeOptions(cmd)
-			if len(args) != 1 {
-				return fmt.Errorf("broker name is required")
-			}
 			return o.broker(args[0])
 		},
 	}
@@ -46,7 +43,6 @@ func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 
 func (o *CreateOptions) broker(name string) error {
 	ctx := context.Background()
-
 	configDir := path.Join(o.ConfigBase, name)
 	broker, err := tmbroker.New(name, configDir)
 	if err != nil {

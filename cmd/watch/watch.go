@@ -24,6 +24,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 
@@ -45,17 +46,11 @@ func NewCmd() *cobra.Command {
 		Use:   "watch [broker]",
 		Short: "Watch events flowing through the broker",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			broker := viper.GetString("context")
+			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 			if len(args) == 1 {
-				broker = args[0]
+				return o.watch(args[0])
 			}
-			c, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			o.ConfigDir = c
-
-			return o.watch(broker)
+			return o.watch(viper.GetString("context"))
 		},
 	}
 

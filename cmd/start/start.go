@@ -32,6 +32,7 @@ import (
 	"github.com/triggermesh/tmcli/pkg/triggermesh/components/source"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/components/target"
 	"github.com/triggermesh/tmcli/pkg/triggermesh/components/transformation"
+	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
 )
 
 const manifestFile = "manifest.yaml"
@@ -49,19 +50,17 @@ func NewCmd() *cobra.Command {
 		Use:   "start [broker]",
 		Short: "Starts TriggerMesh components",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			broker := viper.GetString("context")
-			if len(args) == 1 {
-				broker = args[0]
-			}
-			c, err := cmd.Flags().GetString("config")
+			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
+			o.Version = viper.GetString("triggermesh.version")
+			crds, err := crd.Fetch(o.ConfigDir, o.Version)
 			if err != nil {
 				return err
 			}
-			o.ConfigDir = c
-			o.Version = viper.GetString("triggermesh.version")
-			o.CRD = viper.GetString("triggermesh.servedCRD")
-
-			return o.start(broker)
+			o.CRD = crds
+			if len(args) == 1 {
+				return o.start(args[0])
+			}
+			return o.start(viper.GetString("context"))
 		},
 	}
 	createCmd.Flags().BoolVar(&o.Restart, "restart", true, "Restart components")

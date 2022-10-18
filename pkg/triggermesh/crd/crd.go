@@ -26,8 +26,12 @@ import (
 	"path"
 	"strings"
 
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
+)
+
+const (
+	ghLatestRelease = "https://api.github.com/repos/triggermesh/triggermesh/releases/latest"
+	crdsURL         = "https://github.com/triggermesh/triggermesh/releases/download/$VERSION/triggermesh-crds.yaml"
 )
 
 type CRD struct {
@@ -74,28 +78,27 @@ type release struct {
 	TagName string `json:"tag_name"`
 }
 
-const ghLatestRelease = "https://api.github.com/repos/triggermesh/triggermesh/releases/latest"
-
 func latest() (string, error) {
 	r, err := http.Get(ghLatestRelease)
 	if err != nil {
-		return "", fmt.Errorf("cannot detect latest release tag: %w", err)
+		return "", fmt.Errorf("latest release request: %w", err)
 	}
 	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("latest release status: %w", err)
+	}
 	var j release
-
 	return j.TagName, json.NewDecoder(r.Body).Decode(&j)
 }
 
-func Fetch(configDir string) (string, error) {
+func Fetch(configDir, version string) (string, error) {
 	var err error
-	version := viper.GetString("triggermesh.version")
 	if version == "latest" {
 		if version, err = latest(); err != nil {
 			return "", fmt.Errorf("cannot fetch latest CRD: %w", err)
 		}
 	}
-	url := strings.ReplaceAll(viper.GetString("triggermesh.crd"), "${VERSION}", version)
+	url := strings.ReplaceAll(crdsURL, "$VERSION", version)
 	crdDir := path.Join(configDir, "crd", version)
 	if err := os.MkdirAll(crdDir, os.ModePerm); err != nil {
 		return "", err
@@ -104,7 +107,7 @@ func Fetch(configDir string) (string, error) {
 	if _, err := os.Stat(crdFile); err == nil {
 		return crdFile, nil
 	}
-	log.Println("Fetching CRD")
+	log.Printf("Fetching %s CRD", version)
 	out, err := os.Create(crdFile)
 	if err != nil {
 		return "", err
@@ -116,6 +119,9 @@ func Fetch(configDir string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("CRD request failed: %s", resp.Status)
+	}
 	_, err = io.Copy(out, resp.Body)
 	return crdFile, err
 }

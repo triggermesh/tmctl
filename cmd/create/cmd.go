@@ -48,8 +48,9 @@ func NewCmd() *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "create <resource>",
 		Short: "Create TriggerMesh objects",
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.HelpFunc()(cmd, args)
+		Args:  cobra.MinimumNArgs(1),
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return o.initialize(args)
 		},
 	}
 
@@ -62,15 +63,11 @@ func NewCmd() *cobra.Command {
 	return createCmd
 }
 
-func (o *CreateOptions) initializeOptions(cmd *cobra.Command) {
-	configBase, err := cmd.Flags().GetString("config")
-	if err != nil {
-		panic(err)
-	}
-	o.ConfigBase = configBase
+func (o *CreateOptions) initialize(args []string) error {
+	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
-	o.CRD = viper.GetString("triggermesh.servedCRD")
+	return nil
 }
 
 func parse(args []string) (string, []string, error) {
