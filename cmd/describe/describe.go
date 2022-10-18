@@ -105,7 +105,7 @@ func (o DescribeOptions) describe(broker string) error {
 				container: []*docker.Container{cc},
 			}
 		case object.Kind == "Trigger":
-			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, brokerConfigDir, tmbroker.Filter{})
+			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, brokerConfigDir, nil)
 			if err := trigger.LookupTrigger(); err != nil {
 				return fmt.Errorf("trigger config: %w", err)
 			}
