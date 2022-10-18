@@ -37,6 +37,7 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 		Use:                "target <kind> [--name <name>][--source <name>,<name>...][--eventTypes <type>,<type>...]",
 		Short:              "TriggerMesh target",
 		DisableFlagParsing: true,
+		SilenceErrors:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 || args[0] == "--help" {
 				targets, err := crd.ListTargets(o.CRD)

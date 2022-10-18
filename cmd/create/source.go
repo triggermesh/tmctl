@@ -37,6 +37,7 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 		Use:                "source <kind> [--name <name>]",
 		Short:              "TriggerMesh source",
 		DisableFlagParsing: true,
+		SilenceErrors:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 || args[0] == "--help" {
 				sources, err := crd.ListSources(o.CRD)

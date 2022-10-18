@@ -19,6 +19,7 @@ package crd
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -55,22 +56,26 @@ func (s *Schema) Process(spec map[string]interface{}) (map[string]interface{}, e
 				k, propertyKeysAsString(s.schema.Properties))
 		}
 
-		// plain secret value only supported right now
-		// if isSecretRef(schemaKey.Properties) {
-		// if _, ok := v.(map[string]interface{}); !ok {
-		// v = map[string]interface{}{
-		// "value": v,
-		// }
-		// spec[k] = v
-		// }
-		// }
+		if schemaKey.AdditionalProperties != nil {
+			if schemaKey.AdditionalProperties.Schema == nil {
+				return nil, fmt.Errorf("additional properties schema is missing in %q", k)
+			}
+			additionalParams, err := additionalPropertiesSpec(v, schemaKey.AdditionalProperties.Schema)
+			if err != nil {
+				return nil, fmt.Errorf("additional properties %q: %w", k, err)
+			}
+			spec[k] = additionalParams
+			continue
+		}
 
 		switch value := v.(type) {
 		case string:
-			if schemaKey.Type[0] == "array" {
+			switch schemaKey.Type[0] {
+			case "array":
 				spec[k] = strings.Split(value, ",")
-			}
-			if schemaKey.Type[0] == "object" {
+			case "boolean":
+				spec[k] = (value == "true")
+			case "object":
 				return nil, fmt.Errorf("%q is expected to be an object with properties: %s",
 					k, propertyKeysAsString(schemaKey.Properties))
 			}
@@ -98,4 +103,51 @@ func propertyKeysAsString(s map[string]spec.Schema) string {
 		keys = append(keys, k)
 	}
 	return strings.Join(keys, ", ")
+}
+
+func additionalPropertiesSpec(value interface{}, spec *spec.Schema) (map[string]interface{}, error) {
+	if result, ok := value.(map[string]interface{}); ok {
+		return result, nil
+	}
+	result := make(map[string]interface{}, 0)
+	if typ := spec.Type[0]; typ != "" {
+		input, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("input value type \"%T\" is not supported", value)
+		}
+		for _, pair := range strings.Split(input, ",") {
+			var key, value string
+			if kv := strings.Split(pair, ":"); len(kv) == 2 {
+				key = kv[0]
+				value = kv[1]
+			} else if kv := strings.Split(pair, "="); len(kv) == 2 {
+				key = kv[0]
+				value = kv[1]
+			} else {
+				return nil, fmt.Errorf("cannot split %q into key-value pair", pair)
+			}
+			switch typ {
+			case "string", "object":
+				result[key] = value
+			case "boolean":
+				result[key] = (value == "true")
+			case "integer":
+				intValue, err := strconv.Atoi(value)
+				if err != nil {
+					return nil, fmt.Errorf("input value type conversion: %w", err)
+				}
+				result[key] = int64(intValue)
+			default:
+				return nil, fmt.Errorf("property type %q is not supported", typ)
+			}
+		}
+	} else if len(spec.AnyOf) != 0 {
+		for _, nestedAPSchema := range spec.AnyOf {
+			// try to convert to anyOf provided types
+			if nestedSpec, err := additionalPropertiesSpec(value, &nestedAPSchema); err == nil {
+				result = nestedSpec
+			}
+		}
+	}
+	return result, nil
 }
