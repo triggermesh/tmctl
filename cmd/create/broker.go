@@ -54,7 +54,7 @@ func (o *CreateOptions) broker(name string) error {
 	}
 
 	log.Println("Updating manifest")
-	restart, err := triggermesh.WriteObject(ctx, broker, path.Join(configDir, manifestFile))
+	restart, err := triggermesh.WriteObject(broker, path.Join(configDir, manifestFile))
 	if err != nil {
 		return err
 	}

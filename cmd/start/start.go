@@ -78,7 +78,7 @@ func (o *StartOptions) start(broker string) error {
 		return fmt.Errorf("cannot parse manifest: %w", err)
 	}
 
-	componentTriggers := make(map[string]*tmbroker.Trigger)
+	componentTriggers := make(map[string][]*tmbroker.Trigger)
 	secrets := make(map[string]map[string]string)
 	var brokerPort string
 	// start eventing first
@@ -96,14 +96,16 @@ func (o *StartOptions) start(broker string) error {
 			}
 			brokerPort = container.HostPort()
 		case "Trigger":
-			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, configDir, []string{})
+			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, configDir, tmbroker.Filter{})
 			if err := trigger.LookupTrigger(); err != nil {
 				return fmt.Errorf("trigger configuration: %w", err)
 			}
-			for _, target := range trigger.GetTargets() {
-				componentTriggers[target.Component] = trigger
+			if triggers, set := componentTriggers[trigger.GetTarget().Component]; set {
+				componentTriggers[trigger.GetTarget().Component] = append(triggers, trigger)
+			} else {
+				componentTriggers[trigger.GetTarget().Component] = []*tmbroker.Trigger{trigger}
 			}
-			if _, err := triggermesh.WriteObject(ctx, trigger, manifestFile); err != nil {
+			if _, err := triggermesh.WriteObject(trigger, manifestFile); err != nil {
 				return fmt.Errorf("creating trigger: %w", err)
 			}
 		case "Secret":
@@ -144,20 +146,22 @@ func (o *StartOptions) start(broker string) error {
 			if err != nil {
 				return fmt.Errorf("starting container: %w", err)
 			}
-			if trigger, exists := componentTriggers[object.Metadata.Name]; exists {
-				trigger.SetTarget(object.Metadata.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
-				if err := trigger.UpdateBrokerConfig(); err != nil {
-					return fmt.Errorf("broker config: %w", err)
-				}
-				if err := trigger.UpdateManifest(); err != nil {
-					return fmt.Errorf("broker manifest: %w", err)
+			if triggers, exists := componentTriggers[object.Metadata.Name]; exists {
+				for _, trigger := range triggers {
+					trigger.SetTarget(object.Metadata.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
+					if err := trigger.UpdateBrokerConfig(); err != nil {
+						return fmt.Errorf("broker config: %w", err)
+					}
+					if err := trigger.UpdateManifest(); err != nil {
+						return fmt.Errorf("broker manifest: %w", err)
+					}
 				}
 			}
 		}
 		if c == nil {
 			continue
 		}
-		if _, err := triggermesh.WriteObject(ctx, c.(triggermesh.Component), manifestFile); err != nil {
+		if _, err := triggermesh.WriteObject(c.(triggermesh.Component), manifestFile); err != nil {
 			return fmt.Errorf("updating manifest: %w", err)
 		}
 	}

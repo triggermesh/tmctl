@@ -116,7 +116,6 @@ func CreateUnstructured(resource, name, broker, crdFile string, spec map[string]
 			}
 		}
 	}
-	unstructured.SetNestedMap(u.Object, map[string]interface{}{}, "status")
 	return u, nil
 }
 

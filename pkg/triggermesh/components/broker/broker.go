@@ -49,11 +49,10 @@ type Broker struct {
 
 	image string
 	spec  map[string]interface{}
-	// Configuration Configuration
 }
 
 type Configuration struct {
-	Triggers []TriggerSpec `yaml:"triggers"`
+	Triggers map[string]Trigger `yaml:"triggers"`
 }
 
 func (b *Broker) AsUnstructured() (unstructured.Unstructured, error) {
@@ -137,6 +136,26 @@ func (b *Broker) GetPort(ctx context.Context) (string, error) {
 
 func (b *Broker) ConsumedEventTypes() ([]string, error) {
 	return []string{}, nil
+}
+
+func GetTargetTriggers(configDir, target string) (map[string]Trigger, error) {
+	config, err := readBrokerConfig(path.Join(configDir, brokerConfigFile))
+	if err != nil {
+		return nil, fmt.Errorf("read broker config: %w", err)
+	}
+	for name, trigger := range config.Triggers {
+		if trigger.GetTarget().Component != target {
+			delete(config.Triggers, name)
+			continue
+		}
+		config.Triggers[name] = Trigger{
+			BrokerConfigDir: configDir,
+			Name:            name,
+			Filters:         trigger.Filters,
+			Target:          trigger.Target,
+		}
+	}
+	return config.Triggers, nil
 }
 
 func New(name, brokerConfigDir string) (*Broker, error) {

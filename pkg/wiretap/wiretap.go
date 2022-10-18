@@ -80,9 +80,14 @@ func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
 }
 
 func (w *Wiretap) CreateTrigger(eventTypes []string) error {
-	trigger := tmbroker.NewTrigger("wiretap", w.Broker, w.ConfigDir, eventTypes)
-	trigger.SetTarget("wiretap", w.Destination)
-	return trigger.UpdateBrokerConfig()
+	for _, et := range eventTypes {
+		trigger := tmbroker.NewTrigger("", w.Broker, w.ConfigDir, tmbroker.FilterExactType(et))
+		trigger.SetTarget("wiretap", w.Destination)
+		if err := trigger.UpdateBrokerConfig(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (w *Wiretap) Cleanup(ctx context.Context) error {
@@ -90,9 +95,14 @@ func (w *Wiretap) Cleanup(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
-	trigger := tmbroker.NewTrigger("wiretap", w.Broker, w.ConfigDir, []string{})
-	if err := trigger.RemoveTriggerFromConfig(); err != nil {
-		return fmt.Errorf("removing trigger: %v", err)
+	triggers, err := tmbroker.GetTargetTriggers(path.Join(w.ConfigDir, w.Broker), "wiretap")
+	if err != nil {
+		return fmt.Errorf("wiretap triggers: %w", err)
+	}
+	for _, trigger := range triggers {
+		if err := trigger.RemoveTriggerFromConfig(); err != nil {
+			return fmt.Errorf("removing trigger: %v", err)
+		}
 	}
 	return docker.ForceStop(ctx, fmt.Sprintf("%s-wiretap", w.Broker), client)
 }

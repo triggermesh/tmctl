@@ -34,11 +34,10 @@ import (
 
 func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:                "source <kind> <args>",
+		Use:                "source <kind> [--name <name>] <spec>",
 		Short:              "TriggerMesh source",
 		DisableFlagParsing: true,
-		SilenceErrors:      true,
-		SilenceUsage:       true,
+		Args:               cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.initializeOptions(cmd)
 			if len(args) == 0 {
@@ -83,7 +82,7 @@ func (o *CreateOptions) source(name, kind string, args []string) error {
 	}
 
 	log.Println("Updating manifest")
-	restart, err := triggermesh.WriteObject(ctx, s, manifest)
+	restart, err := triggermesh.WriteObject(s, manifest)
 	if err != nil {
 		return err
 	}

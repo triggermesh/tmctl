@@ -75,7 +75,7 @@ func (o *CreateOptions) initializeOptions(cmd *cobra.Command) {
 
 func parse(args []string) (string, []string, error) {
 	if l := len(args); l < 1 {
-		return "", []string{}, fmt.Errorf("expected at least 1 arguments, got %d", l)
+		return "", []string{}, fmt.Errorf("expected at least 2 arguments, got %d", l)
 	}
 	return args[0], args[1:], nil
 }
@@ -137,13 +137,17 @@ func (o *CreateOptions) producersEventTypes(source string) ([]string, error) {
 	return et, nil
 }
 
-func (o *CreateOptions) createTrigger(name string, eventTypesFilter []string, targetName, port string) error {
+func (o *CreateOptions) createTrigger(name, targetName, port string, filter tmbroker.Filter) error {
 	if name == "" {
+		filterString, err := filter.String()
+		if err != nil {
+			return fmt.Errorf("filter: %w", err)
+		}
 		// in case of event types hash collision, replace with sha256
-		eventTypesHash := md5.Sum([]byte(strings.Join(append(eventTypesFilter, targetName), " ")))
-		name = fmt.Sprintf("%s-trigger-%s", o.Context, hex.EncodeToString(eventTypesHash[:4]))
+		hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", targetName, filterString)))
+		name = fmt.Sprintf("%s-trigger-%s", o.Context, hex.EncodeToString(hash[:4]))
 	}
-	tr := tmbroker.NewTrigger(name, o.Context, path.Join(o.ConfigBase, o.Context), eventTypesFilter)
+	tr := tmbroker.NewTrigger(name, o.Context, path.Join(o.ConfigBase, o.Context), filter)
 	tr.SetTarget(targetName, fmt.Sprintf("http://host.docker.internal:%s", port))
 	if err := tr.UpdateBrokerConfig(); err != nil {
 		return fmt.Errorf("broker config: %w", err)
