@@ -23,7 +23,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/triggermesh/tmcli/pkg/kubernetes"
+	"github.com/triggermesh/tmctl/pkg/kubernetes"
 )
 
 type Manifest struct {

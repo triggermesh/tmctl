@@ -22,8 +22,8 @@ import (
 	"io"
 	"path"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/docker"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
 type Wiretap struct {

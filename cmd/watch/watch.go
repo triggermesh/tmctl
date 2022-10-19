@@ -31,7 +31,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmcli/pkg/wiretap"
+	"github.com/triggermesh/tmctl/pkg/wiretap"
 )
 
 type WatchOptions struct {

@@ -26,12 +26,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmcli/pkg/manifest"
-	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/components/source"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/components/target"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/components/transformation"
+	"github.com/triggermesh/tmctl/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/target"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
 )
 
 const manifestFile = "manifest.yaml"

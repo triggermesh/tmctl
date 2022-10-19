@@ -20,7 +20,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/triggermesh/tmcli/cmd"
+	"github.com/triggermesh/tmctl/cmd"
 )
 
 func main() {

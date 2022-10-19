@@ -22,9 +22,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
-	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"gopkg.in/yaml.v3"
 )
 
@@ -49,10 +49,10 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 	switch kind {
 	case "broker":
 		result = fmt.Sprintf("%s\nCurrent broker is set to %q", result, object.GetName())
-		result = fmt.Sprintf("%s\nTo change the current broker use \"tmcli brokers --set <broker name>\"", result)
+		result = fmt.Sprintf("%s\nTo change the current broker use \"tmctl brokers --set <broker name>\"", result)
 		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
 		result = fmt.Sprintf("%s\nNext steps:", result)
-		result = fmt.Sprintf("%s\n\ttmcli create source\t - create source that will produce events", result)
+		result = fmt.Sprintf("%s\n\ttmctl create source\t - create source that will produce events", result)
 	case "producer":
 		et, _ := object.(triggermesh.Producer).GetEventTypes()
 		if len(et) != 0 {
@@ -60,8 +60,8 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 		}
 		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
 		result = fmt.Sprintf("%s\nNext steps:", result)
-		result = fmt.Sprintf("%s\n\ttmcli create target <kind> --source %s [--eventTypes <types>]\t - create target that will consume events from this source", result, object.GetName())
-		result = fmt.Sprintf("%s\n\ttmcli watch\t\t\t\t\t\t\t\t\t - show events flowing through the broker in the real time", result)
+		result = fmt.Sprintf("%s\n\ttmctl create target <kind> --source %s [--eventTypes <types>]\t - create target that will consume events from this source", result, object.GetName())
+		result = fmt.Sprintf("%s\n\ttmctl watch\t\t\t\t\t\t\t\t\t - show events flowing through the broker in the real time", result)
 	case "consumer":
 		et, _ := object.(triggermesh.Consumer).ConsumedEventTypes()
 		if len(et) != 0 {
@@ -76,8 +76,8 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 		}
 		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
 		result = fmt.Sprintf("%s\nNext steps:", result)
-		result = fmt.Sprintf("%s\n\ttmcli watch\t - show events flowing through the broker in the real time", result)
-		result = fmt.Sprintf("%s\n\ttmcli dump\t - dump Kubernetes manifest", result)
+		result = fmt.Sprintf("%s\n\ttmctl watch\t - show events flowing through the broker in the real time", result)
+		result = fmt.Sprintf("%s\n\ttmctl dump\t - dump Kubernetes manifest", result)
 	}
 	fmt.Println(result)
 }
