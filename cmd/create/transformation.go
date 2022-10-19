@@ -28,11 +28,11 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/triggermesh/tmcli/pkg/output"
-	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/components/transformation"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
+	"github.com/triggermesh/tmctl/pkg/output"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const (

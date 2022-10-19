@@ -24,9 +24,9 @@ import (
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/triggermesh/tmcli/pkg/kubernetes"
-	"github.com/triggermesh/tmcli/pkg/manifest"
-	"github.com/triggermesh/tmcli/pkg/triggermesh"
+	"github.com/triggermesh/tmctl/pkg/kubernetes"
+	"github.com/triggermesh/tmctl/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
 
 var _ triggermesh.Component = (*Trigger)(nil)

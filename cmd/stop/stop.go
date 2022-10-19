@@ -25,8 +25,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
-	"github.com/triggermesh/tmcli/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/manifest"
 )
 
 const manifestFile = "manifest.yaml"

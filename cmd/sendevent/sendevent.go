@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
 const (

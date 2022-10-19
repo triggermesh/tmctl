@@ -28,10 +28,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmcli/cmd/brokers"
-	"github.com/triggermesh/tmcli/pkg/docker"
-	"github.com/triggermesh/tmcli/pkg/manifest"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/cmd/brokers"
+	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/manifest"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
 const manifestFile = "manifest.yaml"

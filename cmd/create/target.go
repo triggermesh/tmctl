@@ -25,11 +25,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/triggermesh/tmcli/pkg/output"
-	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/components/target"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
+	"github.com/triggermesh/tmctl/pkg/output"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/target"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 func (o *CreateOptions) NewTargetCmd() *cobra.Command {

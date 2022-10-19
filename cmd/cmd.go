@@ -23,21 +23,23 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmcli/cmd/brokers"
-	"github.com/triggermesh/tmcli/cmd/config"
-	"github.com/triggermesh/tmcli/cmd/create"
-	"github.com/triggermesh/tmcli/cmd/delete"
-	"github.com/triggermesh/tmcli/cmd/describe"
-	"github.com/triggermesh/tmcli/cmd/dump"
-	"github.com/triggermesh/tmcli/cmd/sendevent"
-	"github.com/triggermesh/tmcli/cmd/start"
-	"github.com/triggermesh/tmcli/cmd/stop"
-	"github.com/triggermesh/tmcli/cmd/watch"
+	"github.com/triggermesh/tmctl/cmd/brokers"
+	"github.com/triggermesh/tmctl/cmd/config"
+	"github.com/triggermesh/tmctl/cmd/create"
+	"github.com/triggermesh/tmctl/cmd/delete"
+	"github.com/triggermesh/tmctl/cmd/describe"
+	"github.com/triggermesh/tmctl/cmd/dump"
+	"github.com/triggermesh/tmctl/cmd/sendevent"
+	"github.com/triggermesh/tmctl/cmd/start"
+	"github.com/triggermesh/tmctl/cmd/stop"
+	"github.com/triggermesh/tmctl/cmd/watch"
 )
 
 const (
 	defaultTriggermeshVersion = "v1.21.1"
 	defaultBroker             = ""
+
+	configDir = ".triggermesh/cli"
 )
 
 func NewRootCommand() *cobra.Command {
@@ -74,7 +76,7 @@ Find more information at: https://docs.triggermesh.io`,
 func initConfig() {
 	home, err := os.UserHomeDir()
 	cobra.CheckErr(err)
-	configHome := path.Join(home, ".triggermesh/cli")
+	configHome := path.Join(home, configDir)
 
 	// Search config in home directory with name ".cobra" (without extension).
 	viper.SetConfigType("yaml")

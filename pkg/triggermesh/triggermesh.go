@@ -22,8 +22,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
-	"github.com/triggermesh/tmcli/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/manifest"
 )
 
 func WriteObject(object Component, manifestFile string) (bool, error) {

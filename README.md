@@ -3,36 +3,36 @@ Local environment edition.
 
 Project status: Work in progress, initial testing stage.
 
-Working name is `tmcli`.
+Working name is `tmctl`.
 
 ## Available commands and scenarios
 
 Commands without the context:
 
 ```
-tmcli config *
-tmcli list
-tmcli create broker <broker>
+tmctl config *
+tmctl list
+tmctl create broker <broker>
 ```
 
 Commands with optional context:
 
 ```
-tmcli dump [broker]
-tmcli describe [broker]
-tmcli delete [--broker <broker>] <component>
-tmcli start [broker]
-tmcli stop [broker]
-tmcli watch [broker]
+tmctl dump [broker]
+tmctl describe [broker]
+tmctl delete [--broker <broker>] <component>
+tmctl start [broker]
+tmctl stop [broker]
+tmctl watch [broker]
 ```
 
 Commands with context from config:
 
 ```
-tmcli create source *
-tmcli create target *
-tmcli create trigger *
-tmcli create transformation *
+tmctl create source *
+tmctl create target *
+tmctl create trigger *
+tmctl create transformation *
 ```
 
 ### Installation
@@ -40,13 +40,13 @@ tmcli create transformation *
 Checkout the code:
 
 ```
-git clone git@github.com:triggermesh/tmcli.git
+git clone git@github.com:triggermesh/tmctl.git
 ```
 
 Install binary:
 
 ```
-cd tmcli
+cd tmctl
 go install
 ```
 
@@ -55,37 +55,37 @@ go install
 Create broker:
 
 ```
-tmcli create broker foo
+tmctl create broker foo
 ```
 
 Create source:
 
 ```
-tmcli create source awssqs --arn <arn> --auth.credentials.accessKeyID=<access key> --auth.credentials.secretAccessKey=<secret key>
+tmctl create source awssqs --arn <arn> --auth.credentials.accessKeyID=<access key> --auth.credentials.secretAccessKey=<secret key>
 ```
 
 Watch incoming events:
 
 ```
-tmcli watch
+tmctl watch
 ```
 
 Create transformation:
 ```
-tmcli create transformation --sources foo-awssqssource
+tmctl create transformation --sources foo-awssqssource
 ```
 
 Create target and trigger:
 
 ```
-tmcli create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io
-tmcli create trigger --sources foo-transformation --target foo-cloudeventstarget
+tmctl create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io
+tmctl create trigger --sources foo-transformation --target foo-cloudeventstarget
 ```
 
 Or, in one command:
 
 ```
-tmcli create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io --sources foo-transformation
+tmctl create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io --sources foo-transformation
 ```
 
 Open sockeye [web-interface](https://sockeye-tzununbekov.dev.triggermesh.io), send the message to SQS queue specified in the source creation step and observe the received CloudEvent in the sockeye tab.
@@ -93,37 +93,37 @@ Open sockeye [web-interface](https://sockeye-tzununbekov.dev.triggermesh.io), se
 Or send test event manually:
 
 ```
-tmcli send-event --eventType com.amazon.sqs.message '{"hello":"world"}'
+tmctl send-event --eventType com.amazon.sqs.message '{"hello":"world"}'
 ```
 
 Stop event flow:
 
 ```
-tmcli stop
+tmctl stop
 ```
 
 Start event flow:
 
 ```
-tmcli start
+tmctl start
 ```
 
 Print Kubernetes manifest (not applicable at the moment):
 
 ```
-tmcli dump
+tmctl dump
 ```
 
 Describe the integration:
 
 ```
-tmcli describe
+tmctl describe
 ```
 
 List existing brokers:
 
 ```
-tmcli list
+tmctl list
 ```
 
 ## Contributing
