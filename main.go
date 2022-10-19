@@ -18,14 +18,17 @@ package main
 
 import (
 	"log"
-	"os"
 
 	"github.com/triggermesh/tmctl/cmd"
 )
 
+var (
+	Version string = "dev"
+	Commit  string = "unknown"
+)
+
 func main() {
-	if err := cmd.NewRootCommand().Execute(); err != nil {
-		log.Println(err)
-		os.Exit(1)
+	if err := cmd.NewRootCommand(Version, Commit).Execute(); err != nil {
+		log.Fatal(err)
 	}
 }

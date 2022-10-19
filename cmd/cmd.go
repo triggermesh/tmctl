@@ -32,6 +32,7 @@ import (
 	"github.com/triggermesh/tmctl/cmd/sendevent"
 	"github.com/triggermesh/tmctl/cmd/start"
 	"github.com/triggermesh/tmctl/cmd/stop"
+	"github.com/triggermesh/tmctl/cmd/version"
 	"github.com/triggermesh/tmctl/cmd/watch"
 )
 
@@ -42,7 +43,7 @@ const (
 	configDir = ".triggermesh/cli"
 )
 
-func NewRootCommand() *cobra.Command {
+func NewRootCommand(ver, commit string) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "tmctl",
 		Short: "A command line interface to build event-driven applications",
@@ -69,6 +70,7 @@ Find more information at: https://docs.triggermesh.io`,
 	rootCmd.AddCommand(start.NewCmd())
 	rootCmd.AddCommand(stop.NewCmd())
 	rootCmd.AddCommand(watch.NewCmd())
+	rootCmd.AddCommand(version.NewCmd(ver, commit))
 
 	return rootCmd
 }
