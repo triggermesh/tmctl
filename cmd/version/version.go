@@ -22,6 +22,7 @@ import (
 	"runtime"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 )
@@ -30,11 +31,16 @@ func NewCmd(ver, commit string) *cobra.Command {
 	versionCmd := &cobra.Command{
 		Use:   "version",
 		Short: "CLI version information",
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		},
 		Run: func(_ *cobra.Command, _ []string) {
 			fmt.Println("CLI:")
 			fmt.Println(" Version: ", ver)
 			fmt.Println(" Commit: ", commit)
 			fmt.Printf(" OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH)
+			fmt.Println("\nTriggerMesh:")
+			fmt.Println(" Components version: ", viper.GetString("triggermesh.version"))
 			fmt.Println("\nDocker:")
 			fmt.Println(" ", dockerVersion())
 		},

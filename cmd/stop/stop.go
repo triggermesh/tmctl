@@ -40,6 +40,9 @@ func NewCmd() *cobra.Command {
 	stopCmd := &cobra.Command{
 		Use:   "stop [broker]",
 		Short: "Stops TriggerMesh components",
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 			if len(args) == 1 {

@@ -95,7 +95,7 @@ func Fetch(configDir, version string) (string, error) {
 	var err error
 	if version == "latest" {
 		if version, err = latest(); err != nil {
-			return "", fmt.Errorf("cannot fetch latest CRD: %w", err)
+			return "", fmt.Errorf("cannot fetch \"latest\" version: %w", err)
 		}
 	}
 	url := strings.ReplaceAll(crdsURL, "$VERSION", version)

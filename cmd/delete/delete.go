@@ -29,6 +29,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/triggermesh/tmctl/cmd/brokers"
+	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
@@ -37,27 +38,39 @@ import (
 const manifestFile = "manifest.yaml"
 
 type DeleteOptions struct {
-	ConfigDir string
-	Context   string
+	ConfigBase string
+	Context    string
 }
 
 func NewCmd() *cobra.Command {
 	o := &DeleteOptions{}
 	var deleteBroker string
 	deleteCmd := &cobra.Command{
-		Use:   "delete <component1, component2...> [--broker <name>]",
-		Short: "Delete components",
+		Use:               "delete <component1, component2...> [--broker <name>]",
+		Short:             "Delete components",
+		ValidArgsFunction: o.deleteCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
-			o.Context = viper.GetString("context")
 			if deleteBroker != "" {
 				return o.deleteBroker(deleteBroker)
 			}
 			return o.deleteComponents(args, false)
 		},
 	}
+	cobra.OnInitialize(o.initialize)
 	deleteCmd.Flags().StringVar(&deleteBroker, "broker", "", "Delete the broker")
+	deleteCmd.RegisterFlagCompletionFunc("broker", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		list, err := brokers.List(path.Dir(viper.ConfigFileUsed()), "")
+		if err != nil {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return list, cobra.ShellCompDirectiveNoFileComp
+	})
 	return deleteCmd
+}
+
+func (o *DeleteOptions) initialize() {
+	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
+	o.Context = viper.GetString("context")
 }
 
 func (o *DeleteOptions) deleteBroker(broker string) error {
@@ -66,7 +79,7 @@ func (o *DeleteOptions) deleteBroker(broker string) error {
 	if err := oo.deleteComponents([]string{}, true); err != nil {
 		return fmt.Errorf("deleting component: %w", err)
 	}
-	if err := os.RemoveAll(path.Join(o.ConfigDir, broker)); err != nil {
+	if err := os.RemoveAll(path.Join(o.ConfigBase, broker)); err != nil {
 		return fmt.Errorf("delete broker %q: %v", broker, err)
 	}
 	if broker == o.Context {
@@ -81,7 +94,7 @@ func (o *DeleteOptions) deleteComponents(components []string, force bool) error 
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
-	currentManifest := manifest.New(path.Join(o.ConfigDir, o.Context, manifestFile))
+	currentManifest := manifest.New(path.Join(o.ConfigBase, o.Context, manifestFile))
 	if err := currentManifest.Read(); err != nil {
 		return fmt.Errorf("manifest read: %w", err)
 	}
@@ -119,7 +132,7 @@ func (o *DeleteOptions) removeObject(component string, manifest *manifest.Manife
 			continue
 		}
 		if object.Kind == "Trigger" {
-			trigger := tmbroker.NewTrigger(object.Metadata.Name, o.Context, path.Join(o.ConfigDir, o.Context), nil)
+			trigger := tmbroker.NewTrigger(object.Metadata.Name, o.Context, path.Join(o.ConfigBase, o.Context), nil)
 			if err := trigger.RemoveTriggerFromConfig(); err != nil {
 				log.Printf("Deleting %q: %v", object.Metadata.Name, err)
 				continue
@@ -134,7 +147,7 @@ func (o *DeleteOptions) stopContainer(ctx context.Context, name string, client *
 }
 
 func (o *DeleteOptions) cleanupTriggers(component string, manifest *manifest.Manifest) {
-	triggers, err := tmbroker.GetTargetTriggers(path.Join(o.ConfigDir, o.Context), component)
+	triggers, err := tmbroker.GetTargetTriggers(path.Join(o.ConfigBase, o.Context), component)
 	if err != nil {
 		return
 	}
@@ -148,7 +161,7 @@ func (o *DeleteOptions) cleanupTriggers(component string, manifest *manifest.Man
 }
 
 func (o *DeleteOptions) switchContext() error {
-	list, err := brokers.List(o.ConfigDir, o.Context)
+	list, err := brokers.List(o.ConfigBase, o.Context)
 	if err != nil {
 		return fmt.Errorf("list brokers: %w", err)
 	}
@@ -159,4 +172,12 @@ func (o *DeleteOptions) switchContext() error {
 	}
 	viper.Set("context", context)
 	return viper.WriteConfig()
+}
+
+func (o *DeleteOptions) deleteCompletion(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		return append(completion.ListAll(path.Join(o.ConfigBase, o.Context, manifestFile)), "--broker"),
+			cobra.ShellCompDirectiveNoFileComp
+	}
+	return nil, cobra.ShellCompDirectiveNoFileComp
 }

@@ -28,11 +28,11 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
+	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/output"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const (
@@ -66,14 +66,10 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 	var name, target, file string
 	var eventSourcesFilter, eventTypesFilter []string
 	transformationCmd := &cobra.Command{
-		Use:   "transformation [--source <name>] [--target <name>] [--from <path>]",
-		Short: "TriggerMesh transformation",
+		Use: "transformation [--target <name>][--source <name>,<name>...][--eventTypes <type>,<type>...][--from <path>]",
+		// Short:     "TriggerMesh transformation",
+		ValidArgs: []string{"--name", "--target", "--source", "--eventTypes", "--from"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			crds, err := crd.Fetch(o.ConfigBase, o.Version)
-			if err != nil {
-				return err
-			}
-			o.CRD = crds
 			return o.transformation(name, target, file, eventSourcesFilter, eventTypesFilter)
 		},
 	}
@@ -82,13 +78,25 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 	transformationCmd.Flags().StringVar(&target, "target", "", "Target name")
 	transformationCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Event sources filter")
 	transformationCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
+
+	transformationCmd.RegisterFlagCompletionFunc("name", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return []string{}, cobra.ShellCompDirectiveNoFileComp
+	})
+	transformationCmd.RegisterFlagCompletionFunc("source", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return completion.ListSources(path.Join(o.ConfigBase, o.Context, manifestFile)), cobra.ShellCompDirectiveNoFileComp
+	})
+	transformationCmd.RegisterFlagCompletionFunc("eventTypes", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return completion.ListEventTypes(path.Join(o.ConfigBase, o.Context, manifestFile), o.CRD), cobra.ShellCompDirectiveNoFileComp
+	})
+	transformationCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return completion.ListTargets(path.Join(o.ConfigBase, o.Context, manifestFile)), cobra.ShellCompDirectiveNoFileComp
+	})
 	return transformationCmd
 }
 
 func (o *CreateOptions) transformation(name, target, file string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
-	configDir := path.Join(o.ConfigBase, o.Context)
-	manifestFile := path.Join(configDir, manifestFile)
+	manifestFile := path.Join(o.ConfigBase, o.Context, manifestFile)
 
 	var targetPort string
 	if target != "" {
@@ -217,8 +225,7 @@ func readInput() (string, error) {
 }
 
 func (o *CreateOptions) lookupTarget(ctx context.Context, target string) (string, error) {
-	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
-	targetObject, err := o.getObject(target, manifest)
+	targetObject, err := o.getObject(target)
 	if err != nil {
 		return "", fmt.Errorf("transformation target: %w", err)
 	}

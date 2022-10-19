@@ -62,6 +62,9 @@ func NewCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "describe [broker]",
 		Short: "Show broker status",
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 			o.Version = viper.GetString("triggermesh.version")

@@ -24,23 +24,19 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 	var name, target string
 	var eventSourcesFilter, eventTypesFilter []string
 	triggerCmd := &cobra.Command{
-		Use:   "trigger --target <name> [--source <name>][--eventType <event type>]",
-		Short: "TriggerMesh trigger",
+		Use: "trigger --target <name> [--source <name>][--eventType <event type>]",
+		// Short:     "TriggerMesh trigger",
+		ValidArgs: []string{"--target", "--name", "--source", "--eventTypes"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			crds, err := crd.Fetch(o.ConfigBase, o.Version)
-			if err != nil {
-				return err
-			}
-			o.CRD = crds
 			return o.trigger(name, eventSourcesFilter, eventTypesFilter, target)
 		},
 	}
@@ -49,13 +45,23 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 	triggerCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Event sources filter")
 	triggerCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
 	triggerCmd.MarkFlagRequired("target")
+
+	triggerCmd.RegisterFlagCompletionFunc("name", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return []string{}, cobra.ShellCompDirectiveNoFileComp
+	})
+	triggerCmd.RegisterFlagCompletionFunc("source", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return completion.ListSources(path.Join(o.ConfigBase, o.Context, manifestFile)), cobra.ShellCompDirectiveNoFileComp
+	})
+	triggerCmd.RegisterFlagCompletionFunc("eventTypes", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return completion.ListEventTypes(path.Join(o.ConfigBase, o.Context, manifestFile), o.CRD), cobra.ShellCompDirectiveNoFileComp
+	})
+	triggerCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return completion.ListTargets(path.Join(o.ConfigBase, o.Context, manifestFile)), cobra.ShellCompDirectiveNoFileComp
+	})
 	return triggerCmd
 }
 
 func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilter []string, target string) error {
-	configDir := path.Join(o.ConfigBase, o.Context)
-	manifest := path.Join(configDir, manifestFile)
-
 	for _, source := range eventSourcesFilter {
 		et, err := o.producersEventTypes(source)
 		if err != nil {
@@ -64,7 +70,7 @@ func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 		eventTypesFilter = append(eventTypesFilter, et...)
 	}
 
-	component, err := o.getObject(target, manifest)
+	component, err := o.getObject(target)
 	if err != nil {
 		return fmt.Errorf("%q not found: %w", target, err)
 	}

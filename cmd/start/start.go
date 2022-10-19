@@ -49,6 +49,9 @@ func NewCmd() *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "start [broker]",
 		Short: "Starts TriggerMesh components",
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 			o.Version = viper.GetString("triggermesh.version")
