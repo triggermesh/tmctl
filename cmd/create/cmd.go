@@ -49,8 +49,8 @@ func NewCmd() *cobra.Command {
 		Use:   "create <resource>",
 		Short: "Create TriggerMesh objects",
 		Args:  cobra.MinimumNArgs(1),
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return o.initialize(args)
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			o.initialize(args)
 		},
 	}
 
@@ -63,11 +63,10 @@ func NewCmd() *cobra.Command {
 	return createCmd
 }
 
-func (o *CreateOptions) initialize(args []string) error {
+func (o *CreateOptions) initialize(args []string) {
 	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
-	return nil
 }
 
 func parse(args []string) (string, []string, error) {
@@ -98,20 +97,21 @@ func (o *CreateOptions) getObject(name, manifestPath string) (triggermesh.Compon
 }
 
 func parameterFromArgs(parameter string, args []string) (string, []string) {
-	var value string
+	var value, newArgs []string
 	for k := 0; k < len(args); k++ {
 		if strings.HasPrefix(args[k], "--"+parameter) {
 			if kv := strings.Split(args[k], "="); len(kv) == 2 {
-				value = kv[1]
-			} else if len(args) > k+1 && !strings.HasPrefix(args[k+1], "--") {
-				value = args[k+1]
-				k++
+				value = []string{kv[1]}
 			}
-			args = append(args[:k-1], args[k+1:]...)
-			break
+			for j := k + 1; j < len(args) && !strings.HasPrefix(args[j], "--"); j++ {
+				value = append(value, args[j])
+				k = j
+			}
+			continue
 		}
+		newArgs = append(newArgs, args[k])
 	}
-	return value, args
+	return strings.Join(value, ","), newArgs
 }
 
 func (o *CreateOptions) producersEventTypes(source string) ([]string, error) {
