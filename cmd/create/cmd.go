@@ -32,6 +32,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/target"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const manifestFile = "manifest.yaml"
@@ -48,11 +49,11 @@ func NewCmd() *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "create <resource>",
 		Short: "Create TriggerMesh objects",
-		Args:  cobra.MinimumNArgs(1),
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			o.initialize(args)
-		},
+		// CompletionOptions: cobra.CompletionOptions{DisableDescriptions: true},
+		Args: cobra.MinimumNArgs(1),
 	}
+
+	cobra.OnInitialize(o.initialize)
 
 	createCmd.AddCommand(o.NewBrokerCmd())
 	createCmd.AddCommand(o.NewSourceCmd())
@@ -63,10 +64,13 @@ func NewCmd() *cobra.Command {
 	return createCmd
 }
 
-func (o *CreateOptions) initialize(args []string) {
+func (o *CreateOptions) initialize() {
 	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
+	crds, err := crd.Fetch(o.ConfigBase, o.Version)
+	cobra.CheckErr(err)
+	o.CRD = crds
 }
 
 func parse(args []string) (string, []string, error) {
@@ -76,8 +80,8 @@ func parse(args []string) (string, []string, error) {
 	return args[0], args[1:], nil
 }
 
-func (o *CreateOptions) getObject(name, manifestPath string) (triggermesh.Component, error) {
-	manifest := manifest.New(manifestPath)
+func (o *CreateOptions) getObject(name string) (triggermesh.Component, error) {
+	manifest := manifest.New(path.Join(o.ConfigBase, o.Context, manifestFile))
 	if err := manifest.Read(); err != nil {
 		return nil, fmt.Errorf("reading manifest: %w", err)
 	}
@@ -115,8 +119,7 @@ func parameterFromArgs(parameter string, args []string) (string, []string) {
 }
 
 func (o *CreateOptions) producersEventTypes(source string) ([]string, error) {
-	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
-	c, err := o.getObject(source, manifest)
+	c, err := o.getObject(source)
 	if err != nil {
 		return []string{}, fmt.Errorf("%q does not exist", source)
 	}

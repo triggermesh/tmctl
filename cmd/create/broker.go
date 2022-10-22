@@ -32,9 +32,12 @@ import (
 
 func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "broker <name>",
-		Short: "TriggerMesh broker",
-		Args:  cobra.MinimumNArgs(1),
+		Use: "broker <name>",
+		// Short: "TriggerMesh broker",
+		Args: cobra.MinimumNArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return o.broker(args[0])
 		},

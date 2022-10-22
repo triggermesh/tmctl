@@ -70,6 +70,9 @@ func (s *Schema) Process(spec map[string]interface{}) (map[string]interface{}, e
 
 		switch value := v.(type) {
 		case string:
+			if len(schemaKey.Type) == 0 {
+				break
+			}
 			switch schemaKey.Type[0] {
 			case "array":
 				spec[k] = strings.Split(value, ",")
@@ -110,7 +113,15 @@ func additionalPropertiesSpec(value interface{}, spec *spec.Schema) (map[string]
 		return result, nil
 	}
 	result := make(map[string]interface{}, 0)
-	if typ := spec.Type[0]; typ != "" {
+
+	if len(spec.AnyOf) != 0 {
+		for _, nestedAPSchema := range spec.AnyOf {
+			// try to convert to anyOf provided types
+			if nestedSpec, err := additionalPropertiesSpec(value, &nestedAPSchema); err == nil {
+				result = nestedSpec
+			}
+		}
+	} else if typ := spec.Type[0]; typ != "" {
 		input, ok := value.(string)
 		if !ok {
 			return nil, fmt.Errorf("input value type \"%T\" is not supported", value)
@@ -141,13 +152,49 @@ func additionalPropertiesSpec(value interface{}, spec *spec.Schema) (map[string]
 				return nil, fmt.Errorf("property type %q is not supported", typ)
 			}
 		}
-	} else if len(spec.AnyOf) != 0 {
-		for _, nestedAPSchema := range spec.AnyOf {
-			// try to convert to anyOf provided types
-			if nestedSpec, err := additionalPropertiesSpec(value, &nestedAPSchema); err == nil {
-				result = nestedSpec
-			}
-		}
 	}
 	return result, nil
+}
+
+type Property struct {
+	Required    bool
+	Typ         string
+	Description string
+}
+
+func (s *Schema) GetAttributesCompletion(path ...string) (bool, map[string]Property) {
+	result := make(map[string]Property, len(s.schema.Properties))
+	schema := s.schema.Properties
+	for _, key := range path {
+		if key == "" {
+			continue
+		}
+		nestedSchema, exists := schema[key]
+		if !exists {
+			return false, result
+		}
+		schema = nestedSchema.Properties
+	}
+	for name, prop := range schema {
+		if _, secret := isSecretRef(prop); secret {
+			prop.Type = []string{"string/secret"}
+		}
+		if name == "sink" ||
+			name == "valueFromSecret" ||
+			name == "secretKeyRef" {
+			continue
+		}
+		property := Property{
+			Typ:         strings.Join(prop.Type, ","),
+			Description: strings.ReplaceAll(prop.Description, "\n", " "),
+		}
+		for _, req := range s.schema.Required {
+			if req == name {
+				property.Required = true
+				break
+			}
+		}
+		result[name] = property
+	}
+	return true, result
 }

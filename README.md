@@ -50,6 +50,31 @@ cd tmctl
 go install
 ```
 
+### Autocompletion
+
+The CLI can generate completion scripts that can be loaded into the shell
+to help use the CLI more easily:
+
+for Bash:
+```
+source <(tmctl completion bash)
+```
+or for ZSH:
+
+```
+source <(tmctl completion zsh)
+```
+
+To make autocompletion load automatically, put this command in one of the
+shell profile configuration, e.g.:
+
+```
+echo 'source <(tmctl completion bash)' >>~/.bash_profile
+```
+
+`tmctl` binary must be available in the `$PATH` to generate and use completion.
+
+
 ### Local event flow
 
 Create broker:

@@ -45,6 +45,9 @@ func NewCmd() *cobra.Command {
 	watchCmd := &cobra.Command{
 		Use:   "watch [broker]",
 		Short: "Watch events flowing through the broker",
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 			if len(args) == 1 {

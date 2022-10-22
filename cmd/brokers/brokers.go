@@ -31,8 +31,9 @@ const manifestFile = "manifest.yaml"
 func NewCmd() *cobra.Command {
 	var broker string
 	brokersCmd := &cobra.Command{
-		Use:   "brokers [--set <broker>]",
-		Short: "Show the list of brokers",
+		Use:       "brokers [--set <broker>]",
+		Short:     "Show the list of brokers",
+		ValidArgs: []string{"--set"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if broker != "" {
 				viper.Set("context", broker)
@@ -52,6 +53,13 @@ func NewCmd() *cobra.Command {
 		},
 	}
 	brokersCmd.Flags().StringVar(&broker, "set", "", "Change the current broker")
+	brokersCmd.RegisterFlagCompletionFunc("set", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		list, err := List(path.Dir(viper.ConfigFileUsed()), "")
+		if err != nil {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return list, cobra.ShellCompDirectiveNoFileComp
+	})
 	return brokersCmd
 }
 

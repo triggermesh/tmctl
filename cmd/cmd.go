@@ -50,12 +50,14 @@ func NewRootCommand(ver, commit string) *cobra.Command {
 		Long: `tmctl is a CLI to help you create event brokers, sources, targets and transformations.
 
 Find more information at: https://docs.triggermesh.io`,
+		// CompletionOptions: cobra.CompletionOptions{DisableDescriptions: true},
 	}
 
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().String("broker", defaultBroker, "Default broker name")
-	rootCmd.PersistentFlags().String("version", defaultTriggermeshVersion, "TriggerMesh components version")
+	rootCmd.PersistentFlags().String("version", defaultTriggermeshVersion, "TriggerMesh components version.")
+	rootCmd.PersistentFlags().String("broker", defaultBroker, "Optional broker name.")
+	// rootCmd.PersistentFlags().MarkHidden("broker")
 
 	viper.BindPFlag("context", rootCmd.PersistentFlags().Lookup("broker"))
 	viper.BindPFlag("triggermesh.version", rootCmd.PersistentFlags().Lookup("version"))
@@ -71,6 +73,17 @@ Find more information at: https://docs.triggermesh.io`,
 	rootCmd.AddCommand(stop.NewCmd())
 	rootCmd.AddCommand(watch.NewCmd())
 	rootCmd.AddCommand(version.NewCmd(ver, commit))
+
+	rootCmd.RegisterFlagCompletionFunc("broker", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		list, err := brokers.List(path.Dir(viper.ConfigFileUsed()), "")
+		if err != nil {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return list, cobra.ShellCompDirectiveNoFileComp
+	})
+	rootCmd.RegisterFlagCompletionFunc("version", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return []string{}, cobra.ShellCompDirectiveNoFileComp
+	})
 
 	return rootCmd
 }

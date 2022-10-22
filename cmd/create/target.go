@@ -25,6 +25,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/triggermesh/tmctl/cmd/brokers"
+	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/output"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
@@ -34,10 +36,11 @@ import (
 
 func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:                "target <kind> [--name <name>][--source <name>,<name>...][--eventTypes <type>,<type>...]",
-		Short:              "TriggerMesh target",
+		Use: "target <kind> [--name <name>][--source <name>,<name>...][--eventTypes <type>,<type>...]",
+		// Short:              "TriggerMesh target",
 		DisableFlagParsing: true,
 		SilenceErrors:      true,
+		ValidArgsFunction:  o.targetsCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 || args[0] == "--help" {
 				targets, err := crd.ListTargets(o.CRD)
@@ -57,11 +60,6 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 			if version != "" {
 				o.Version = version
 			}
-			crds, err := crd.Fetch(o.ConfigBase, o.Version)
-			if err != nil {
-				return err
-			}
-			o.CRD = crds
 			eventSourcesFilter, args := parameterFromArgs("source", args)
 			eventTypesFilter, args := parameterFromArgs("eventTypes", args)
 			var typeFilter, sourceFilter []string
@@ -78,8 +76,7 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 
 func (o *CreateOptions) target(name, kind string, args []string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
-	configDir := path.Join(o.ConfigBase, o.Context)
-	manifest := path.Join(configDir, manifestFile)
+	manifestFile := path.Join(o.ConfigBase, o.Context, manifestFile)
 
 	for _, source := range eventSourcesFilter {
 		et, err := o.producersEventTypes(source)
@@ -91,13 +88,13 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourcesFil
 
 	t := target.New(name, o.CRD, kind, o.Context, o.Version, args)
 
-	secretEnv, secretsChanged, err := triggermesh.ProcessSecrets(ctx, t, manifest)
+	secretEnv, secretsChanged, err := triggermesh.ProcessSecrets(ctx, t, manifestFile)
 	if err != nil {
 		return fmt.Errorf("spec processing: %w", err)
 	}
 
 	log.Println("Updating manifest")
-	restart, err := triggermesh.WriteObject(t, manifest)
+	restart, err := triggermesh.WriteObject(t, manifestFile)
 	if err != nil {
 		return err
 	}
@@ -115,4 +112,80 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourcesFil
 
 	output.PrintStatus("consumer", t, eventSourcesFilter, eventTypesFilter)
 	return nil
+}
+
+func (o *CreateOptions) targetsCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		sources, err := crd.ListTargets(o.CRD)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return sources, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	if toComplete == "--source" ||
+		toComplete == "--eventTypes" ||
+		toComplete == "--name" {
+		return []string{toComplete}, cobra.ShellCompDirectiveNoFileComp
+	}
+	manifestFile := path.Join(o.ConfigBase, o.Context, manifestFile)
+	switch args[len(args)-1] {
+	case "--source":
+		return completion.ListSources(manifestFile), cobra.ShellCompDirectiveNoFileComp
+	case "--eventTypes":
+		return completion.ListEventTypes(manifestFile, o.CRD), cobra.ShellCompDirectiveNoFileComp
+	case "--broker":
+		list, err := brokers.List(o.ConfigBase, "")
+		if err != nil {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return list, cobra.ShellCompDirectiveNoFileComp
+	}
+	if strings.HasPrefix(args[len(args)-1], "--") {
+		return []string{}, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	prefix := ""
+	toComplete = strings.TrimLeft(toComplete, "-")
+	var properties map[string]crd.Property
+
+	if !strings.Contains(toComplete, ".") {
+		_, properties = completion.SpecFromCRD(args[0]+"target", o.CRD)
+		if property, exists := properties[toComplete]; exists {
+			if property.Typ == "object" {
+				return []string{"--" + toComplete + "."}, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+			}
+			return []string{"--" + toComplete}, cobra.ShellCompDirectiveNoFileComp
+		}
+	} else {
+		path := strings.Split(toComplete, ".")
+		exists, nestedProperties := completion.SpecFromCRD(args[0]+"target", o.CRD, path...)
+		if len(nestedProperties) != 0 {
+			prefix = toComplete
+			if !strings.HasSuffix(prefix, ".") && prefix != "--" {
+				prefix += "."
+			}
+			properties = nestedProperties
+		} else if exists {
+			return []string{"--" + toComplete}, cobra.ShellCompDirectiveNoFileComp
+		} else {
+			_, properties = completion.SpecFromCRD(args[0]+"target", o.CRD, path[:len(path)-1]...)
+			prefix = strings.Join(path[:len(path)-1], ".") + "."
+		}
+	}
+
+	var spec []string
+	for name, property := range properties {
+		attr := property.Typ
+		if property.Required {
+			attr = fmt.Sprintf("required,%s", attr)
+		}
+		name = prefix + name
+		spec = append(spec, fmt.Sprintf("--%s\t(%s) %s", name, attr, property.Description))
+	}
+	return append(spec,
+		"--source\tEvent source name.",
+		"--eventTypes\tEvent types filter.",
+		"--name\tOptional component name.",
+	), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 }

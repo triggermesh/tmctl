@@ -45,6 +45,9 @@ func NewCmd() *cobra.Command {
 	sendCmd := &cobra.Command{
 		Use:   "send-event <data> [--eventType <type>]",
 		Short: "Send CloudEvent to the broker",
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Context = viper.GetString("context")
 			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
