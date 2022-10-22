@@ -162,7 +162,7 @@ type Property struct {
 	Description string
 }
 
-func (s *Schema) GetAttributesCompletion(path ...string) map[string]Property {
+func (s *Schema) GetAttributesCompletion(path ...string) (bool, map[string]Property) {
 	result := make(map[string]Property, len(s.schema.Properties))
 	schema := s.schema.Properties
 	for _, key := range path {
@@ -171,7 +171,7 @@ func (s *Schema) GetAttributesCompletion(path ...string) map[string]Property {
 		}
 		nestedSchema, exists := schema[key]
 		if !exists {
-			return result
+			return false, result
 		}
 		schema = nestedSchema.Properties
 	}
@@ -196,5 +196,5 @@ func (s *Schema) GetAttributesCompletion(path ...string) map[string]Property {
 		}
 		result[name] = property
 	}
-	return result
+	return true, result
 }

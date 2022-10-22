@@ -123,14 +123,17 @@ func (o *CreateOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 		return sources, cobra.ShellCompDirectiveNoFileComp
 	}
 
+	if toComplete == "--source" ||
+		toComplete == "--eventTypes" ||
+		toComplete == "--name" {
+		return []string{toComplete}, cobra.ShellCompDirectiveNoFileComp
+	}
 	manifestFile := path.Join(o.ConfigBase, o.Context, manifestFile)
 	switch args[len(args)-1] {
 	case "--source":
 		return completion.ListSources(manifestFile), cobra.ShellCompDirectiveNoFileComp
 	case "--eventTypes":
 		return completion.ListEventTypes(manifestFile, o.CRD), cobra.ShellCompDirectiveNoFileComp
-	case "--name":
-		return []string{}, cobra.ShellCompDirectiveNoFileComp
 	case "--broker":
 		list, err := brokers.List(o.ConfigBase, "")
 		if err != nil {
@@ -147,23 +150,27 @@ func (o *CreateOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 	var properties map[string]crd.Property
 
 	if !strings.Contains(toComplete, ".") {
-		properties = completion.SpecFromCRD(args[0]+"target", o.CRD)
+		_, properties = completion.SpecFromCRD(args[0]+"target", o.CRD)
 		if property, exists := properties[toComplete]; exists {
 			if property.Typ == "object" {
 				return []string{"--" + toComplete + "."}, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 			}
+			return []string{"--" + toComplete}, cobra.ShellCompDirectiveNoFileComp
 		}
 	} else {
 		path := strings.Split(toComplete, ".")
-		if nestedProperties := completion.SpecFromCRD(args[0]+"target", o.CRD, path...); len(nestedProperties) != 0 {
+		exists, nestedProperties := completion.SpecFromCRD(args[0]+"target", o.CRD, path...)
+		if len(nestedProperties) != 0 {
 			prefix = toComplete
 			if !strings.HasSuffix(prefix, ".") && prefix != "--" {
 				prefix += "."
 			}
 			properties = nestedProperties
+		} else if exists {
+			return []string{"--" + toComplete}, cobra.ShellCompDirectiveNoFileComp
 		} else {
+			_, properties = completion.SpecFromCRD(args[0]+"target", o.CRD, path[:len(path)-1]...)
 			prefix = strings.Join(path[:len(path)-1], ".") + "."
-			properties = completion.SpecFromCRD(args[0]+"target", o.CRD, path[:len(path)-1]...)
 		}
 	}
 

@@ -83,17 +83,17 @@ func ListEventTypes(manifestFile, crdFile string) []string {
 	return eventTypes
 }
 
-func SpecFromCRD(name, crdFile string, path ...string) map[string]crd.Property {
+func SpecFromCRD(name, crdFile string, path ...string) (bool, map[string]crd.Property) {
 	result := make(map[string]crd.Property, 0)
 	c, err := crd.GetResourceCRD(name, crdFile)
 	if err != nil {
-		return result
+		return false, result
 	}
 	var schema *crd.Schema
 	for _, version := range c.Spec.Versions {
 		if version.Served {
 			if schema, err = crd.GetSchema(version.Schema.OpenAPIV3Schema.Properties.Spec); err != nil {
-				return result
+				return false, result
 			}
 			break
 		}
