@@ -46,8 +46,8 @@ func NewCmd() *cobra.Command {
 	o := &DeleteOptions{}
 	var deleteBroker string
 	deleteCmd := &cobra.Command{
-		Use:               "delete <component1, component2...> [--broker <name>]",
-		Short:             "Delete components",
+		Use:               "delete <component_name_1, component_name_2...> [--broker <name>]",
+		Short:             "Delete components by names",
 		ValidArgsFunction: o.deleteCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if deleteBroker != "" {
