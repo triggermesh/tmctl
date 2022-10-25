@@ -76,7 +76,7 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 	transformationCmd.Flags().StringVar(&name, "name", "", "Transformation name")
 	transformationCmd.Flags().StringVarP(&file, "from", "f", "", "Transformation specification file")
 	transformationCmd.Flags().StringVar(&target, "target", "", "Target name")
-	transformationCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Event sources filter")
+	transformationCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Sources component names")
 	transformationCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
 
 	transformationCmd.RegisterFlagCompletionFunc("name", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
