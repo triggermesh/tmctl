@@ -51,7 +51,7 @@ type Target struct {
 }
 
 func (t *Target) AsUnstructured() (unstructured.Unstructured, error) {
-	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
+	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec, nil)
 }
 
 func (t *Target) AsK8sObject() (kubernetes.Object, error) {
@@ -116,6 +116,8 @@ func (t *Target) GetChildren() ([]triggermesh.Component, error) {
 	}
 	return []triggermesh.Component{secret.New(strings.ToLower(t.Name), t.Broker, secrets)}, nil
 }
+
+func (t *Target) SetStatus(map[string]interface{}) {}
 
 func (t *Target) ConsumedEventTypes() ([]string, error) {
 	return []string{}, nil

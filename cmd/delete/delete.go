@@ -31,8 +31,12 @@ import (
 	"github.com/triggermesh/tmctl/cmd/brokers"
 	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const manifestFile = "manifest.yaml"
@@ -40,6 +44,8 @@ const manifestFile = "manifest.yaml"
 type DeleteOptions struct {
 	ConfigBase string
 	Context    string
+	Version    string
+	CRD        string
 }
 
 func NewCmd() *cobra.Command {
@@ -71,6 +77,10 @@ func NewCmd() *cobra.Command {
 func (o *DeleteOptions) initialize() {
 	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
+	o.Version = viper.GetString("triggermesh.version")
+	crds, err := crd.Fetch(o.ConfigBase, o.Version)
+	cobra.CheckErr(err)
+	o.CRD = crds
 }
 
 func (o *DeleteOptions) deleteBroker(broker string) error {
@@ -88,22 +98,23 @@ func (o *DeleteOptions) deleteBroker(broker string) error {
 	return nil
 }
 
-func (o *DeleteOptions) deleteComponents(components []string, force bool) error {
+func (o *DeleteOptions) deleteComponents(names []string, force bool) error {
 	ctx := context.Background()
+	manifestPath := path.Join(o.ConfigBase, o.Context, manifestFile)
 	client, err := docker.NewClient()
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
-	currentManifest := manifest.New(path.Join(o.ConfigBase, o.Context, manifestFile))
-	if err := currentManifest.Read(); err != nil {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
 		return fmt.Errorf("manifest read: %w", err)
 	}
-	for _, object := range currentManifest.Objects {
+	for _, object := range manifest.Objects {
 		skip := false
-		if len(components) > 0 {
+		if len(names) > 0 {
 			skip = true
-			for _, v := range components {
-				if v == object.Metadata.Name {
+			for _, v := range names {
+				if v == object.Metadata.Name && object.Kind != "Secret" {
 					skip = false
 					break
 				}
@@ -119,11 +130,15 @@ func (o *DeleteOptions) deleteComponents(components []string, force bool) error 
 			object.Metadata.Name += "-broker"
 		}
 		log.Printf("Deleting %q %s", object.Metadata.Name, strings.ToLower(object.Kind))
+		if err := o.removeExternalServices(ctx, object); err != nil {
+			log.Printf("WARN: external services are not deleted: %v", err)
+		}
 		o.stopContainer(ctx, object.Metadata.Name, client)
-		o.removeObject(object.Metadata.Name, currentManifest)
-		o.cleanupTriggers(object.Metadata.Name, currentManifest)
+		o.removeObject(object.Metadata.Name, manifest)
+		o.cleanupTriggers(object.Metadata.Name, manifest)
+		o.cleanupSecrets(object.Metadata.Name, manifest)
 	}
-	return currentManifest.Write()
+	return manifest.Write()
 }
 
 func (o *DeleteOptions) removeObject(component string, manifest *manifest.Manifest) {
@@ -138,7 +153,7 @@ func (o *DeleteOptions) removeObject(component string, manifest *manifest.Manife
 				continue
 			}
 		}
-		manifest.Remove(object.Metadata.Name)
+		manifest.Remove(object.Metadata.Name, object.Kind)
 	}
 }
 
@@ -156,8 +171,33 @@ func (o *DeleteOptions) cleanupTriggers(component string, manifest *manifest.Man
 			log.Printf("Deleting trigger %q: %v", trigger.Name, err)
 			continue
 		}
-		manifest.Remove(name)
+		manifest.Remove(name, trigger.GetKind())
 	}
+}
+
+func (o *DeleteOptions) cleanupSecrets(component string, manifest *manifest.Manifest) {
+	for _, object := range manifest.Objects {
+		if object.Metadata.Name == component && object.Kind == "Secret" {
+			manifest.Remove(component, object.Kind)
+		}
+	}
+}
+
+func (o *DeleteOptions) removeExternalServices(ctx context.Context, object kubernetes.Object) error {
+	manifestPath := path.Join(o.ConfigBase, o.Context, manifestFile)
+	component, err := components.GetObject(object.Metadata.Name, manifestPath, o.CRD, o.Version)
+	if err != nil {
+		return err
+	}
+	p, ok := component.(triggermesh.Parent)
+	if !ok {
+		return nil
+	}
+	secrets, _, err := triggermesh.ProcessSecrets(ctx, p, manifestPath)
+	if err != nil {
+		return err
+	}
+	return triggermesh.FinalizeExternalServices(ctx, component, secrets)
 }
 
 func (o *DeleteOptions) switchContext() error {

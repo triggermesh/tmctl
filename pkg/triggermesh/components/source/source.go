@@ -46,12 +46,13 @@ type Source struct {
 	Kind    string
 	Version string
 
-	image string
-	spec  map[string]interface{}
+	image  string
+	spec   map[string]interface{}
+	status map[string]interface{}
 }
 
 func (s *Source) AsUnstructured() (unstructured.Unstructured, error) {
-	return kubernetes.CreateUnstructured(s.GetKind(), s.GetName(), s.Broker, s.CRDFile, s.spec)
+	return kubernetes.CreateUnstructured(s.GetKind(), s.GetName(), s.Broker, s.CRDFile, s.spec, s.status)
 }
 
 func (s *Source) AsK8sObject() (kubernetes.Object, error) {
@@ -84,6 +85,7 @@ func (s *Source) GetKind() string {
 }
 
 func (s *Source) GetImage() string {
+
 	return s.image
 }
 
@@ -127,6 +129,10 @@ func (s *Source) GetChildren() ([]triggermesh.Component, error) {
 		return nil, nil
 	}
 	return []triggermesh.Component{secret.New(strings.ToLower(s.Name), s.Broker, secrets)}, nil
+}
+
+func (s *Source) SetStatus(data map[string]interface{}) {
+	s.status = data
 }
 
 func (s *Source) SetEventType(string) error {

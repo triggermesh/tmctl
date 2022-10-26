@@ -17,8 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"path"
 	"strings"
@@ -26,12 +24,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmctl/pkg/manifest"
-	"github.com/triggermesh/tmctl/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/components/target"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
@@ -80,26 +72,6 @@ func parse(args []string) (string, []string, error) {
 	return args[0], args[1:], nil
 }
 
-func (o *CreateOptions) getObject(name string) (triggermesh.Component, error) {
-	manifest := manifest.New(path.Join(o.ConfigBase, o.Context, manifestFile))
-	if err := manifest.Read(); err != nil {
-		return nil, fmt.Errorf("reading manifest: %w", err)
-	}
-	for _, object := range manifest.Objects {
-		if object.Metadata.Name == name {
-			switch object.APIVersion {
-			case "sources.triggermesh.io/v1alpha1":
-				return source.New(object.Metadata.Name, o.CRD, object.Kind, "", o.Version, object.Spec), nil
-			case "targets.triggermesh.io/v1alpha1":
-				return target.New(object.Metadata.Name, o.CRD, object.Kind, "", o.Version, object.Spec), nil
-			case "flow.triggermesh.io/v1alpha1":
-				return transformation.New(object.Metadata.Name, o.CRD, object.Kind, "", o.Version, object.Spec), nil
-			}
-		}
-	}
-	return nil, nil
-}
-
 func parameterFromArgs(parameter string, args []string) (string, []string) {
 	var value, newArgs []string
 	for k := 0; k < len(args); k++ {
@@ -116,41 +88,4 @@ func parameterFromArgs(parameter string, args []string) (string, []string) {
 		newArgs = append(newArgs, args[k])
 	}
 	return strings.Join(value, ","), newArgs
-}
-
-func (o *CreateOptions) producersEventTypes(source string) ([]string, error) {
-	c, err := o.getObject(source)
-	if err != nil {
-		return []string{}, fmt.Errorf("%q does not exist", source)
-	}
-	producer, ok := c.(triggermesh.Producer)
-	if !ok {
-		return []string{}, fmt.Errorf("event producer %q is not available", source)
-	}
-	et, err := producer.GetEventTypes()
-	if err != nil {
-		return []string{}, fmt.Errorf("%q event types: %w", source, err)
-	}
-	if len(et) == 0 {
-		return []string{}, fmt.Errorf("%q does not expose its event types", source)
-	}
-	return et, nil
-}
-
-func (o *CreateOptions) createTrigger(name, targetName, port string, filter *tmbroker.Filter) error {
-	if name == "" {
-		filterString, err := filter.String()
-		if err != nil {
-			return fmt.Errorf("filter: %w", err)
-		}
-		// in case of event types hash collision, replace with sha256
-		hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", targetName, filterString)))
-		name = fmt.Sprintf("%s-trigger-%s", o.Context, hex.EncodeToString(hash[:4]))
-	}
-	tr := tmbroker.NewTrigger(name, o.Context, path.Join(o.ConfigBase, o.Context), filter)
-	tr.SetTarget(targetName, fmt.Sprintf("http://host.docker.internal:%s", port))
-	if err := tr.UpdateBrokerConfig(); err != nil {
-		return fmt.Errorf("broker config: %w", err)
-	}
-	return tr.UpdateManifest()
 }

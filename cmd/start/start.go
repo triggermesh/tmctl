@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"log"
 	"path"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -81,7 +80,6 @@ func (o *StartOptions) start(broker string) error {
 	}
 
 	componentTriggers := make(map[string][]*tmbroker.Trigger)
-	secrets := make(map[string]map[string]string)
 	var brokerPort string
 	// start eventing first
 	for _, object := range manifest.Objects {
@@ -110,8 +108,6 @@ func (o *StartOptions) start(broker string) error {
 			if _, err := triggermesh.WriteObject(trigger, manifestFile); err != nil {
 				return fmt.Errorf("creating trigger: %w", err)
 			}
-		case "Secret":
-			secrets[strings.ToLower(object.Metadata.Name)] = object.Data
 		}
 	}
 
@@ -120,48 +116,41 @@ func (o *StartOptions) start(broker string) error {
 	}
 
 	for i, object := range manifest.Objects {
-		var objectSecrets map[string]string
 		var c triggermesh.Runnable
-		switch {
-		case strings.HasSuffix(object.Kind, "Source"):
+		switch object.APIVersion {
+		case "sources.triggermesh.io/v1alpha1":
 			manifest.Objects[i].Spec["sink"] = map[string]interface{}{"uri": fmt.Sprintf("http://host.docker.internal:%s", brokerPort)}
 			c = source.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-			if s, ok := secrets[strings.ToLower(object.Metadata.Name)]; ok {
-				objectSecrets = s
-			}
-			log.Printf("Starting %s\n", object.Metadata.Name)
-			if _, err := triggermesh.Start(ctx, c, o.Restart, objectSecrets); err != nil {
-				return fmt.Errorf("starting container: %w", err)
-			}
-		case strings.HasSuffix(object.Kind, "Target") ||
-			strings.HasSuffix(object.Kind, "Transformation"):
-			if object.Kind == "Transformation" {
-				c = transformation.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-			} else {
-				c = target.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-			}
-			if s, ok := secrets[strings.ToLower(object.Metadata.Name)]; ok {
-				objectSecrets = s
-			}
-			log.Printf("Starting %s\n", object.Metadata.Name)
-			container, err := triggermesh.Start(ctx, c, o.Restart, objectSecrets)
-			if err != nil {
-				return fmt.Errorf("starting container: %w", err)
-			}
-			if triggers, exists := componentTriggers[object.Metadata.Name]; exists {
-				for _, trigger := range triggers {
-					trigger.SetTarget(object.Metadata.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
-					if err := trigger.UpdateBrokerConfig(); err != nil {
-						return fmt.Errorf("broker config: %w", err)
-					}
-					if err := trigger.UpdateManifest(); err != nil {
-						return fmt.Errorf("broker manifest: %w", err)
-					}
-				}
-			}
+		case "targets.triggermesh.io/v1alpha1":
+			c = target.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
+		case "flow.triggermesh.io/v1alpha1":
+			c = transformation.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
 		}
 		if c == nil {
 			continue
+		}
+		secrets, _, err := triggermesh.ProcessSecrets(ctx, c.(triggermesh.Parent), manifestFile)
+		if err != nil {
+			return fmt.Errorf("processing secrets: %w", err)
+		}
+		if err := triggermesh.InitializeServicesAndStatus(ctx, c.(triggermesh.Component), secrets); err != nil {
+			return fmt.Errorf("services initialization: %w", err)
+		}
+		log.Printf("Starting %s\n", object.Metadata.Name)
+		container, err := triggermesh.Start(ctx, c, o.Restart, secrets)
+		if err != nil {
+			return fmt.Errorf("starting container: %w", err)
+		}
+		if triggers, exists := componentTriggers[object.Metadata.Name]; exists {
+			for _, trigger := range triggers {
+				trigger.SetTarget(object.Metadata.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
+				if err := trigger.UpdateBrokerConfig(); err != nil {
+					return fmt.Errorf("broker config: %w", err)
+				}
+				if err := trigger.UpdateManifest(); err != nil {
+					return fmt.Errorf("broker manifest: %w", err)
+				}
+			}
 		}
 		if _, err := triggermesh.WriteObject(c.(triggermesh.Component), manifestFile); err != nil {
 			return fmt.Errorf("updating manifest: %w", err)

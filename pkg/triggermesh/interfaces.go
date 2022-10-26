@@ -32,6 +32,8 @@ type Component interface {
 	GetName() string
 	GetKind() string
 	GetSpec() map[string]interface{}
+
+	SetStatus(map[string]interface{})
 }
 
 type Runnable interface {

@@ -46,7 +46,7 @@ type Transformation struct {
 }
 
 func (t *Transformation) AsUnstructured() (unstructured.Unstructured, error) {
-	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
+	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec, nil)
 }
 
 func (t *Transformation) AsK8sObject() (kubernetes.Object, error) {
@@ -143,6 +143,8 @@ func (t *Transformation) GetPort(ctx context.Context) (string, error) {
 	}
 	return container.HostPort(), nil
 }
+
+func (t *Transformation) SetStatus(map[string]interface{}) {}
 
 func New(name, crdFile, kind, broker, version string, spec map[string]interface{}) *Transformation {
 	if name == "" {

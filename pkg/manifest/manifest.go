@@ -73,10 +73,10 @@ func (m *Manifest) Add(object kubernetes.Object) bool {
 	return true
 }
 
-func (m *Manifest) Remove(name string) {
+func (m *Manifest) Remove(name, kind string) {
 	objects := []kubernetes.Object{}
 	for _, o := range m.Objects {
-		if o.Metadata.Name == name {
+		if o.Metadata.Name == name && o.Kind == kind {
 			continue
 		}
 		objects = append(objects, o)

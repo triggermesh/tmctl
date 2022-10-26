@@ -134,6 +134,8 @@ func (b *Broker) GetPort(ctx context.Context) (string, error) {
 	return container.HostPort(), nil
 }
 
+func (b *Broker) SetStatus(map[string]interface{}) {}
+
 func (b *Broker) ConsumedEventTypes() ([]string, error) {
 	return []string{}, nil
 }

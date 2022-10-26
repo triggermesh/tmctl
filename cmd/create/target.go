@@ -29,6 +29,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/output"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/target"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
@@ -76,10 +77,11 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 
 func (o *CreateOptions) target(name, kind string, args []string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
-	manifestFile := path.Join(o.ConfigBase, o.Context, manifestFile)
+	configBase := path.Join(o.ConfigBase, o.Context)
+	manifestPath := path.Join(configBase, manifestFile)
 
 	for _, source := range eventSourcesFilter {
-		et, err := o.producersEventTypes(source)
+		et, err := components.ProducersEventTypes(source, manifestPath, o.CRD, o.Version)
 		if err != nil {
 			return fmt.Errorf("%q event types: %w", source, err)
 		}
@@ -88,13 +90,13 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourcesFil
 
 	t := target.New(name, o.CRD, kind, o.Context, o.Version, args)
 
-	secretEnv, secretsChanged, err := triggermesh.ProcessSecrets(ctx, t, manifestFile)
+	secretEnv, secretsChanged, err := triggermesh.ProcessSecrets(ctx, t, manifestPath)
 	if err != nil {
 		return fmt.Errorf("spec processing: %w", err)
 	}
 
 	log.Println("Updating manifest")
-	restart, err := triggermesh.WriteObject(t, manifestFile)
+	restart, err := triggermesh.WriteObject(t, manifestPath)
 	if err != nil {
 		return err
 	}
@@ -105,7 +107,7 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourcesFil
 	}
 
 	for _, et := range eventTypesFilter {
-		if err := o.createTrigger("", container.Name, container.HostPort(), tmbroker.FilterExactType(et)); err != nil {
+		if err := tmbroker.CreateTrigger("", container.Name, container.HostPort(), o.Context, configBase, tmbroker.FilterExactType(et)); err != nil {
 			return err
 		}
 	}
@@ -128,12 +130,12 @@ func (o *CreateOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 		toComplete == "--name" {
 		return []string{toComplete}, cobra.ShellCompDirectiveNoFileComp
 	}
-	manifestFile := path.Join(o.ConfigBase, o.Context, manifestFile)
+	manifestPath := path.Join(o.ConfigBase, o.Context, manifestFile)
 	switch args[len(args)-1] {
 	case "--source":
-		return completion.ListSources(manifestFile), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListSources(manifestPath), cobra.ShellCompDirectiveNoFileComp
 	case "--eventTypes":
-		return completion.ListEventTypes(manifestFile, o.CRD), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListEventTypes(manifestPath, o.CRD), cobra.ShellCompDirectiveNoFileComp
 	case "--broker":
 		list, err := brokers.List(o.ConfigBase, "")
 		if err != nil {

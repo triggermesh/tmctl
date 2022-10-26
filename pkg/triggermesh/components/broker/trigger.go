@@ -17,6 +17,8 @@ limitations under the License.
 package broker
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path"
@@ -112,6 +114,8 @@ func (t *Trigger) GetSpec() map[string]interface{} {
 		"target":  t.Target,
 	}
 }
+
+func (t *Trigger) SetStatus(map[string]interface{}) {}
 
 func NewTrigger(name, broker, configDir string, filter *Filter) *Trigger {
 	trigger := Trigger{
@@ -219,4 +223,22 @@ func writeBrokerConfig(path string, configuration *Configuration) error {
 		return fmt.Errorf("marshal broker configuration: %w", err)
 	}
 	return os.WriteFile(path, out, os.ModePerm)
+}
+
+func CreateTrigger(name, targetName, port, broker, configBase string, filter *Filter) error {
+	if name == "" {
+		filterString, err := filter.String()
+		if err != nil {
+			return fmt.Errorf("filter: %w", err)
+		}
+		// in case of event types hash collision, replace with sha256
+		hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", targetName, filterString)))
+		name = fmt.Sprintf("%s-trigger-%s", broker, hex.EncodeToString(hash[:4]))
+	}
+	tr := NewTrigger(name, broker, configBase, filter)
+	tr.SetTarget(targetName, fmt.Sprintf("http://host.docker.internal:%s", port))
+	if err := tr.UpdateBrokerConfig(); err != nil {
+		return fmt.Errorf("broker config: %w", err)
+	}
+	return tr.UpdateManifest()
 }

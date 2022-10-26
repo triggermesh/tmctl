@@ -80,7 +80,7 @@ func CreateObject(resource, name, broker, crdFile string, spec map[string]interf
 	}, nil
 }
 
-func CreateUnstructured(resource, name, broker, crdFile string, spec map[string]interface{}) (unstructured.Unstructured, error) {
+func CreateUnstructured(resource, name, broker, crdFile string, spec map[string]interface{}, status map[string]interface{}) (unstructured.Unstructured, error) {
 	crdObject, err := crd.GetResourceCRD(resource, crdFile)
 	if err != nil {
 		return unstructured.Unstructured{}, fmt.Errorf("CRD schema not found: %w", err)
@@ -115,6 +115,9 @@ func CreateUnstructured(resource, name, broker, crdFile string, spec map[string]
 				return unstructured.Unstructured{}, fmt.Errorf("object key %q: %w", k, err)
 			}
 		}
+	}
+	if err := unstructured.SetNestedMap(u.Object, status, "status"); err != nil {
+		return unstructured.Unstructured{}, fmt.Errorf("object status: %w", err)
 	}
 	return u, nil
 }

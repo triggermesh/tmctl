@@ -18,12 +18,14 @@ package triggermesh
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler"
 )
 
 func WriteObject(object Component, manifestFile string) (bool, error) {
@@ -41,12 +43,12 @@ func WriteObject(object Component, manifestFile string) (bool, error) {
 	return true, manifest.Write()
 }
 
-func RemoveObject(name string, manifestFile string) error {
+func RemoveObject(name, kind string, manifestFile string) error {
 	manifest := manifest.New(manifestFile)
 	if err := manifest.Read(); err != nil {
 		return fmt.Errorf("reading manifest: %w", err)
 	}
-	manifest.Remove(name)
+	manifest.Remove(name, kind)
 	return manifest.Write()
 }
 
@@ -102,7 +104,11 @@ func secretToEnv(secret Component) ([]corev1.EnvVar, error) {
 	}
 	var result []corev1.EnvVar
 	for k, v := range secret.GetSpec() {
-		result = append(result, corev1.EnvVar{Name: k, Value: v.(string)})
+		plainValue, err := base64.StdEncoding.DecodeString(v.(string))
+		if err != nil {
+			return []corev1.EnvVar{}, fmt.Errorf("decoding secret value: %w", err)
+		}
+		result = append(result, corev1.EnvVar{Name: k, Value: string(plainValue)})
 	}
 	return result, nil
 }
@@ -110,7 +116,10 @@ func secretToEnv(secret Component) ([]corev1.EnvVar, error) {
 func ProcessSecrets(ctx context.Context, p Parent, manifestFile string) (map[string]string, bool, error) {
 	secrets, err := p.GetChildren()
 	if err != nil {
-		return nil, false, fmt.Errorf("component nested objects: %w", err)
+		// return nil, false, fmt.Errorf("component nested objects: %w", err)
+		// Secrets are already extracted, read manifest
+		secrets, err := readSecrets(p.(Component).GetName(), manifestFile)
+		return secrets, false, err
 	}
 	secretsChanged := false
 	secretEnv := make(map[string]string)
@@ -131,4 +140,45 @@ func ProcessSecrets(ctx context.Context, p Parent, manifestFile string) (map[str
 		}
 	}
 	return secretEnv, secretsChanged, nil
+}
+
+func readSecrets(parent, manifestFile string) (map[string]string, error) {
+	manifest := manifest.New(manifestFile)
+	if err := manifest.Read(); err != nil {
+		return nil, fmt.Errorf("reading manifest: %w", err)
+	}
+	secrets := make(map[string]string)
+	for _, object := range manifest.Objects {
+		if object.Kind == "Secret" && object.Metadata.Name == parent {
+			for key, value := range object.Data {
+				plainValue, err := base64.StdEncoding.DecodeString(value)
+				if err != nil {
+					return nil, fmt.Errorf("decoding secret: %w", err)
+				}
+				secrets[key] = string(plainValue)
+			}
+		}
+	}
+	return secrets, nil
+}
+
+func InitializeServicesAndStatus(ctx context.Context, object Component, secrets map[string]string) error {
+	u, err := object.AsUnstructured()
+	if err != nil {
+		return err
+	}
+	status, err := reconciler.InitializeAndGetStatus(ctx, u, secrets)
+	if err != nil {
+		return err
+	}
+	object.SetStatus(status)
+	return nil
+}
+
+func FinalizeExternalServices(ctx context.Context, object Component, secrets map[string]string) error {
+	u, err := object.AsUnstructured()
+	if err != nil {
+		return err
+	}
+	return reconciler.Finalize(ctx, u, secrets)
 }

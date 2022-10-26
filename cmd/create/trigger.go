@@ -26,6 +26,7 @@ import (
 
 	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
@@ -62,15 +63,18 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 }
 
 func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilter []string, target string) error {
+	configBase := path.Join(o.ConfigBase, o.Context)
+	manifestPath := path.Join(configBase, manifestFile)
+
 	for _, source := range eventSourcesFilter {
-		et, err := o.producersEventTypes(source)
+		et, err := components.ProducersEventTypes(source, manifestPath, o.CRD, o.Version)
 		if err != nil {
 			return fmt.Errorf("event types filter: %w", err)
 		}
 		eventTypesFilter = append(eventTypesFilter, et...)
 	}
 
-	component, err := o.getObject(target)
+	component, err := components.GetObject(target, manifestPath, o.CRD, o.Version)
 	if err != nil {
 		return fmt.Errorf("%q not found: %w", target, err)
 	}
@@ -87,10 +91,10 @@ func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 
 	log.Println("Creating trigger")
 	if len(eventTypesFilter) == 0 {
-		return o.createTrigger(name, component.GetName(), port, nil)
+		return tmbroker.CreateTrigger(name, component.GetName(), port, o.Context, configBase, nil)
 	}
 	for _, et := range eventTypesFilter {
-		if err := o.createTrigger(name, component.GetName(), port, tmbroker.FilterExactType(et)); err != nil {
+		if err := tmbroker.CreateTrigger(name, component.GetName(), port, o.Context, configBase, tmbroker.FilterExactType(et)); err != nil {
 			return err
 		}
 	}

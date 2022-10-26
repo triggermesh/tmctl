@@ -88,11 +88,13 @@ func (o *CreateOptions) source(name, kind string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("spec processing: %w", err)
 	}
-
 	log.Println("Updating manifest")
 	restart, err := triggermesh.WriteObject(s, manifest)
 	if err != nil {
 		return err
+	}
+	if err := triggermesh.InitializeServicesAndStatus(ctx, s, secretEnv); err != nil {
+		return fmt.Errorf("external services initialization: %w", err)
 	}
 	log.Println("Starting container")
 	if _, err := triggermesh.Start(ctx, s, (restart || secretsChanged), secretEnv); err != nil {

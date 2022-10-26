@@ -75,6 +75,8 @@ func (s *Secret) GetSpec() map[string]interface{} {
 	return spec
 }
 
+func (s *Secret) SetStatus(map[string]interface{}) {}
+
 func New(name, context string, data map[string]string) *Secret {
 	return &Secret{
 		Name:    name,
