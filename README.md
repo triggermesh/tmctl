@@ -1,3 +1,54 @@
+```
+#HAPPY
+go run . create broker bob
+
+go run . create source awssqs --arn=arn:aws:sqs:us-west-1:397904378622:test  --auth.credentials.accessKeyID=AKIAVZJHS7L7FYPAUPJ5 --auth.credentials.secretAccessKey=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
+
+
+go run . create target cloudevents --endpoint http://tmdebugger-personal-org-75-personal-ns-75.k.triggermesh.io
+
+go run . create trigger --sources bob-awssqssource --target bob-cloudeventstarget
+
+go run . dump -o docker-compose
+```
+
+
+Local instance data:
+```
+go run . create target cloudevents --endpoint http://192.168.1.15:8080
+go run . create trigger --eventTypes com.test --target bob-cloudeventstarget
+go run . send-event --eventType com.test '{"hello":"world"}'
+
+```
+
+KafkaSource
+WebhookSource
+CloudEventsSource
+AWSSQSSource
+AWSKinesisSource
+AzureEventHubSource
+HTTPPollerSource
+GoogleCloudPubSubSource
+
+
+I agree that dumping from k8s to docker-compose & back is cool... but designing from here is not. In my opionon this is useles technology wrapped with the interface it is. We are doing the exact same thing as we tried to do with tmcli and it failed. So i dont understand at all what we are trying to acomplish here. 
+
+This is maybe, an "oh hey, thats cool" repo. NOT a "I need this every day of my life to do my job or it sucks" repo.. 
+
+No one asked for this, and everyone we have brought it up to (that i was in the prensense of) dismissed, rejected, or said "thats cool, but I probably would not use this"-Noah Kreiger
+
+
+
+```
+go run . create trigger --sources awssqs --target foo-cloudeventstarget
+
+
+#BROKEN
+go run .  create transformation --sources awssqs
+
+```
+
+
 # TriggerMesh CLI
 Local environment edition.
 
