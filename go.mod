@@ -1,4 +1,4 @@
-module github.com/triggermesh/tmcli
+module github.com/triggermesh/tmctl
 
 go 1.19
 

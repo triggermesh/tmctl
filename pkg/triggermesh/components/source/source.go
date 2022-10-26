@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
-	"github.com/triggermesh/tmcli/pkg/kubernetes"
-	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/adapter"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/components/secret"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/pkg"
+	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/kubernetes"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -122,6 +122,9 @@ func (s *Source) GetChildren() ([]triggermesh.Component, error) {
 	secrets, err := kubernetes.ExtractSecrets(s.Name, s.Kind, s.CRDFile, s.spec)
 	if err != nil {
 		return nil, fmt.Errorf("extracting secrets: %w", err)
+	}
+	if len(secrets) == 0 {
+		return nil, nil
 	}
 	return []triggermesh.Component{secret.New(strings.ToLower(s.Name), s.Broker, secrets)}, nil
 }

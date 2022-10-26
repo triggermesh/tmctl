@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const (
@@ -116,7 +116,6 @@ func CreateUnstructured(resource, name, broker, crdFile string, spec map[string]
 			}
 		}
 	}
-	unstructured.SetNestedMap(u.Object, map[string]interface{}{}, "status")
 	return u, nil
 }
 

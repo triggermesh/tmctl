@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
-	"github.com/triggermesh/tmcli/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/manifest"
 )
 
 const manifestFile = "manifest.yaml"
@@ -67,16 +67,11 @@ func NewCmd() *cobra.Command {
 		Use:   "dump [broker]",
 		Short: "Generate Kubernetes manifest",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			broker := viper.GetString("context")
+			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 			if len(args) == 1 {
-				broker = args[0]
+				return o.dump(args[0])
 			}
-			configDir, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			o.ConfigDir = configDir
-			return o.dump(broker)
+			return o.dump(viper.GetString("context"))
 		},
 	}
 	dumpCmd.Flags().StringVarP(&o.Format, "output", "o", "yaml", "Output format")

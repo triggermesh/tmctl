@@ -24,14 +24,15 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
-	"github.com/triggermesh/tmcli/pkg/manifest"
-	"github.com/triggermesh/tmcli/pkg/output"
-	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/components/source"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/components/target"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/components/transformation"
+	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/output"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/target"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const manifestFile = "manifest.yaml"
@@ -59,21 +60,23 @@ type DescribeOptions struct {
 func NewCmd() *cobra.Command {
 	o := &DescribeOptions{}
 	return &cobra.Command{
-		Use:   "describe <broker>",
+		Use:   "describe [broker]",
 		Short: "Show broker status",
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			broker := viper.GetString("context")
-			if len(args) == 1 {
-				broker = args[0]
-			}
-			configDir, err := cmd.Flags().GetString("config")
+			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
+			o.Version = viper.GetString("triggermesh.version")
+			crds, err := crd.Fetch(o.ConfigDir, o.Version)
 			if err != nil {
 				return err
 			}
-			o.ConfigDir = configDir
-			o.Version = viper.GetString("triggermesh.version")
-			o.CRD = viper.GetString("triggermesh.servedCRD")
-			return o.describe(broker)
+			o.CRD = crds
+			if len(args) == 1 {
+				return o.describe(args[0])
+			}
+			return o.describe(viper.GetString("context"))
 		},
 	}
 }
@@ -84,7 +87,7 @@ func (o DescribeOptions) describe(broker string) error {
 	manifestFile := path.Join(brokerConfigDir, manifestFile)
 	manifest := manifest.New(manifestFile)
 	if err := manifest.Read(); err != nil {
-		return fmt.Errorf("cannot parse manifest: %w", err)
+		return nil
 	}
 
 	var intg integration
@@ -105,7 +108,7 @@ func (o DescribeOptions) describe(broker string) error {
 				container: []*docker.Container{cc},
 			}
 		case object.Kind == "Trigger":
-			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, brokerConfigDir, []string{})
+			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, brokerConfigDir, nil)
 			if err := trigger.LookupTrigger(); err != nil {
 				return fmt.Errorf("trigger config: %w", err)
 			}

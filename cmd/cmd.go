@@ -17,74 +17,53 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"os"
-	"strings"
+	"path"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/crd"
-
-	"github.com/triggermesh/tmcli/cmd/brokers"
-        "github.com/triggermesh/tmcli/cmd/config"
-	"github.com/triggermesh/tmcli/cmd/create"
-	"github.com/triggermesh/tmcli/cmd/delete"
-	"github.com/triggermesh/tmcli/cmd/describe"
-	"github.com/triggermesh/tmcli/cmd/dump"
-	"github.com/triggermesh/tmcli/cmd/sendevent"
-	"github.com/triggermesh/tmcli/cmd/start"
-	"github.com/triggermesh/tmcli/cmd/stop"
-	"github.com/triggermesh/tmcli/cmd/watch"
+	"github.com/triggermesh/tmctl/cmd/brokers"
+	"github.com/triggermesh/tmctl/cmd/config"
+	"github.com/triggermesh/tmctl/cmd/create"
+	"github.com/triggermesh/tmctl/cmd/delete"
+	"github.com/triggermesh/tmctl/cmd/describe"
+	"github.com/triggermesh/tmctl/cmd/dump"
+	"github.com/triggermesh/tmctl/cmd/sendevent"
+	"github.com/triggermesh/tmctl/cmd/start"
+	"github.com/triggermesh/tmctl/cmd/stop"
+	"github.com/triggermesh/tmctl/cmd/version"
+	"github.com/triggermesh/tmctl/cmd/watch"
 )
 
-var (
-	defaultConfigPath = "$HOME/.triggermesh/cli"
+const (
+	defaultTriggermeshVersion = "v1.21.1"
+	defaultBroker             = ""
+
+	configDir = ".triggermesh/cli"
 )
 
-func NewRootCommand() *cobra.Command {
+func NewRootCommand(ver, commit string) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "tmctl",
 		Short: "A command line interface to build event-driven applications",
-		Long:  `tmctl is a CLI to help you create event brokers, sources, targets and transformations.
+		Long: `tmctl is a CLI to help you create event brokers, sources, targets and transformations.
 
 Find more information at: https://docs.triggermesh.io`,
-
-		PersistentPreRunE: func(ccmd *cobra.Command, args []string) error {
-			// check docker server
-			_, err := docker.NewClient()
-			if err != nil {
-				return fmt.Errorf("docker client: %w", err)
-			}
-
-			if err := initConfig(); err != nil {
-				return err
-			}
-			crdFile, err := crd.Fetch(defaultConfigPath)
-			if err != nil {
-				return err
-			}
-			viper.Set("triggermesh.servedCRD", crdFile)
-			return nil
-		},
-		Run: func(ccmd *cobra.Command, args []string) {
-			ccmd.HelpFunc()(ccmd, args)
-		},
+		// CompletionOptions: cobra.CompletionOptions{DisableDescriptions: true},
 	}
-	// persistent flags
-	rootCmd.PersistentFlags().String("config", defaultConfigPath, "Config home dir")
-	rootCmd.PersistentFlags().String("context", "default", "Context")
-	rootCmd.PersistentFlags().String("version", "latest", "TriggerMesh components version")
-	rootCmd.PersistentFlags().Bool("debug", false, "Enable debug output")
 
-	// bind config args
-	viper.BindPFlag("context", rootCmd.PersistentFlags().Lookup("context"))
+	cobra.OnInitialize(initConfig)
+
+	rootCmd.PersistentFlags().String("version", defaultTriggermeshVersion, "TriggerMesh components version.")
+	rootCmd.PersistentFlags().String("broker", defaultBroker, "Optional broker name.")
+	// rootCmd.PersistentFlags().MarkHidden("broker")
+
+	viper.BindPFlag("context", rootCmd.PersistentFlags().Lookup("broker"))
 	viper.BindPFlag("triggermesh.version", rootCmd.PersistentFlags().Lookup("version"))
 
-	// commands
 	rootCmd.AddCommand(brokers.NewCmd())
-        rootCmd.AddCommand(create.NewCmd())
+	rootCmd.AddCommand(create.NewCmd())
 	rootCmd.AddCommand(config.NewCmd())
 	rootCmd.AddCommand(delete.NewCmd())
 	rootCmd.AddCommand(describe.NewCmd())
@@ -93,38 +72,40 @@ Find more information at: https://docs.triggermesh.io`,
 	rootCmd.AddCommand(start.NewCmd())
 	rootCmd.AddCommand(stop.NewCmd())
 	rootCmd.AddCommand(watch.NewCmd())
+	rootCmd.AddCommand(version.NewCmd(ver, commit))
+
+	rootCmd.RegisterFlagCompletionFunc("broker", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		list, err := brokers.List(path.Dir(viper.ConfigFileUsed()), "")
+		if err != nil {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return list, cobra.ShellCompDirectiveNoFileComp
+	})
+	rootCmd.RegisterFlagCompletionFunc("version", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return []string{}, cobra.ShellCompDirectiveNoFileComp
+	})
 
 	return rootCmd
 }
 
-func init() {
+func initConfig() {
 	home, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Printf("User home dir not set: %v\n", err)
-		os.Exit(1)
-	}
-	defaultConfigPath = strings.Replace(defaultConfigPath, "$HOME", home, 1)
-}
+	cobra.CheckErr(err)
+	configHome := path.Join(home, configDir)
 
-func initConfig() error {
+	// Search config in home directory with name ".cobra" (without extension).
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")
-	viper.AddConfigPath(defaultConfigPath)
+	viper.AddConfigPath(configHome)
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return err
-			}
-			if err := os.MkdirAll(strings.Replace(defaultConfigPath, "$HOME", home, 1), os.ModePerm); err != nil {
-				return err
-			}
-			viper.SetDefault("context", "default")
-			viper.SetDefault("triggermesh.crd", "https://github.com/triggermesh/triggermesh/releases/download/${VERSION}/triggermesh-crds.yaml")
-			viper.SetDefault("triggermesh.version", "latest")
-			return viper.SafeWriteConfig()
+			cobra.CheckErr(os.MkdirAll(configHome, os.ModePerm))
+			viper.SetDefault("context", defaultBroker)
+			viper.SetDefault("triggermesh.version", defaultTriggermeshVersion)
+			cobra.CheckErr(viper.SafeWriteConfig())
+			cobra.CheckErr(viper.ReadInConfig())
+		} else {
+			cobra.CheckErr(err)
 		}
-		return err
 	}
-	return nil
 }

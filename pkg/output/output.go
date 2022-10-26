@@ -22,9 +22,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
-	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"gopkg.in/yaml.v3"
 )
 
@@ -48,11 +48,11 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 
 	switch kind {
 	case "broker":
-		result = fmt.Sprintf("%s\nCurrent context is set to %q", result, object.GetName())
-		result = fmt.Sprintf("%s\nTo change the context use \"tmcli config set context <context name>\"", result)
+		result = fmt.Sprintf("%s\nCurrent broker is set to %q", result, object.GetName())
+		result = fmt.Sprintf("%s\nTo change the current broker use \"tmctl brokers --set <broker name>\"", result)
 		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
 		result = fmt.Sprintf("%s\nNext steps:", result)
-		result = fmt.Sprintf("%s\n\ttmcli create source\t - create source that will produce events", result)
+		result = fmt.Sprintf("%s\n\ttmctl create source\t - create source that will produce events", result)
 	case "producer":
 		et, _ := object.(triggermesh.Producer).GetEventTypes()
 		if len(et) != 0 {
@@ -60,8 +60,8 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 		}
 		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
 		result = fmt.Sprintf("%s\nNext steps:", result)
-		result = fmt.Sprintf("%s\n\ttmcli create target <kind> --source %s [--eventTypes <types>]\t - create target that will consume events from this source", result, object.GetName())
-		result = fmt.Sprintf("%s\n\ttmcli watch\t\t\t\t\t\t\t\t\t - show events flowing through the broker in the real time", result)
+		result = fmt.Sprintf("%s\n\ttmctl create target <kind> --source %s [--eventTypes <types>]\t - create target that will consume events from this source", result, object.GetName())
+		result = fmt.Sprintf("%s\n\ttmctl watch\t\t\t\t\t\t\t\t\t - show events flowing through the broker in the real time", result)
 	case "consumer":
 		et, _ := object.(triggermesh.Consumer).ConsumedEventTypes()
 		if len(et) != 0 {
@@ -76,8 +76,8 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 		}
 		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
 		result = fmt.Sprintf("%s\nNext steps:", result)
-		result = fmt.Sprintf("%s\n\ttmcli watch\t - show events flowing through the broker in the real time", result)
-		result = fmt.Sprintf("%s\n\ttmcli dump\t - dump Kubernetes manifest", result)
+		result = fmt.Sprintf("%s\n\ttmctl watch\t - show events flowing through the broker in the real time", result)
+		result = fmt.Sprintf("%s\n\ttmctl dump\t - dump Kubernetes manifest", result)
 	}
 	fmt.Println(result)
 }
@@ -153,15 +153,14 @@ func DescribeTrigger(triggers []*tmbroker.Trigger) {
 	defer w.Flush()
 	fmt.Fprintln(w, "Trigger\tTarget\tFilter")
 	for _, trigger := range triggers {
-		var targets []string
 		var filters []string
 		for _, filter := range trigger.GetFilters() {
 			filters = append(filters, triggerFilterToString(filter))
 		}
-		for _, target := range trigger.GetTargets() {
-			targets = append(targets, target.Component)
+		if len(filters) == 0 {
+			filters = []string{"*"}
 		}
-		fmt.Fprintf(w, "%s\t%v\t%v\n", trigger.Name, strings.Join(targets, ", "), strings.Join(filters, ", "))
+		fmt.Fprintf(w, "%s\t%v\t%v\n", trigger.Name, trigger.Target.Component, strings.Join(filters, ", "))
 	}
 	fmt.Fprintln(w)
 }
@@ -169,8 +168,11 @@ func DescribeTrigger(triggers []*tmbroker.Trigger) {
 func triggerFilterToString(filter tmbroker.Filter) string {
 	// that works with "exact type" filtering
 	// needs to be tested for other cases
-	f, _ := yaml.Marshal(filter)
-	result := strings.ReplaceAll(string(f), "\n", " ")
+	f, err := yaml.Marshal(filter)
+	if err != nil {
+		return ""
+	}
+	result := strings.ReplaceAll(string(f), "\n", "")
 	result = strings.ReplaceAll(result, " ", "")
 	result = strings.ReplaceAll(result, ":", " ")
 	return result

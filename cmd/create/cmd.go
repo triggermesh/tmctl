@@ -26,12 +26,13 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmcli/pkg/manifest"
-	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/components/source"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/components/target"
-	"github.com/triggermesh/tmcli/pkg/triggermesh/components/transformation"
+	"github.com/triggermesh/tmctl/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/target"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const manifestFile = "manifest.yaml"
@@ -48,10 +49,11 @@ func NewCmd() *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "create <resource>",
 		Short: "Create TriggerMesh objects",
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.HelpFunc()(cmd, args)
-		},
+		// CompletionOptions: cobra.CompletionOptions{DisableDescriptions: true},
+		Args: cobra.MinimumNArgs(1),
 	}
+
+	cobra.OnInitialize(o.initialize)
 
 	createCmd.AddCommand(o.NewBrokerCmd())
 	createCmd.AddCommand(o.NewSourceCmd())
@@ -62,26 +64,24 @@ func NewCmd() *cobra.Command {
 	return createCmd
 }
 
-func (o *CreateOptions) initializeOptions(cmd *cobra.Command) {
-	configBase, err := cmd.Flags().GetString("config")
-	if err != nil {
-		panic(err)
-	}
-	o.ConfigBase = configBase
+func (o *CreateOptions) initialize() {
+	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
-	o.CRD = viper.GetString("triggermesh.servedCRD")
+	crds, err := crd.Fetch(o.ConfigBase, o.Version)
+	cobra.CheckErr(err)
+	o.CRD = crds
 }
 
 func parse(args []string) (string, []string, error) {
 	if l := len(args); l < 1 {
-		return "", []string{}, fmt.Errorf("expected at least 1 arguments, got %d", l)
+		return "", []string{}, fmt.Errorf("expected at least 2 arguments, got %d", l)
 	}
 	return args[0], args[1:], nil
 }
 
-func (o *CreateOptions) getObject(name, manifestPath string) (triggermesh.Component, error) {
-	manifest := manifest.New(manifestPath)
+func (o *CreateOptions) getObject(name string) (triggermesh.Component, error) {
+	manifest := manifest.New(path.Join(o.ConfigBase, o.Context, manifestFile))
 	if err := manifest.Read(); err != nil {
 		return nil, fmt.Errorf("reading manifest: %w", err)
 	}
@@ -101,25 +101,25 @@ func (o *CreateOptions) getObject(name, manifestPath string) (triggermesh.Compon
 }
 
 func parameterFromArgs(parameter string, args []string) (string, []string) {
-	var value string
+	var value, newArgs []string
 	for k := 0; k < len(args); k++ {
 		if strings.HasPrefix(args[k], "--"+parameter) {
 			if kv := strings.Split(args[k], "="); len(kv) == 2 {
-				value = kv[1]
-			} else if len(args) > k+1 && !strings.HasPrefix(args[k+1], "--") {
-				value = args[k+1]
-				k++
+				value = []string{kv[1]}
 			}
-			args = append(args[:k-1], args[k+1:]...)
-			break
+			for j := k + 1; j < len(args) && !strings.HasPrefix(args[j], "--"); j++ {
+				value = append(value, args[j])
+				k = j
+			}
+			continue
 		}
+		newArgs = append(newArgs, args[k])
 	}
-	return value, args
+	return strings.Join(value, ","), newArgs
 }
 
 func (o *CreateOptions) producersEventTypes(source string) ([]string, error) {
-	manifest := path.Join(o.ConfigBase, o.Context, manifestFile)
-	c, err := o.getObject(source, manifest)
+	c, err := o.getObject(source)
 	if err != nil {
 		return []string{}, fmt.Errorf("%q does not exist", source)
 	}
@@ -137,13 +137,17 @@ func (o *CreateOptions) producersEventTypes(source string) ([]string, error) {
 	return et, nil
 }
 
-func (o *CreateOptions) createTrigger(name string, eventTypesFilter []string, targetName, port string) error {
+func (o *CreateOptions) createTrigger(name, targetName, port string, filter *tmbroker.Filter) error {
 	if name == "" {
+		filterString, err := filter.String()
+		if err != nil {
+			return fmt.Errorf("filter: %w", err)
+		}
 		// in case of event types hash collision, replace with sha256
-		eventTypesHash := md5.Sum([]byte(strings.Join(append(eventTypesFilter, targetName), " ")))
-		name = fmt.Sprintf("%s-trigger-%s", o.Context, hex.EncodeToString(eventTypesHash[:4]))
+		hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", targetName, filterString)))
+		name = fmt.Sprintf("%s-trigger-%s", o.Context, hex.EncodeToString(hash[:4]))
 	}
-	tr := tmbroker.NewTrigger(name, o.Context, path.Join(o.ConfigBase, o.Context), eventTypesFilter)
+	tr := tmbroker.NewTrigger(name, o.Context, path.Join(o.ConfigBase, o.Context), filter)
 	tr.SetTarget(targetName, fmt.Sprintf("http://host.docker.internal:%s", port))
 	if err := tr.UpdateBrokerConfig(); err != nil {
 		return fmt.Errorf("broker config: %w", err)

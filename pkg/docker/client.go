@@ -204,6 +204,7 @@ func (c *Container) LookupHostConfig(ctx context.Context, client *client.Client)
 		return nil, err
 	}
 	c.runtimeHostConfig = *jsn.HostConfig
+	c.runtimeContainerConfig = *jsn.Config
 	return c, nil
 }
 
@@ -214,6 +215,10 @@ func (c *Container) HostPort() string {
 		}
 	}
 	return ""
+}
+
+func (c *Container) Image() string {
+	return c.runtimeContainerConfig.Image
 }
 
 func (c *Container) Connect(ctx context.Context) error {

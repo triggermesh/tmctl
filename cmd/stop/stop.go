@@ -25,8 +25,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
-	"github.com/triggermesh/tmcli/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/manifest"
 )
 
 const manifestFile = "manifest.yaml"
@@ -40,17 +40,15 @@ func NewCmd() *cobra.Command {
 	stopCmd := &cobra.Command{
 		Use:   "stop [broker]",
 		Short: "Stops TriggerMesh components",
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			o.ConfigDir = c
-			broker := viper.GetString("context")
+			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 			if len(args) == 1 {
-				broker = args[0]
+				return o.stop(args[0])
 			}
-			return o.stop(broker)
+			return o.stop(viper.GetString("context"))
 		},
 	}
 

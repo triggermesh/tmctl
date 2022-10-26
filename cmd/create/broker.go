@@ -25,20 +25,20 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmcli/pkg/output"
-	"github.com/triggermesh/tmcli/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmcli/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/output"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
 func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "broker <name>",
-		Short: "TriggerMesh broker",
+		Use: "broker <name>",
+		// Short: "TriggerMesh broker",
+		Args: cobra.MinimumNArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.initializeOptions(cmd)
-			if len(args) != 1 {
-				return fmt.Errorf("broker name is required")
-			}
 			return o.broker(args[0])
 		},
 	}
@@ -46,7 +46,6 @@ func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 
 func (o *CreateOptions) broker(name string) error {
 	ctx := context.Background()
-
 	configDir := path.Join(o.ConfigBase, name)
 	broker, err := tmbroker.New(name, configDir)
 	if err != nil {
@@ -54,7 +53,7 @@ func (o *CreateOptions) broker(name string) error {
 	}
 
 	log.Println("Updating manifest")
-	restart, err := triggermesh.WriteObject(ctx, broker, path.Join(configDir, manifestFile))
+	restart, err := triggermesh.WriteObject(broker, path.Join(configDir, manifestFile))
 	if err != nil {
 		return err
 	}

@@ -19,8 +19,8 @@ package secret
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/triggermesh/tmcli/pkg/kubernetes"
-	"github.com/triggermesh/tmcli/pkg/triggermesh"
+	"github.com/triggermesh/tmctl/pkg/kubernetes"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
 
 var _ triggermesh.Component = (*Secret)(nil)

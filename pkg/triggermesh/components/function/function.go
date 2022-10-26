@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/triggermesh/tmcli/pkg/kubernetes"
+	"github.com/triggermesh/tmctl/pkg/kubernetes"
 )
 
 var functionRuntimes = map[string]string{

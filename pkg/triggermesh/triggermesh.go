@@ -22,11 +22,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/triggermesh/tmcli/pkg/docker"
-	"github.com/triggermesh/tmcli/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/manifest"
 )
 
-func WriteObject(ctx context.Context, object Component, manifestFile string) (bool, error) {
+func WriteObject(object Component, manifestFile string) (bool, error) {
 	manifest := manifest.New(manifestFile)
 	if err := manifest.Read(); err != nil {
 		return false, fmt.Errorf("reading manifest: %w", err)
@@ -41,6 +41,15 @@ func WriteObject(ctx context.Context, object Component, manifestFile string) (bo
 	return true, manifest.Write()
 }
 
+func RemoveObject(name string, manifestFile string) error {
+	manifest := manifest.New(manifestFile)
+	if err := manifest.Read(); err != nil {
+		return fmt.Errorf("reading manifest: %w", err)
+	}
+	manifest.Remove(name)
+	return manifest.Write()
+}
+
 func Start(ctx context.Context, object Runnable, restart bool, additionalEnv map[string]string) (*docker.Container, error) {
 	client, err := docker.NewClient()
 	if err != nil {
@@ -53,15 +62,20 @@ func Start(ctx context.Context, object Runnable, restart bool, additionalEnv map
 	if err := container.PullImage(ctx, client, object.GetImage()); err != nil {
 		return nil, fmt.Errorf("pulling image: %w", err)
 	}
-	if restart {
-		// skip errors
-		container.Remove(ctx, client)
-	}
-	if existingContainer, err := container.LookupHostConfig(ctx, client); err == nil {
-		if err := existingContainer.Connect(ctx); err == nil {
-			// container is up
-			return existingContainer, nil
+	var containerIsRunning bool
+	existingContainer, _ := container.LookupHostConfig(ctx, client)
+	if existingContainer != nil {
+		if object.GetImage() != existingContainer.Image() {
+			restart = true
 		}
+		if err := existingContainer.Connect(ctx); err == nil {
+			containerIsRunning = true
+		}
+	}
+	if restart {
+		container.Remove(ctx, client)
+	} else if containerIsRunning {
+		return existingContainer, nil
 	}
 	container, err = container.Start(ctx, client)
 	if err != nil {
@@ -101,7 +115,7 @@ func ProcessSecrets(ctx context.Context, p Parent, manifestFile string) (map[str
 	secretsChanged := false
 	secretEnv := make(map[string]string)
 	for _, s := range secrets {
-		dirty, err := WriteObject(ctx, s, manifestFile)
+		dirty, err := WriteObject(s, manifestFile)
 		if err != nil {
 			return nil, false, fmt.Errorf("write nested object: %w", err)
 		}

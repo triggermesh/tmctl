@@ -24,13 +24,14 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmcli/pkg/wiretap"
+	"github.com/triggermesh/tmctl/pkg/wiretap"
 )
 
 type WatchOptions struct {
@@ -44,18 +45,15 @@ func NewCmd() *cobra.Command {
 	watchCmd := &cobra.Command{
 		Use:   "watch [broker]",
 		Short: "Watch events flowing through the broker",
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{}, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			broker := viper.GetString("context")
+			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 			if len(args) == 1 {
-				broker = args[0]
+				return o.watch(args[0])
 			}
-			c, err := cmd.Flags().GetString("config")
-			if err != nil {
-				return err
-			}
-			o.ConfigDir = c
-
-			return o.watch(broker)
+			return o.watch(viper.GetString("context"))
 		},
 	}
 

@@ -43,7 +43,7 @@ func ParseArgs(args []string) map[string]interface{} {
 		}
 		if str, ok := value.(string); ok {
 			if valInt, err := strconv.Atoi(str); err == nil {
-				value = valInt
+				value = int64(valInt)
 			}
 		}
 		keys := strings.Split(key, ".")
