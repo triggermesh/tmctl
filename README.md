@@ -10,6 +10,7 @@ go run . create target cloudevents --endpoint http://tmdebugger-personal-org-75-
 go run . create trigger --sources bob-awssqssource --target bob-cloudeventstarget
 
 go run . dump -o docker-compose
+go run . compose
 ```
 
 

@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/triggermesh/tmctl/cmd/brokers"
+	"github.com/triggermesh/tmctl/cmd/compose"
 	"github.com/triggermesh/tmctl/cmd/config"
 	"github.com/triggermesh/tmctl/cmd/create"
 	"github.com/triggermesh/tmctl/cmd/delete"
@@ -65,6 +66,7 @@ Find more information at: https://docs.triggermesh.io`,
 	rootCmd.AddCommand(brokers.NewCmd())
 	rootCmd.AddCommand(create.NewCmd())
 	rootCmd.AddCommand(config.NewCmd())
+	rootCmd.AddCommand(compose.NewCmd())
 	rootCmd.AddCommand(delete.NewCmd())
 	rootCmd.AddCommand(describe.NewCmd())
 	rootCmd.AddCommand(dump.NewCmd())
