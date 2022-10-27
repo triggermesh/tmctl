@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fake
+package awss3source
 
 import (
 	"fmt"
@@ -26,48 +26,22 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sts"
 
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external"
 	sourcesv1alpha1 "github.com/triggermesh/triggermesh/pkg/apis/sources/v1alpha1"
 )
 
 const defaultS3Region = "us-east-1"
 
-const (
-	awsAccessKeyEnv = "accessKeyID"
-	awsSecretKeyEnv = "secretAccessKey"
-)
-
-type AWSS3ClientGetter struct {
-	AccessKeyID     string
-	SecretAccessKey string
-}
-
-func ReadSecret(secrets map[string]string) (string, string, error) {
-	accessKey, exists := secrets[awsAccessKeyEnv]
-	if !exists {
-		return "", "", fmt.Errorf("%q secret is missing", awsAccessKeyEnv)
+func Client(src *sourcesv1alpha1.AWSS3Source, secrets map[string]string) (*s3.S3, *sqs.SQS, error) {
+	accessKey, secretKey, err := external.ReadSecret(secrets)
+	if err != nil {
+		return nil, nil, fmt.Errorf("secrets read: %w", err)
 	}
-	secretKey, exists := secrets[awsSecretKeyEnv]
-	if !exists {
-		return "", "", fmt.Errorf("%q secret is missing", awsSecretKeyEnv)
-	}
-	return accessKey, secretKey, nil
-}
-
-func NewAWSS3ClientGetter(accessKeyID, secretAccessKey string) AWSS3ClientGetter {
-	return AWSS3ClientGetter{
-		AccessKeyID:     accessKeyID,
-		SecretAccessKey: secretAccessKey,
-	}
-}
-
-func (c AWSS3ClientGetter) Get(src *sourcesv1alpha1.AWSS3Source) (*s3.S3, *sqs.SQS, error) {
 	sess := session.Must(session.NewSession(awscore.NewConfig()))
-
 	creds := &credentials.Value{
-		AccessKeyID:     c.AccessKeyID,
-		SecretAccessKey: c.SecretAccessKey,
+		AccessKeyID:     accessKey,
+		SecretAccessKey: secretKey,
 	}
-
 	region, err := determineS3Region(src, creds)
 	if err != nil {
 		return nil, nil, fmt.Errorf("determining suitable S3 region: %w", err)

@@ -25,32 +25,54 @@ import (
 
 	commonv1alpha1 "github.com/triggermesh/triggermesh/pkg/apis/common/v1alpha1"
 	sourcesv1alpha1 "github.com/triggermesh/triggermesh/pkg/apis/sources/v1alpha1"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/awss3source"
+	externalawseb "github.com/triggermesh/triggermesh/pkg/sources/reconciler/awseventbridgesource"
+	externalawss3 "github.com/triggermesh/triggermesh/pkg/sources/reconciler/awss3source"
 
-	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/fake"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/awseventbridgesource"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/awss3source"
 )
 
 func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructured, secrets map[string]string) (map[string]interface{}, error) {
 	switch object.GetKind() {
 	case "AWSS3Source":
 		var o *sourcesv1alpha1.AWSS3Source
-		accessKey, secretKey, err := fake.ReadSecret(secrets)
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return nil, err
+		}
+		s3Client, sqsClient, err := awss3source.Client(o, secrets)
 		if err != nil {
 			return nil, err
 		}
+		arn, err := externalawss3.EnsureQueue(commonv1alpha1.WithReconcilable(ctx, o), sqsClient)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"queueARN": arn}, externalawss3.EnsureNotificationsEnabled(ctx, s3Client, arn)
+	case "AWSEventBridgeSource":
+		var o *sourcesv1alpha1.AWSEventBridgeSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
 			return nil, err
 		}
 		ctx = commonv1alpha1.WithReconcilable(ctx, o)
-		s3Client, sqsClient, err := fake.NewAWSS3ClientGetter(accessKey, secretKey).Get(o)
+		ebClient, sqsClient, err := awseventbridgesource.Client(o, secrets)
 		if err != nil {
 			return nil, err
 		}
-		arn, err := awss3source.EnsureQueue(ctx, sqsClient)
+		queue, err := externalawseb.EnsureQueue(ctx, sqsClient)
 		if err != nil {
 			return nil, err
 		}
-		return map[string]interface{}{"queueARN": arn}, awss3source.EnsureNotificationsEnabled(ctx, s3Client, arn)
+		ruleARN, err := externalawseb.EnsureRule(ctx, ebClient, queue)
+		if err != nil {
+			return nil, err
+		}
+		if err := externalawseb.EnsureQueuePolicy(ctx, sqsClient, queue, ruleARN); err != nil {
+			return nil, err
+		}
+		if err := externalawseb.SetRuleTarget(ctx, ebClient, ruleARN, queue.ARN); err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"queueARN": queue.ARN}, nil
 	}
 	return nil, nil
 }
@@ -59,23 +81,36 @@ func Finalize(ctx context.Context, object unstructured.Unstructured, secrets map
 	switch object.GetKind() {
 	case "AWSS3Source":
 		var o *sourcesv1alpha1.AWSS3Source
-		accessKey, secretKey, err := fake.ReadSecret(secrets)
-		if err != nil {
-			return err
-		}
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
 			return err
 		}
 		ctx = commonv1alpha1.WithReconcilable(ctx, o)
-		s3Client, sqsClient, err := fake.NewAWSS3ClientGetter(accessKey, secretKey).Get(o)
+		s3Client, sqsClient, err := awss3source.Client(o, secrets)
 		if err != nil {
 			return err
 		}
-		if err := awss3source.EnsureNoQueue(ctx, sqsClient); err != nil {
+		if err := externalawss3.EnsureNoQueue(ctx, sqsClient); err != nil {
 			return err
 		}
-		if err := awss3source.EnsureNotificationsDisabled(ctx, s3Client); strings.Contains(strings.ToLower(err.Error()), "error") {
-			// EnsureNotificationsDisabled returns error even if it succeeded
+		if err := externalawss3.EnsureNotificationsDisabled(ctx, s3Client); strings.Contains(strings.ToLower(err.Error()), "error") {
+			// EnsureNotificationsDisabled returns "normal" event (error) if it succeeded
+			return err
+		}
+	case "AWSEventBridgeSource":
+		var o *sourcesv1alpha1.AWSEventBridgeSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return err
+		}
+		ctx = commonv1alpha1.WithReconcilable(ctx, o)
+		ebClient, sqsClient, err := awseventbridgesource.Client(o, secrets)
+		if err != nil {
+			return err
+		}
+		queueName, err := externalawseb.EnsureNoRule(ctx, ebClient, sqsClient)
+		if err != nil {
+			return err
+		}
+		if err := externalawseb.EnsureNoQueue(ctx, sqsClient, queueName); err != nil {
 			return err
 		}
 	}
