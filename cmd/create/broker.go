@@ -39,6 +39,7 @@ func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			o.Manifest = path.Join(o.ConfigBase, args[0], manifestFile)
 			return o.broker(args[0])
 		},
 	}
@@ -46,20 +47,19 @@ func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 
 func (o *CreateOptions) broker(name string) error {
 	ctx := context.Background()
-	configDir := path.Join(o.ConfigBase, name)
-	broker, err := tmbroker.New(name, configDir)
+	broker, err := tmbroker.New(name, o.Manifest)
 	if err != nil {
 		return fmt.Errorf("broker: %w", err)
 	}
 
 	log.Println("Updating manifest")
-	restart, err := triggermesh.WriteObject(broker, path.Join(configDir, manifestFile))
+	restart, err := broker.Add(o.Manifest)
 	if err != nil {
 		return err
 	}
 
 	log.Println("Starting container")
-	if _, err := triggermesh.Start(ctx, broker, restart, nil); err != nil {
+	if _, err := broker.(triggermesh.Runnable).Start(ctx, nil, restart); err != nil {
 		return err
 	}
 

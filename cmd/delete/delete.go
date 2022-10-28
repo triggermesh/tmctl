@@ -50,20 +50,20 @@ type DeleteOptions struct {
 
 func NewCmd() *cobra.Command {
 	o := &DeleteOptions{}
-	var deleteBroker string
+	var broker string
 	deleteCmd := &cobra.Command{
 		Use:               "delete <component_name_1, component_name_2...> [--broker <name>]",
 		Short:             "Delete components by names",
 		ValidArgsFunction: o.deleteCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if deleteBroker != "" {
-				return o.deleteBroker(deleteBroker)
+			if broker != "" {
+				return o.deleteBroker(broker)
 			}
 			return o.deleteComponents(args, false)
 		},
 	}
 	cobra.OnInitialize(o.initialize)
-	deleteCmd.Flags().StringVar(&deleteBroker, "broker", "", "Delete the broker")
+	deleteCmd.Flags().StringVar(&broker, "broker", "", "Delete the broker")
 	deleteCmd.RegisterFlagCompletionFunc("broker", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		list, err := brokers.List(path.Dir(viper.ConfigFileUsed()), "")
 		if err != nil {
@@ -100,21 +100,23 @@ func (o *DeleteOptions) deleteBroker(broker string) error {
 
 func (o *DeleteOptions) deleteComponents(names []string, force bool) error {
 	ctx := context.Background()
-	manifestPath := path.Join(o.ConfigBase, o.Context, manifestFile)
 	client, err := docker.NewClient()
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
-	manifest := manifest.New(manifestPath)
+	manifest := manifest.New(path.Join(o.ConfigBase, o.Context, manifestFile))
 	if err := manifest.Read(); err != nil {
 		return fmt.Errorf("manifest read: %w", err)
 	}
 	for _, object := range manifest.Objects {
+		if object.Kind == "Secret" {
+			continue
+		}
 		skip := false
 		if len(names) > 0 {
 			skip = true
 			for _, v := range names {
-				if v == object.Metadata.Name && object.Kind != "Secret" {
+				if v == object.Metadata.Name {
 					skip = false
 					break
 				}
@@ -147,8 +149,8 @@ func (o *DeleteOptions) removeObject(component string, manifest *manifest.Manife
 			continue
 		}
 		if object.Kind == "Trigger" {
-			trigger := tmbroker.NewTrigger(object.Metadata.Name, o.Context, path.Join(o.ConfigBase, o.Context), nil)
-			if err := trigger.RemoveTriggerFromConfig(); err != nil {
+			trigger := tmbroker.NewTrigger(object.Metadata.Name, o.Context, o.ConfigBase, nil)
+			if err := trigger.(*tmbroker.Trigger).RemoveTriggerFromConfig(); err != nil {
 				log.Printf("Deleting %q: %v", object.Metadata.Name, err)
 				continue
 			}
@@ -184,20 +186,24 @@ func (o *DeleteOptions) cleanupSecrets(component string, manifest *manifest.Mani
 }
 
 func (o *DeleteOptions) removeExternalServices(ctx context.Context, object kubernetes.Object) error {
-	manifestPath := path.Join(o.ConfigBase, o.Context, manifestFile)
-	component, err := components.GetObject(object.Metadata.Name, manifestPath, o.CRD, o.Version)
+	manifestFile := path.Join(o.ConfigBase, o.Context, manifestFile)
+	component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, manifestFile)
 	if err != nil {
 		return err
+	}
+	r, ok := component.(triggermesh.Reconcilable)
+	if !ok {
+		return nil
 	}
 	p, ok := component.(triggermesh.Parent)
 	if !ok {
 		return nil
 	}
-	secrets, _, err := triggermesh.ProcessSecrets(ctx, p, manifestPath)
+	secrets, _, err := triggermesh.ProcessSecrets(ctx, p, manifestFile)
 	if err != nil {
 		return err
 	}
-	return triggermesh.FinalizeExternalServices(ctx, component, secrets)
+	return r.Finalize(ctx, secrets)
 }
 
 func (o *DeleteOptions) switchContext() error {

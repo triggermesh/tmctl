@@ -25,6 +25,7 @@ import (
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
+	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
@@ -46,33 +47,57 @@ type Target struct {
 	Version string
 	Kind    string
 
-	image string
-	spec  map[string]interface{}
+	spec map[string]interface{}
 }
 
-func (t *Target) AsUnstructured() (unstructured.Unstructured, error) {
+func (t *Target) asUnstructured() (unstructured.Unstructured, error) {
 	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec, nil)
 }
 
-func (t *Target) AsK8sObject() (kubernetes.Object, error) {
+func (t *Target) asK8sObject() (kubernetes.Object, error) {
 	return kubernetes.CreateObject(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
 }
 
-func (t *Target) AsContainer(additionalEnvs map[string]string) (*docker.Container, error) {
-	o, err := t.AsUnstructured()
+func (t *Target) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {
+	o, err := t.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
-	t.image = adapter.Image(o, t.Version)
-	co, ho, err := adapter.RuntimeParams(o, t.image, additionalEnvs)
+	image := adapter.Image(o, t.Version)
+	co, ho, err := adapter.RuntimeParams(o, image, additionalEnvs)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
 	return &docker.Container{
 		Name:                   t.GetName(),
+		Image:                  image,
 		CreateHostOptions:      ho,
 		CreateContainerOptions: co,
 	}, nil
+}
+
+func (t *Target) Add(manifestPath string) (bool, error) {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
+		return false, err
+	}
+	o, err := t.asK8sObject()
+	if err != nil {
+		return false, err
+	}
+	if dirty := manifest.Add(o); !dirty {
+		return false, nil
+	}
+	return true, manifest.Write()
+}
+
+func (t *Target) Delete(manifestPath string) error {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
+		return err
+	}
+	manifest.Remove(t.Name, t.GetKind())
+	return manifest.Write()
 }
 
 func (t *Target) GetName() string {
@@ -83,25 +108,14 @@ func (t *Target) GetKind() string {
 	return t.Kind
 }
 
-func (t *Target) GetImage() string {
-	return t.image
-}
-
 func (t *Target) GetSpec() map[string]interface{} {
 	return t.spec
 }
 
 func (t *Target) GetPort(ctx context.Context) (string, error) {
-	client, err := docker.NewClient()
-	if err != nil {
-		return "", fmt.Errorf("docker client: %w", err)
-	}
-	container, err := t.AsContainer(nil)
+	container, err := t.Info(ctx)
 	if err != nil {
 		return "", fmt.Errorf("container object: %w", err)
-	}
-	if container, err = container.LookupHostConfig(ctx, client); err != nil {
-		return "", fmt.Errorf("container runtime config: %w", err)
 	}
 	return container.HostPort(), nil
 }
@@ -117,13 +131,47 @@ func (t *Target) GetChildren() ([]triggermesh.Component, error) {
 	return []triggermesh.Component{secret.New(strings.ToLower(t.Name), t.Broker, secrets)}, nil
 }
 
-func (t *Target) SetStatus(map[string]interface{}) {}
-
 func (t *Target) ConsumedEventTypes() ([]string, error) {
 	return []string{}, nil
 }
 
-func New(name, crdFile, kind, broker, version string, params interface{}) *Target {
+func (t *Target) Start(ctx context.Context, additionalEnvs map[string]string, restart bool) (*docker.Container, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("docker client: %w", err)
+	}
+	container, err := t.asContainer(additionalEnvs)
+	if err != nil {
+		return nil, fmt.Errorf("container object: %w", err)
+	}
+	return container.Start(ctx, client, restart)
+}
+
+func (t *Target) Stop(ctx context.Context) error {
+	client, err := docker.NewClient()
+	if err != nil {
+		return fmt.Errorf("docker client: %w", err)
+	}
+	container, err := t.asContainer(nil)
+	if err != nil {
+		return fmt.Errorf("container object: %w", err)
+	}
+	return container.Remove(ctx, client)
+}
+
+func (t *Target) Info(ctx context.Context) (*docker.Container, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("docker client: %w", err)
+	}
+	container, err := t.asContainer(nil)
+	if err != nil {
+		return nil, fmt.Errorf("container object: %w", err)
+	}
+	return container.LookupHostConfig(ctx, client)
+}
+
+func New(name, crdFile, kind, broker, version string, params interface{}) triggermesh.Component {
 	var spec map[string]interface{}
 	switch p := params.(type) {
 	case []string:

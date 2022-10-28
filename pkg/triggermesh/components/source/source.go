@@ -17,25 +17,30 @@ limitations under the License.
 package source
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
+	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var (
-	_ triggermesh.Component = (*Source)(nil)
-	_ triggermesh.Producer  = (*Source)(nil)
-	_ triggermesh.Runnable  = (*Source)(nil)
-	_ triggermesh.Parent    = (*Source)(nil)
+	_ triggermesh.Reconcilable = (*Source)(nil)
+	_ triggermesh.Component    = (*Source)(nil)
+	_ triggermesh.Producer     = (*Source)(nil)
+	_ triggermesh.Runnable     = (*Source)(nil)
+	_ triggermesh.Parent       = (*Source)(nil)
 )
 
 type Source struct {
@@ -46,34 +51,58 @@ type Source struct {
 	Kind    string
 	Version string
 
-	image  string
 	spec   map[string]interface{}
 	status map[string]interface{}
 }
 
-func (s *Source) AsUnstructured() (unstructured.Unstructured, error) {
+func (s *Source) asUnstructured() (unstructured.Unstructured, error) {
 	return kubernetes.CreateUnstructured(s.GetKind(), s.GetName(), s.Broker, s.CRDFile, s.spec, s.status)
 }
 
-func (s *Source) AsK8sObject() (kubernetes.Object, error) {
+func (s *Source) asK8sObject() (kubernetes.Object, error) {
 	return kubernetes.CreateObject(s.GetKind(), s.GetName(), s.Broker, s.CRDFile, s.spec)
 }
 
-func (s *Source) AsContainer(additionalEnvs map[string]string) (*docker.Container, error) {
-	o, err := s.AsUnstructured()
+func (s *Source) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {
+	o, err := s.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
-	s.image = adapter.Image(o, s.Version)
-	co, ho, err := adapter.RuntimeParams(o, s.image, additionalEnvs)
+	image := adapter.Image(o, s.Version)
+	co, ho, err := adapter.RuntimeParams(o, image, additionalEnvs)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
 	return &docker.Container{
 		Name:                   s.GetName(),
+		Image:                  image,
 		CreateHostOptions:      ho,
 		CreateContainerOptions: co,
 	}, nil
+}
+
+func (s *Source) Add(manifestPath string) (bool, error) {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
+		return false, err
+	}
+	o, err := s.asK8sObject()
+	if err != nil {
+		return false, err
+	}
+	if dirty := manifest.Add(o); !dirty {
+		return false, nil
+	}
+	return true, manifest.Write()
+}
+
+func (s *Source) Delete(manifestPath string) error {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
+		return err
+	}
+	manifest.Remove(s.Name, s.GetKind())
+	return manifest.Write()
 }
 
 func (s *Source) GetName() string {
@@ -82,11 +111,6 @@ func (s *Source) GetName() string {
 
 func (s *Source) GetKind() string {
 	return s.Kind
-}
-
-func (s *Source) GetImage() string {
-
-	return s.image
 }
 
 func (s *Source) GetSpec() map[string]interface{} {
@@ -131,15 +155,67 @@ func (s *Source) GetChildren() ([]triggermesh.Component, error) {
 	return []triggermesh.Component{secret.New(strings.ToLower(s.Name), s.Broker, secrets)}, nil
 }
 
-func (s *Source) SetStatus(data map[string]interface{}) {
-	s.status = data
-}
-
 func (s *Source) SetEventType(string) error {
 	return fmt.Errorf("event source does not support context attributes override")
 }
 
-func New(name, crdFile, kind, broker, version string, params interface{}) *Source {
+func (s *Source) Start(ctx context.Context, additionalEnvs map[string]string, restart bool) (*docker.Container, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("docker client: %w", err)
+	}
+	container, err := s.asContainer(additionalEnvs)
+	if err != nil {
+		return nil, fmt.Errorf("container object: %w", err)
+	}
+	return container.Start(ctx, client, restart)
+}
+
+func (s *Source) Stop(ctx context.Context) error {
+	client, err := docker.NewClient()
+	if err != nil {
+		return fmt.Errorf("docker client: %w", err)
+	}
+	container, err := s.asContainer(nil)
+	if err != nil {
+		return fmt.Errorf("container object: %w", err)
+	}
+	return container.Remove(ctx, client)
+}
+
+func (s *Source) Info(ctx context.Context) (*docker.Container, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("docker client: %w", err)
+	}
+	container, err := s.asContainer(nil)
+	if err != nil {
+		return nil, fmt.Errorf("container object: %w", err)
+	}
+	return container.LookupHostConfig(ctx, client)
+}
+
+func (s *Source) Initialize(ctx context.Context, secrets map[string]string) (map[string]interface{}, error) {
+	u, err := s.asUnstructured()
+	if err != nil {
+		return nil, err
+	}
+	return reconciler.InitializeAndGetStatus(ctx, u, secrets)
+}
+
+func (s *Source) Finalize(ctx context.Context, secrets map[string]string) error {
+	u, err := s.asUnstructured()
+	if err != nil {
+		return err
+	}
+	return reconciler.Finalize(ctx, u, secrets)
+}
+
+func (s *Source) UpdateStatus(status map[string]interface{}) {
+	s.status = status
+}
+
+func New(name, crdFile, kind, broker, version string, params interface{}) triggermesh.Component {
 	var spec map[string]interface{}
 	switch p := params.(type) {
 	case []string:

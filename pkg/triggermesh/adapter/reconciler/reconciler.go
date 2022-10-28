@@ -43,7 +43,8 @@ func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructure
 		if err != nil {
 			return nil, err
 		}
-		arn, err := externalawss3.EnsureQueue(commonv1alpha1.WithReconcilable(ctx, o), sqsClient)
+		ctx = commonv1alpha1.WithReconcilable(ctx, o)
+		arn, err := externalawss3.EnsureQueue(ctx, sqsClient)
 		if err != nil {
 			return nil, err
 		}
@@ -73,6 +74,8 @@ func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructure
 			return nil, err
 		}
 		return map[string]interface{}{"queueARN": queue.ARN}, nil
+	case "GoogleCloudPubSubSource":
+
 	}
 	return nil, nil
 }

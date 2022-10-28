@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
+	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
 
@@ -32,7 +33,7 @@ type Secret struct {
 	data map[string]string
 }
 
-func (s *Secret) AsUnstructured() (unstructured.Unstructured, error) {
+func (s *Secret) asUnstructured() (unstructured.Unstructured, error) {
 	u := unstructured.Unstructured{}
 	u.SetAPIVersion("v1")
 	u.SetKind(s.GetKind())
@@ -44,7 +45,7 @@ func (s *Secret) AsUnstructured() (unstructured.Unstructured, error) {
 	return u, unstructured.SetNestedStringMap(u.Object, s.data, "data")
 }
 
-func (s *Secret) AsK8sObject() (kubernetes.Object, error) {
+func (s *Secret) asK8sObject() (kubernetes.Object, error) {
 	return kubernetes.Object{
 		APIVersion: "v1",
 		Kind:       s.GetKind(),
@@ -75,9 +76,31 @@ func (s *Secret) GetSpec() map[string]interface{} {
 	return spec
 }
 
-func (s *Secret) SetStatus(map[string]interface{}) {}
+func (s *Secret) Add(manifestPath string) (bool, error) {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
+		return false, err
+	}
+	o, err := s.asK8sObject()
+	if err != nil {
+		return false, err
+	}
+	if dirty := manifest.Add(o); !dirty {
+		return false, nil
+	}
+	return true, manifest.Write()
+}
 
-func New(name, context string, data map[string]string) *Secret {
+func (s *Secret) Delete(manifestPath string) error {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
+		return err
+	}
+	manifest.Remove(s.Name, s.GetKind())
+	return manifest.Write()
+}
+
+func New(name, context string, data map[string]string) triggermesh.Component {
 	return &Secret{
 		Name:    name,
 		Context: context,

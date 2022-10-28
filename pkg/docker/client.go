@@ -47,8 +47,9 @@ type imagePullEvent struct {
 }
 
 type Container struct {
-	ID   string
-	Name string
+	ID    string
+	Name  string
+	Image string
 
 	CreateContainerOptions []ContainerOption
 	CreateHostOptions      []HostOption
@@ -80,8 +81,8 @@ func (c *Container) Remove(ctx context.Context, client *client.Client) error {
 	})
 }
 
-func (c *Container) PullImage(ctx context.Context, client *client.Client, image string) error {
-	reader, err := client.ImagePull(ctx, image, types.ImagePullOptions{})
+func (c *Container) pullImage(ctx context.Context, client *client.Client) error {
+	reader, err := client.ImagePull(ctx, c.Image, types.ImagePullOptions{})
 	if err != nil {
 		return err
 	}
@@ -108,7 +109,7 @@ func (c *Container) PullImage(ctx context.Context, client *client.Client, image 
 	return nil
 }
 
-func (c *Container) Start(ctx context.Context, client *client.Client) (*Container, error) {
+func (c *Container) Start(ctx context.Context, client *client.Client, restart bool) (*Container, error) {
 	cc := container.Config{}
 	for _, opt := range c.CreateContainerOptions {
 		opt(&cc)
@@ -117,6 +118,26 @@ func (c *Container) Start(ctx context.Context, client *client.Client) (*Containe
 	hc := container.HostConfig{}
 	for _, opt := range c.CreateHostOptions {
 		opt(&hc)
+	}
+
+	if err := c.pullImage(ctx, client); err != nil {
+		return nil, fmt.Errorf("pulling image: %w", err)
+	}
+
+	var containerIsRunning bool
+	existingContainer, _ := c.LookupHostConfig(ctx, client)
+	if existingContainer != nil {
+		if c.Image != existingContainer.Image {
+			restart = true
+		}
+		if err := existingContainer.Connect(ctx); err == nil {
+			containerIsRunning = true
+		}
+	}
+	if restart {
+		c.Remove(ctx, client)
+	} else if containerIsRunning {
+		return existingContainer, nil
 	}
 
 	resp, err := client.ContainerCreate(ctx, &cc, &hc, nil, nil, c.Name)
@@ -162,10 +183,6 @@ func (c *Container) Start(ctx context.Context, client *client.Client) (*Containe
 			}
 		}
 	}
-}
-
-func (c *Container) Inspect(ctx context.Context, client client.Client) (types.ContainerJSON, error) {
-	return client.ContainerInspect(ctx, c.ID)
 }
 
 func openPort() int {
@@ -215,10 +232,6 @@ func (c *Container) HostPort() string {
 		}
 	}
 	return ""
-}
-
-func (c *Container) Image() string {
-	return c.runtimeContainerConfig.Image
 }
 
 func (c *Container) Connect(ctx context.Context) error {

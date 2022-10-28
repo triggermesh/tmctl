@@ -77,11 +77,16 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 
 func (o *CreateOptions) target(name, kind string, args []string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
-	configBase := path.Join(o.ConfigBase, o.Context)
-	manifestPath := path.Join(configBase, manifestFile)
 
 	for _, source := range eventSourcesFilter {
-		et, err := components.ProducersEventTypes(source, manifestPath, o.CRD, o.Version)
+		s, err := components.GetObject(source, o.CRD, o.Version, o.Manifest)
+		if err != nil {
+			return fmt.Errorf("%q event types: %w", source, err)
+		}
+		if _, ok := s.(triggermesh.Producer); !ok {
+			return fmt.Errorf("%q is not an event producer", source)
+		}
+		et, err := s.(triggermesh.Producer).GetEventTypes()
 		if err != nil {
 			return fmt.Errorf("%q event types: %w", source, err)
 		}
@@ -90,24 +95,23 @@ func (o *CreateOptions) target(name, kind string, args []string, eventSourcesFil
 
 	t := target.New(name, o.CRD, kind, o.Context, o.Version, args)
 
-	secretEnv, secretsChanged, err := triggermesh.ProcessSecrets(ctx, t, manifestPath)
+	secretEnv, secretsChanged, err := triggermesh.ProcessSecrets(ctx, t.(triggermesh.Parent), o.Manifest)
 	if err != nil {
 		return fmt.Errorf("spec processing: %w", err)
 	}
 
 	log.Println("Updating manifest")
-	restart, err := triggermesh.WriteObject(t, manifestPath)
+	restart, err := t.Add(o.Manifest)
 	if err != nil {
 		return err
 	}
 	log.Println("Starting container")
-	container, err := triggermesh.Start(ctx, t, (restart || secretsChanged), secretEnv)
+	container, err := t.(triggermesh.Runnable).Start(ctx, secretEnv, (restart || secretsChanged))
 	if err != nil {
 		return err
 	}
-
 	for _, et := range eventTypesFilter {
-		if err := tmbroker.CreateTrigger("", container.Name, container.HostPort(), o.Context, configBase, tmbroker.FilterExactType(et)); err != nil {
+		if err := tmbroker.CreateTrigger("", container.Name, container.HostPort(), o.Context, o.ConfigBase, tmbroker.FilterExactType(et)); err != nil {
 			return err
 		}
 	}

@@ -34,6 +34,7 @@ type CreateOptions struct {
 	Context    string
 	Version    string
 	CRD        string
+	Manifest   string
 }
 
 func NewCmd() *cobra.Command {
@@ -60,6 +61,7 @@ func (o *CreateOptions) initialize() {
 	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
+	o.Manifest = path.Join(o.ConfigBase, o.Context, manifestFile)
 	crds, err := crd.Fetch(o.ConfigBase, o.Version)
 	cobra.CheckErr(err)
 	o.CRD = crds

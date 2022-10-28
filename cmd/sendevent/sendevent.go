@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
@@ -46,7 +47,7 @@ func NewCmd() *cobra.Command {
 		Use:   "send-event <data> [--eventType <type>]",
 		Short: "Send CloudEvent to the broker",
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-			return []string{}, cobra.ShellCompDirectiveNoFileComp
+			return []string{"--eventType"}, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Context = viper.GetString("context")
@@ -64,7 +65,7 @@ func (o *SendOptions) send(data string) error {
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}
-	port, err := broker.GetPort(ctx)
+	port, err := broker.(triggermesh.Consumer).GetPort(ctx)
 	if err != nil {
 		return fmt.Errorf("broker socket: %v", err)
 	}

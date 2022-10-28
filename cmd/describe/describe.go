@@ -42,8 +42,7 @@ type integration struct {
 	Sources         components
 	Transformations components
 	Targets         components
-
-	Triggers []*tmbroker.Trigger
+	Triggers        components
 }
 
 type components struct {
@@ -83,8 +82,7 @@ func NewCmd() *cobra.Command {
 
 func (o DescribeOptions) describe(broker string) error {
 	ctx := context.Background()
-	brokerConfigDir := path.Join(o.ConfigDir, broker)
-	manifestFile := path.Join(brokerConfigDir, manifestFile)
+	manifestFile := path.Join(o.ConfigDir, broker, manifestFile)
 	manifest := manifest.New(manifestFile)
 	if err := manifest.Read(); err != nil {
 		return nil
@@ -94,59 +92,55 @@ func (o DescribeOptions) describe(broker string) error {
 	for _, object := range manifest.Objects {
 		switch {
 		case object.Kind == "Broker":
-			co, err := tmbroker.New(object.Metadata.Name, brokerConfigDir)
+			broker, err := tmbroker.New(object.Metadata.Name, manifestFile)
 			if err != nil {
 				return fmt.Errorf("creating broker object: %v", err)
 			}
-			cc, err := triggermesh.Info(ctx, co)
+			container, err := broker.(triggermesh.Runnable).Info(ctx)
 			if err != nil {
-				// ignore the error
-				cc = nil
+				container = nil
 			}
 			intg.Broker = components{
-				object:    []triggermesh.Component{co},
-				container: []*docker.Container{cc},
+				object:    []triggermesh.Component{broker},
+				container: []*docker.Container{container},
 			}
 		case object.Kind == "Trigger":
-			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, brokerConfigDir, nil)
-			if err := trigger.LookupTrigger(); err != nil {
+			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigDir, nil)
+			if err := trigger.(*tmbroker.Trigger).LookupTrigger(); err != nil {
 				return fmt.Errorf("trigger config: %w", err)
 			}
-			intg.Triggers = append(intg.Triggers, trigger)
+			intg.Triggers.object = append(intg.Triggers.object, trigger)
 		case object.Kind == "Transformation":
-			co := transformation.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-			cc, err := triggermesh.Info(ctx, co)
+			trn := transformation.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
+			container, err := trn.(triggermesh.Runnable).Info(ctx)
 			if err != nil {
-				// ignore the error
-				cc = nil
+				container = nil
 			}
-			intg.Transformations.object = append(intg.Transformations.object, co)
-			intg.Transformations.container = append(intg.Transformations.container, cc)
+			intg.Transformations.object = append(intg.Transformations.object, trn)
+			intg.Transformations.container = append(intg.Transformations.container, container)
 		case object.APIVersion == "sources.triggermesh.io/v1alpha1":
-			co := source.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-			cc, err := triggermesh.Info(ctx, co)
+			source := source.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
+			container, err := source.(triggermesh.Runnable).Info(ctx)
 			if err != nil {
-				// ignore the error
-				cc = nil
+				container = nil
 			}
-			intg.Sources.object = append(intg.Sources.object, co)
-			intg.Sources.container = append(intg.Sources.container, cc)
+			intg.Sources.object = append(intg.Sources.object, source)
+			intg.Sources.container = append(intg.Sources.container, container)
 		case object.APIVersion == "targets.triggermesh.io/v1alpha1":
-			co := target.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-			cc, err := triggermesh.Info(ctx, co)
+			target := target.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
+			container, err := target.(triggermesh.Runnable).Info(ctx)
 			if err != nil {
-				// ignore the error
-				cc = nil
+				container = nil
 			}
-			intg.Targets.object = append(intg.Targets.object, co)
-			intg.Targets.container = append(intg.Targets.container, cc)
+			intg.Targets.object = append(intg.Targets.object, target)
+			intg.Targets.container = append(intg.Targets.container, container)
 		default:
 			continue
 		}
 	}
 
 	output.DescribeBroker(intg.Broker.object, intg.Broker.container)
-	output.DescribeTrigger(intg.Triggers)
+	output.DescribeTrigger(intg.Triggers.object)
 	output.DescribeSource(intg.Sources.object, intg.Sources.container)
 	output.DescribeTransformation(intg.Transformations.object, intg.Transformations.container)
 	output.DescribeTarget(intg.Targets.object, intg.Targets.container)

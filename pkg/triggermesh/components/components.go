@@ -17,8 +17,6 @@ limitations under the License.
 package components
 
 import (
-	"fmt"
-
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
@@ -26,10 +24,10 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
 )
 
-func GetObject(name, manifestFile, crdFile, version string) (triggermesh.Component, error) {
-	manifest := manifest.New(manifestFile)
+func GetObject(name, crdFile, version, manifestPath string) (triggermesh.Component, error) {
+	manifest := manifest.New(manifestPath)
 	if err := manifest.Read(); err != nil {
-		return nil, fmt.Errorf("reading manifest: %w", err)
+		return nil, err
 	}
 	for _, object := range manifest.Objects {
 		if object.Metadata.Name == name {
@@ -44,23 +42,4 @@ func GetObject(name, manifestFile, crdFile, version string) (triggermesh.Compone
 		}
 	}
 	return nil, nil
-}
-
-func ProducersEventTypes(name, manifestFile, crdFile, version string) ([]string, error) {
-	c, err := GetObject(name, manifestFile, crdFile, version)
-	if err != nil {
-		return []string{}, fmt.Errorf("%q does not exist", name)
-	}
-	producer, ok := c.(triggermesh.Producer)
-	if !ok {
-		return []string{}, fmt.Errorf("event producer %q is not available", name)
-	}
-	et, err := producer.GetEventTypes()
-	if err != nil {
-		return []string{}, fmt.Errorf("%q event types: %w", name, err)
-	}
-	if len(et) == 0 {
-		return []string{}, fmt.Errorf("%q does not expose its event types", name)
-	}
-	return et, nil
 }
