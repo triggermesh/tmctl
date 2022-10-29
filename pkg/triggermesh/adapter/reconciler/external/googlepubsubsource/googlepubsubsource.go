@@ -26,8 +26,11 @@ import (
 )
 
 func Client(src *sourcesv1alpha1.GoogleCloudPubSubSource, secrets map[string]string) (*pubsub.Client, error) {
-	saKey := []byte{}
 	project := src.Spec.Topic.Project
-
+	saKey := []byte{}
+	for _, v := range secrets {
+		saKey = []byte(v)
+		break
+	}
 	return pubsub.NewClient(context.Background(), project, option.WithCredentialsJSON(saKey))
 }

@@ -27,9 +27,11 @@ import (
 	sourcesv1alpha1 "github.com/triggermesh/triggermesh/pkg/apis/sources/v1alpha1"
 	externalawseb "github.com/triggermesh/triggermesh/pkg/sources/reconciler/awseventbridgesource"
 	externalawss3 "github.com/triggermesh/triggermesh/pkg/sources/reconciler/awss3source"
+	externalpubsub "github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudpubsubsource"
 
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/awseventbridgesource"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/awss3source"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/googlepubsubsource"
 )
 
 func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructured, secrets map[string]string) (map[string]interface{}, error) {
@@ -75,7 +77,19 @@ func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructure
 		}
 		return map[string]interface{}{"queueARN": queue.ARN}, nil
 	case "GoogleCloudPubSubSource":
-
+		var o *sourcesv1alpha1.GoogleCloudPubSubSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return nil, err
+		}
+		ctx = commonv1alpha1.WithReconcilable(ctx, o)
+		client, err := googlepubsubsource.Client(o, secrets)
+		if err != nil {
+			return nil, err
+		}
+		if err := externalpubsub.EnsureSubscription(ctx, client); err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"subscription": o.Status.Subscription}, nil
 	}
 	return nil, nil
 }
@@ -116,6 +130,17 @@ func Finalize(ctx context.Context, object unstructured.Unstructured, secrets map
 		if err := externalawseb.EnsureNoQueue(ctx, sqsClient, queueName); err != nil {
 			return err
 		}
+	case "GoogleCloudPubSubSource":
+		var o *sourcesv1alpha1.GoogleCloudPubSubSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return err
+		}
+		ctx = commonv1alpha1.WithReconcilable(ctx, o)
+		client, err := googlepubsubsource.Client(o, secrets)
+		if err != nil {
+			return err
+		}
+		return externalpubsub.EnsureNoSubscription(ctx, client)
 	}
 	return nil
 }
