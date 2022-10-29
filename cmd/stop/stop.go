@@ -38,11 +38,9 @@ type StopOptions struct {
 func NewCmd() *cobra.Command {
 	o := &StopOptions{}
 	stopCmd := &cobra.Command{
-		Use:   "stop [broker]",
-		Short: "Stops TriggerMesh components",
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-			return []string{}, cobra.ShellCompDirectiveNoFileComp
-		},
+		Use:       "stop [broker]",
+		Short:     "Stops TriggerMesh components",
+		ValidArgs: []string{},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 			if len(args) == 1 {

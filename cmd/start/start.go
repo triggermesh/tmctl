@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"log"
 	"path"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -38,10 +37,12 @@ import (
 const manifestFile = "manifest.yaml"
 
 type StartOptions struct {
-	ConfigDir string
-	Version   string
-	Restart   bool
-	CRD       string
+	ConfigBase string
+	Context    string
+	Version    string
+	Manifest   string
+	Restart    bool
+	CRD        string
 }
 
 func NewCmd() *cobra.Command {
@@ -50,120 +51,124 @@ func NewCmd() *cobra.Command {
 		Use:   "start [broker]",
 		Short: "Starts TriggerMesh components",
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-			return []string{}, cobra.ShellCompDirectiveNoFileComp
+			return []string{"--broker", "--restart", "--version"}, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
-			o.Version = viper.GetString("triggermesh.version")
-			crds, err := crd.Fetch(o.ConfigDir, o.Version)
-			if err != nil {
-				return err
-			}
-			o.CRD = crds
 			if len(args) == 1 {
 				return o.start(args[0])
 			}
 			return o.start(viper.GetString("context"))
 		},
 	}
-	createCmd.Flags().BoolVar(&o.Restart, "restart", true, "Restart components")
+	cobra.OnInitialize(o.initialize)
+	createCmd.Flags().BoolVar(&o.Restart, "restart", false, "Restart components")
 
 	return createCmd
 }
 
+func (o *StartOptions) initialize() {
+	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
+	o.Context = viper.GetString("context")
+	o.Version = viper.GetString("triggermesh.version")
+	o.Manifest = path.Join(o.ConfigBase, o.Context, manifestFile)
+	crds, err := crd.Fetch(o.ConfigBase, o.Version)
+	cobra.CheckErr(err)
+	o.CRD = crds
+}
+
 func (o *StartOptions) start(broker string) error {
 	ctx := context.Background()
-	configDir := path.Join(o.ConfigDir, broker)
-	manifestFile := path.Join(configDir, manifestFile)
-	manifest := manifest.New(manifestFile)
+	manifest := manifest.New(o.Manifest)
 	if err := manifest.Read(); err != nil {
 		return fmt.Errorf("cannot parse manifest: %w", err)
 	}
 
-	componentTriggers := make(map[string][]*tmbroker.Trigger)
-	secrets := make(map[string]map[string]string)
+	componentTriggers := make(map[string][]triggermesh.Component)
 	var brokerPort string
 	// start eventing first
 	for _, object := range manifest.Objects {
 		switch object.Kind {
 		case "Broker":
-			broker, err := tmbroker.New(object.Metadata.Name, configDir)
+			broker, err := tmbroker.New(object.Metadata.Name, o.Manifest)
 			if err != nil {
 				return fmt.Errorf("creating broker object: %w", err)
 			}
 			log.Println("Starting broker")
-			container, err := triggermesh.Start(ctx, broker, o.Restart, nil)
+			container, err := broker.(triggermesh.Runnable).Start(ctx, nil, o.Restart)
 			if err != nil {
 				return fmt.Errorf("starting broker container: %w", err)
 			}
 			brokerPort = container.HostPort()
 		case "Trigger":
-			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, configDir, nil)
+			t := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigBase, nil)
+			trigger := t.(*tmbroker.Trigger)
 			if err := trigger.LookupTrigger(); err != nil {
 				return fmt.Errorf("trigger configuration: %w", err)
 			}
 			if triggers, set := componentTriggers[trigger.GetTarget().Component]; set {
 				componentTriggers[trigger.GetTarget().Component] = append(triggers, trigger)
 			} else {
-				componentTriggers[trigger.GetTarget().Component] = []*tmbroker.Trigger{trigger}
+				componentTriggers[trigger.GetTarget().Component] = []triggermesh.Component{trigger}
 			}
-			if _, err := triggermesh.WriteObject(trigger, manifestFile); err != nil {
+			if _, err := t.Add(o.Manifest); err != nil {
 				return fmt.Errorf("creating trigger: %w", err)
 			}
-		case "Secret":
-			secrets[strings.ToLower(object.Metadata.Name)] = object.Data
 		}
 	}
 
-	if brokerPort == "" {
-		return fmt.Errorf("broker is not available")
-	}
-
 	for i, object := range manifest.Objects {
-		var objectSecrets map[string]string
-		var c triggermesh.Runnable
-		switch {
-		case strings.HasSuffix(object.Kind, "Source"):
+		var c triggermesh.Component
+		switch object.APIVersion {
+		case "sources.triggermesh.io/v1alpha1":
 			manifest.Objects[i].Spec["sink"] = map[string]interface{}{"uri": fmt.Sprintf("http://host.docker.internal:%s", brokerPort)}
 			c = source.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-			if s, ok := secrets[strings.ToLower(object.Metadata.Name)]; ok {
-				objectSecrets = s
-			}
-			log.Printf("Starting %s\n", object.Metadata.Name)
-			if _, err := triggermesh.Start(ctx, c, o.Restart, objectSecrets); err != nil {
-				return fmt.Errorf("starting container: %w", err)
-			}
-		case strings.HasSuffix(object.Kind, "Target") ||
-			strings.HasSuffix(object.Kind, "Transformation"):
-			if object.Kind == "Transformation" {
-				c = transformation.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-			} else {
-				c = target.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-			}
-			if s, ok := secrets[strings.ToLower(object.Metadata.Name)]; ok {
-				objectSecrets = s
-			}
-			log.Printf("Starting %s\n", object.Metadata.Name)
-			container, err := triggermesh.Start(ctx, c, o.Restart, objectSecrets)
+		case "targets.triggermesh.io/v1alpha1":
+			c = target.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
+		case "flow.triggermesh.io/v1alpha1":
+			c = transformation.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
+		}
+		if c == nil {
+			continue
+		}
+
+		secrets := make(map[string]string, 0)
+		if parent, ok := c.(triggermesh.Parent); ok {
+			s, _, err := triggermesh.ProcessSecrets(ctx, parent, o.Manifest)
 			if err != nil {
-				return fmt.Errorf("starting container: %w", err)
+				return fmt.Errorf("processing secrets: %w", err)
+			}
+			secrets = s
+		}
+		if reconcilable, ok := c.(triggermesh.Reconcilable); ok {
+			status, err := reconcilable.Initialize(ctx, secrets)
+			if err != nil {
+				return fmt.Errorf("external services initialization: %w", err)
+			}
+			reconcilable.UpdateStatus(status)
+		}
+		log.Printf("Starting %s\n", object.Metadata.Name)
+		if _, err := c.(triggermesh.Runnable).Start(ctx, secrets, o.Restart); err != nil {
+			return fmt.Errorf("starting container: %w", err)
+		}
+		if consumer, ok := c.(triggermesh.Consumer); ok {
+			port, err := consumer.GetPort(ctx)
+			if err != nil {
+				return fmt.Errorf("container port: %w", err)
 			}
 			if triggers, exists := componentTriggers[object.Metadata.Name]; exists {
-				for _, trigger := range triggers {
-					trigger.SetTarget(object.Metadata.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
+				for _, t := range triggers {
+					trigger := t.(*tmbroker.Trigger)
+					trigger.SetTarget(object.Metadata.Name, fmt.Sprintf("http://host.docker.internal:%s", port))
 					if err := trigger.UpdateBrokerConfig(); err != nil {
 						return fmt.Errorf("broker config: %w", err)
 					}
-					if err := trigger.UpdateManifest(); err != nil {
+					if _, err := t.Add(o.Manifest); err != nil {
 						return fmt.Errorf("broker manifest: %w", err)
 					}
 				}
 			}
 		}
-		if c == nil {
-			continue
-		}
-		if _, err := triggermesh.WriteObject(c.(triggermesh.Component), manifestFile); err != nil {
+		if _, err := c.Add(o.Manifest); err != nil {
 			return fmt.Errorf("updating manifest: %w", err)
 		}
 	}

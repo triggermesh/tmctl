@@ -96,7 +96,11 @@ func listenLogs(output io.ReadCloser, done chan os.Signal) {
 			output.Close()
 			return
 		default:
-			fmt.Println(string(scanner.Bytes()[8:]))
+			log := scanner.Bytes()
+			if len(log) > 8 {
+				log = log[8:]
+			}
+			fmt.Println(string(log))
 		}
 	}
 }

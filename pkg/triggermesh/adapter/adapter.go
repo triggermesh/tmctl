@@ -17,7 +17,6 @@ limitations under the License.
 package adapter
 
 import (
-	"encoding/base64"
 	"fmt"
 	"strings"
 
@@ -25,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/env"
 )
 
 const (
@@ -33,6 +33,11 @@ const (
 )
 
 func Image(object unstructured.Unstructured, version string) string {
+	// components with custom images
+	switch object.GetKind() {
+	case "AWSS3Source":
+		return fmt.Sprintf("%s/awssqssource-adapter:%s", registry, version)
+	}
 	return fmt.Sprintf("%s/%s-adapter:%s", registry, strings.ToLower(object.GetKind()), version)
 }
 
@@ -51,23 +56,21 @@ func RuntimeParams(object unstructured.Unstructured, image string, additionalEnv
 		return co, ho, nil
 	}
 
-	kenv, err := buildEnv(object)
+	kenv, err := env.Build(object)
 	if err != nil {
 		return nil, nil, fmt.Errorf("adapter environment: %w", err)
 	}
 
-	if additionalEnvs != nil {
-		for i, v := range kenv {
-			if v.ValueFrom != nil {
-				if secret, ok := additionalEnvs[v.ValueFrom.SecretKeyRef.Key]; ok {
-					plainSecret, err := base64.StdEncoding.DecodeString(secret)
-					if err != nil {
-						return nil, nil, fmt.Errorf("decoding secret value: %w", err)
-					}
-					kenv[i] = corev1.EnvVar{Name: v.Name, Value: string(plainSecret)}
-				}
+	for i, v := range kenv {
+		if v.ValueFrom != nil && additionalEnvs != nil {
+			if secret, ok := additionalEnvs[v.ValueFrom.SecretKeyRef.Key]; ok {
+				kenv[i] = corev1.EnvVar{Name: v.Name, Value: string(secret)}
+				delete(additionalEnvs, v.ValueFrom.SecretKeyRef.Key)
 			}
 		}
+	}
+	for k, v := range additionalEnvs {
+		kenv = append(kenv, corev1.EnvVar{Name: k, Value: v})
 	}
 
 	sinkURI, set, err := unstructured.NestedString(object.Object, "spec", "sink", "uri")

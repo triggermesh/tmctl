@@ -68,34 +68,36 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 
 func (o *CreateOptions) source(name, kind string, args []string) error {
 	ctx := context.Background()
-	configDir := path.Join(o.ConfigBase, o.Context)
-	manifest := path.Join(configDir, manifestFile)
 
-	broker, err := tmbroker.New(o.Context, configDir)
+	broker, err := tmbroker.New(o.Context, path.Join(o.Manifest))
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}
-	port, err := broker.GetPort(ctx)
+	port, err := broker.(triggermesh.Consumer).GetPort(ctx)
 	if err != nil {
-		return fmt.Errorf("broker port: %v", err)
+		return fmt.Errorf("broker offline: %v", err)
 	}
 
 	spec := append(args, fmt.Sprintf("--sink.uri=http://host.docker.internal:%s", port))
 
 	s := source.New(name, o.CRD, kind, o.Context, o.Version, spec)
 
-	secretEnv, secretsChanged, err := triggermesh.ProcessSecrets(ctx, s, manifest)
+	secretEnv, secretsChanged, err := triggermesh.ProcessSecrets(ctx, s.(triggermesh.Parent), o.Manifest)
 	if err != nil {
 		return fmt.Errorf("spec processing: %w", err)
 	}
-
 	log.Println("Updating manifest")
-	restart, err := triggermesh.WriteObject(s, manifest)
+	restart, err := s.Add(o.Manifest)
 	if err != nil {
 		return err
 	}
+	status, err := s.(triggermesh.Reconcilable).Initialize(ctx, secretEnv)
+	if err != nil {
+		return fmt.Errorf("source initialization: %w", err)
+	}
+	s.(triggermesh.Reconcilable).UpdateStatus(status)
 	log.Println("Starting container")
-	if _, err := triggermesh.Start(ctx, s, (restart || secretsChanged), secretEnv); err != nil {
+	if _, err := s.(triggermesh.Runnable).Start(ctx, secretEnv, (restart || secretsChanged)); err != nil {
 		return err
 	}
 	output.PrintStatus("producer", s, []string{}, []string{})

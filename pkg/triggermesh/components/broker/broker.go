@@ -27,6 +27,7 @@ import (
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
+	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 )
@@ -38,7 +39,6 @@ var (
 )
 
 const (
-	manifestFile     = "manifest.yaml"
 	brokerConfigFile = "broker.conf"
 	image            = "tzununbekov/memory-broker"
 )
@@ -47,15 +47,14 @@ type Broker struct {
 	ConfigFile string
 	Name       string
 
-	image string
-	spec  map[string]interface{}
+	spec map[string]interface{}
 }
 
 type Configuration struct {
 	Triggers map[string]Trigger `yaml:"triggers"`
 }
 
-func (b *Broker) AsUnstructured() (unstructured.Unstructured, error) {
+func (b *Broker) asUnstructured() (unstructured.Unstructured, error) {
 	u := unstructured.Unstructured{}
 	u.SetAPIVersion("eventing.triggermesh.io/v1alpha1")
 	u.SetKind("Broker")
@@ -64,7 +63,7 @@ func (b *Broker) AsUnstructured() (unstructured.Unstructured, error) {
 	return u, unstructured.SetNestedField(u.Object, nil, "spec")
 }
 
-func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
+func (b *Broker) asK8sObject() (kubernetes.Object, error) {
 	return kubernetes.Object{
 		APIVersion: "eventing.triggermesh.io/v1alpha1",
 		Kind:       "Broker",
@@ -78,13 +77,13 @@ func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
 	}, nil
 }
 
-func (b *Broker) AsContainer(additionalEnvs map[string]string) (*docker.Container, error) {
-	o, err := b.AsUnstructured()
+func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {
+	o, err := b.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
-	b.image = image
-	co, ho, err := adapter.RuntimeParams(o, b.image, additionalEnvs)
+	image := image
+	co, ho, err := adapter.RuntimeParams(o, image, additionalEnvs)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
@@ -98,9 +97,34 @@ func (b *Broker) AsContainer(additionalEnvs map[string]string) (*docker.Containe
 	}
 	return &docker.Container{
 		Name:                   name,
+		Image:                  image,
 		CreateHostOptions:      ho,
 		CreateContainerOptions: co,
 	}, nil
+}
+
+func (b *Broker) Add(manifestPath string) (bool, error) {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
+		return false, err
+	}
+	o, err := b.asK8sObject()
+	if err != nil {
+		return false, err
+	}
+	if dirty := manifest.Add(o); !dirty {
+		return false, nil
+	}
+	return true, manifest.Write()
+}
+
+func (b *Broker) Delete(manifestPath string) error {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
+		return err
+	}
+	manifest.Remove(b.Name, b.GetKind())
+	return manifest.Write()
 }
 
 func (b *Broker) GetKind() string {
@@ -111,25 +135,14 @@ func (b *Broker) GetName() string {
 	return b.Name
 }
 
-func (b *Broker) GetImage() string {
-	return b.image
-}
-
 func (b *Broker) GetSpec() map[string]interface{} {
 	return b.spec
 }
 
 func (b *Broker) GetPort(ctx context.Context) (string, error) {
-	client, err := docker.NewClient()
-	if err != nil {
-		return "", fmt.Errorf("docker client: %w", err)
-	}
-	container, err := b.AsContainer(nil)
+	container, err := b.Info(ctx)
 	if err != nil {
 		return "", fmt.Errorf("container object: %w", err)
-	}
-	if container, err = container.LookupHostConfig(ctx, client); err != nil {
-		return "", fmt.Errorf("container runtime config: %w", err)
 	}
 	return container.HostPort(), nil
 }
@@ -138,8 +151,8 @@ func (b *Broker) ConsumedEventTypes() ([]string, error) {
 	return []string{}, nil
 }
 
-func GetTargetTriggers(configDir, target string) (map[string]Trigger, error) {
-	config, err := readBrokerConfig(path.Join(configDir, brokerConfigFile))
+func GetTargetTriggers(brokerConfigDir, target string) (map[string]Trigger, error) {
+	config, err := readBrokerConfig(path.Join(brokerConfigDir, brokerConfigFile))
 	if err != nil {
 		return nil, fmt.Errorf("read broker config: %w", err)
 	}
@@ -149,7 +162,7 @@ func GetTargetTriggers(configDir, target string) (map[string]Trigger, error) {
 			continue
 		}
 		config.Triggers[name] = Trigger{
-			BrokerConfigDir: configDir,
+			BrokerConfigDir: brokerConfigDir,
 			Name:            name,
 			Filters:         trigger.Filters,
 			Target:          trigger.Target,
@@ -158,22 +171,57 @@ func GetTargetTriggers(configDir, target string) (map[string]Trigger, error) {
 	return config.Triggers, nil
 }
 
-func New(name, brokerConfigDir string) (*Broker, error) {
+func (b *Broker) Start(ctx context.Context, additionalEnvs map[string]string, restart bool) (*docker.Container, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("docker client: %w", err)
+	}
+	container, err := b.asContainer(additionalEnvs)
+	if err != nil {
+		return nil, fmt.Errorf("container object: %w", err)
+	}
+	return container.Start(ctx, client, restart)
+}
+
+func (b *Broker) Stop(ctx context.Context) error {
+	client, err := docker.NewClient()
+	if err != nil {
+		return fmt.Errorf("docker client: %w", err)
+	}
+	container, err := b.asContainer(nil)
+	if err != nil {
+		return fmt.Errorf("container object: %w", err)
+	}
+	return container.Remove(ctx, client)
+}
+
+func (b *Broker) Info(ctx context.Context) (*docker.Container, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("docker client: %w", err)
+	}
+	container, err := b.asContainer(nil)
+	if err != nil {
+		return nil, fmt.Errorf("container object: %w", err)
+	}
+	return container.LookupHostConfig(ctx, client)
+}
+
+func New(name, manifestPath string) (triggermesh.Component, error) {
 	// create config folder
-	if err := os.MkdirAll(brokerConfigDir, os.ModePerm); err != nil {
+	if err := os.MkdirAll(path.Dir(manifestPath), os.ModePerm); err != nil {
 		return nil, fmt.Errorf("broker dir creation: %w", err)
 	}
 	// create empty manifest
-	manifest := path.Join(brokerConfigDir, manifestFile)
-	if _, err := os.Stat(manifest); os.IsNotExist(err) {
-		if _, err := os.Create(manifest); err != nil {
+	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+		if _, err := os.Create(manifestPath); err != nil {
 			return nil, fmt.Errorf("manifest file creation: %w", err)
 		}
 	} else if err != nil {
 		return nil, fmt.Errorf("manifest file access: %w", err)
 	}
 
-	config := path.Join(brokerConfigDir, brokerConfigFile)
+	config := path.Join(path.Dir(manifestPath), brokerConfigFile)
 	if _, err := os.Stat(config); os.IsNotExist(err) {
 		if _, err := os.Create(config); err != nil {
 			return nil, fmt.Errorf("config file: %w", err)

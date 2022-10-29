@@ -19,37 +19,47 @@ package triggermesh
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	"github.com/triggermesh/tmctl/pkg/docker"
-	"github.com/triggermesh/tmctl/pkg/kubernetes"
 )
 
+// Component is the common interface for all TriggerMesh components.
 type Component interface {
-	AsUnstructured() (unstructured.Unstructured, error)
-	AsK8sObject() (kubernetes.Object, error)
+	Add(manifest string) (bool, error)
+	Delete(manifest string) error
 
 	GetName() string
 	GetKind() string
 	GetSpec() map[string]interface{}
 }
 
+// Runnable is the interface for components that can run as Docker containers.
 type Runnable interface {
-	AsContainer(additionalEnvs map[string]string) (*docker.Container, error)
-
-	GetImage() string
+	Start(context.Context, map[string]string, bool) (*docker.Container, error)
+	Stop(context.Context) error
+	Info(context.Context) (*docker.Container, error)
 }
 
+// Producer is implemeted by all components that produce events.
 type Producer interface {
 	SetEventType(string) error
 	GetEventTypes() ([]string, error)
 }
 
+// Consumer is implemented by all components that consume events.
 type Consumer interface {
 	ConsumedEventTypes() ([]string, error)
 	GetPort(context.Context) (string, error)
 }
 
+// Parent is the interface of the components that produce additional components.
 type Parent interface {
 	GetChildren() ([]Component, error)
+}
+
+// Reconcilable is implemented by the components that depend on external services
+// and require additional initialization and finalization logic.
+type Reconcilable interface {
+	Initialize(context.Context, map[string]string) (map[string]interface{}, error)
+	Finalize(context.Context, map[string]string) error
+	UpdateStatus(map[string]interface{})
 }

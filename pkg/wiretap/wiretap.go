@@ -27,8 +27,8 @@ import (
 )
 
 type Wiretap struct {
-	Broker    string
-	ConfigDir string
+	Broker     string
+	ConfigBase string
 	// EventType string
 	Destination string
 }
@@ -38,10 +38,10 @@ const (
 	port  = "8080/tcp"
 )
 
-func New(broker, configDir string) *Wiretap {
+func New(broker, configBase string) *Wiretap {
 	return &Wiretap{
-		Broker:    broker,
-		ConfigDir: path.Join(configDir, broker),
+		Broker:     broker,
+		ConfigBase: configBase,
 	}
 }
 
@@ -61,14 +61,11 @@ func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
 	}
 	container := &docker.Container{
 		Name:                   fmt.Sprintf("%s-wiretap", w.Broker),
+		Image:                  image,
 		CreateHostOptions:      ho,
 		CreateContainerOptions: co,
 	}
-
-	if err := container.PullImage(ctx, client, image); err != nil {
-		return nil, fmt.Errorf("pull image: %w", err)
-	}
-	c, err := container.Start(ctx, client)
+	c, err := container.Start(ctx, client, true)
 	if err != nil {
 		return nil, fmt.Errorf("starting container: %w", err)
 	}
@@ -81,9 +78,9 @@ func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
 
 func (w *Wiretap) CreateTrigger(eventTypes []string) error {
 	for _, et := range eventTypes {
-		trigger := tmbroker.NewTrigger("wiretap-trigger", w.Broker, w.ConfigDir, tmbroker.FilterExactType(et))
-		trigger.SetTarget("wiretap", w.Destination)
-		if err := trigger.UpdateBrokerConfig(); err != nil {
+		trigger := tmbroker.NewTrigger("wiretap-trigger", w.Broker, w.ConfigBase, tmbroker.FilterExactType(et))
+		trigger.(*tmbroker.Trigger).SetTarget("wiretap", w.Destination)
+		if err := trigger.(*tmbroker.Trigger).UpdateBrokerConfig(); err != nil {
 			return err
 		}
 	}
@@ -95,7 +92,7 @@ func (w *Wiretap) Cleanup(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
-	triggers, err := tmbroker.GetTargetTriggers(w.ConfigDir, "wiretap")
+	triggers, err := tmbroker.GetTargetTriggers(path.Join(w.ConfigBase, w.Broker), "wiretap")
 	if err != nil {
 		return fmt.Errorf("wiretap triggers: %w", err)
 	}

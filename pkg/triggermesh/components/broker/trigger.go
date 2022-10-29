@@ -17,17 +17,20 @@ limitations under the License.
 package broker
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path"
 
 	"gopkg.in/yaml.v3"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
+
+const manifestFile = "manifest.yaml"
 
 var _ triggermesh.Component = (*Trigger)(nil)
 
@@ -61,16 +64,7 @@ type Target struct {
 	} `yaml:"deliveryOptions,omitempty"`
 }
 
-func (t *Trigger) AsUnstructured() (unstructured.Unstructured, error) {
-	u := unstructured.Unstructured{}
-	u.SetAPIVersion("eventing.triggermesh.io/v1alpha1")
-	u.SetKind("Trigger")
-	u.SetName(t.Name)
-	u.SetLabels(map[string]string{"context": t.Broker})
-	return u, unstructured.SetNestedField(u.Object, t, "spec")
-}
-
-func (t *Trigger) AsK8sObject() (kubernetes.Object, error) {
+func (t *Trigger) asK8sObject() (kubernetes.Object, error) {
 	spec := map[string]interface{}{
 		"target": t.Target,
 	}
@@ -88,6 +82,30 @@ func (t *Trigger) AsK8sObject() (kubernetes.Object, error) {
 		},
 		Spec: spec,
 	}, nil
+}
+
+func (t *Trigger) Add(manifestPath string) (bool, error) {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
+		return false, err
+	}
+	o, err := t.asK8sObject()
+	if err != nil {
+		return false, err
+	}
+	if dirty := manifest.Add(o); !dirty {
+		return false, nil
+	}
+	return true, manifest.Write()
+}
+
+func (t *Trigger) Delete(manifestPath string) error {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
+		return err
+	}
+	manifest.Remove(t.Name, t.GetKind())
+	return manifest.Write()
 }
 
 func (t *Trigger) GetKind() string {
@@ -113,11 +131,11 @@ func (t *Trigger) GetSpec() map[string]interface{} {
 	}
 }
 
-func NewTrigger(name, broker, configDir string, filter *Filter) *Trigger {
+func NewTrigger(name, broker, configBase string, filter *Filter) triggermesh.Component {
 	trigger := Trigger{
 		Name:            name,
 		Broker:          broker,
-		BrokerConfigDir: configDir,
+		BrokerConfigDir: path.Join(configBase, broker),
 	}
 	if filter != nil {
 		trigger.Filters = []Filter{*filter}
@@ -133,7 +151,7 @@ func (t *Trigger) SetTarget(component, destination string) {
 }
 
 func (t *Trigger) LookupTrigger() error {
-	configFile := path.Join(t.BrokerConfigDir, "broker.conf")
+	configFile := path.Join(t.BrokerConfigDir, brokerConfigFile)
 	configuration, err := readBrokerConfig(configFile)
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -148,7 +166,7 @@ func (t *Trigger) LookupTrigger() error {
 }
 
 func (t *Trigger) RemoveTriggerFromConfig() error {
-	configFile := path.Join(t.BrokerConfigDir, "broker.conf")
+	configFile := path.Join(t.BrokerConfigDir, brokerConfigFile)
 	configuration, err := readBrokerConfig(configFile)
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -158,7 +176,7 @@ func (t *Trigger) RemoveTriggerFromConfig() error {
 }
 
 func (t *Trigger) UpdateBrokerConfig() error {
-	configFile := path.Join(t.BrokerConfigDir, "broker.conf")
+	configFile := path.Join(t.BrokerConfigDir, brokerConfigFile)
 	configuration, err := readBrokerConfig(configFile)
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -176,21 +194,6 @@ func (t *Trigger) UpdateBrokerConfig() error {
 		configuration.Triggers[t.Name] = *t
 	}
 	return writeBrokerConfig(configFile, &configuration)
-}
-
-func (t *Trigger) UpdateManifest() error {
-	m := manifest.New(path.Join(t.BrokerConfigDir, manifestFile))
-	if err := m.Read(); err != nil {
-		return fmt.Errorf("manifest read: %w", err)
-	}
-	o, err := t.AsK8sObject()
-	if err != nil {
-		return fmt.Errorf("trigger object: %w", err)
-	}
-	if dirty := m.Add(o); dirty {
-		return m.Write()
-	}
-	return nil
 }
 
 func (f *Filter) String() (string, error) {
@@ -219,4 +222,23 @@ func writeBrokerConfig(path string, configuration *Configuration) error {
 		return fmt.Errorf("marshal broker configuration: %w", err)
 	}
 	return os.WriteFile(path, out, os.ModePerm)
+}
+
+func CreateTrigger(name, targetName, port, broker, configBase string, filter *Filter) error {
+	if name == "" {
+		filterString, err := filter.String()
+		if err != nil {
+			return fmt.Errorf("filter: %w", err)
+		}
+		// in case of event types hash collision, replace with sha256
+		hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", targetName, filterString)))
+		name = fmt.Sprintf("%s-trigger-%s", broker, hex.EncodeToString(hash[:4]))
+	}
+	tr := NewTrigger(name, broker, configBase, filter)
+	tr.(*Trigger).SetTarget(targetName, fmt.Sprintf("http://host.docker.internal:%s", port))
+	if err := tr.(*Trigger).UpdateBrokerConfig(); err != nil {
+		return fmt.Errorf("broker config: %w", err)
+	}
+	_, err := tr.Add(path.Join(configBase, broker, manifestFile))
+	return err
 }

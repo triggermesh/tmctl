@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/triggermesh/tmctl/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
@@ -73,7 +74,7 @@ func ListEventTypes(manifestFile, crdFile string) []string {
 	for _, object := range m.Objects {
 		if strings.HasPrefix(object.APIVersion, "sources.triggermesh.io") {
 			s := source.New(object.Metadata.Name, crdFile, object.Kind, "", "", object.Spec)
-			et, err := s.GetEventTypes()
+			et, err := s.(triggermesh.Producer).GetEventTypes()
 			if err != nil {
 				continue
 			}

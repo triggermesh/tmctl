@@ -31,6 +31,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/output"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
 )
@@ -96,7 +97,6 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 
 func (o *CreateOptions) transformation(name, target, file string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
-	manifestFile := path.Join(o.ConfigBase, o.Context, manifestFile)
 
 	var targetPort string
 	if target != "" {
@@ -108,7 +108,14 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 	}
 
 	for _, source := range eventSourcesFilter {
-		et, err := o.producersEventTypes(source)
+		s, err := components.GetObject(source, o.CRD, o.Version, o.Manifest)
+		if err != nil {
+			return fmt.Errorf("%q event types: %w", source, err)
+		}
+		if _, ok := s.(triggermesh.Producer); !ok {
+			return fmt.Errorf("%q is not an event producer", source)
+		}
+		et, err := s.(triggermesh.Producer).GetEventTypes()
 		if err != nil {
 			return fmt.Errorf("%q event types: %w", source, err)
 		}
@@ -133,25 +140,25 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 		return fmt.Errorf("decode spec: %w", err)
 	}
 	t := transformation.New(name, o.CRD, "transformation", o.Context, o.Version, spec)
-	if et, _ := t.GetEventTypes(); len(et) == 0 {
-		if err := t.SetEventType(fmt.Sprintf("%s.output", t.Name)); err != nil {
+	if et, _ := t.(triggermesh.Producer).GetEventTypes(); len(et) == 0 {
+		if err := t.(triggermesh.Producer).SetEventType(fmt.Sprintf("%s.output", t.GetName())); err != nil {
 			return fmt.Errorf("setting event type: %w", err)
 		}
 	}
 	log.Println("Updating manifest")
-	restart, err := triggermesh.WriteObject(t, manifestFile)
+	restart, err := t.Add(o.Manifest)
 	if err != nil {
 		return err
 	}
 	log.Println("Starting container")
-	container, err := triggermesh.Start(ctx, t, restart, nil)
+	container, err := t.(triggermesh.Runnable).Start(ctx, nil, restart)
 	if err != nil {
 		return err
 	}
 
 	targetTriggers := make(map[string]tmbroker.Trigger)
 	if target != "" {
-		transformationEventTypes, err := t.GetEventTypes()
+		transformationEventTypes, err := t.(triggermesh.Producer).GetEventTypes()
 		if err != nil {
 			return fmt.Errorf("transformation event type: %w", err)
 		}
@@ -162,7 +169,7 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 
 	for _, et := range eventTypesFilter {
 		filter := tmbroker.FilterExactType(et)
-		if err := o.createTrigger("", container.Name, container.HostPort(), filter); err != nil {
+		if err := tmbroker.CreateTrigger("", container.Name, container.HostPort(), o.Context, o.ConfigBase, filter); err != nil {
 			return err
 		}
 		for _, trigger := range targetTriggers {
@@ -178,7 +185,8 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 			if err := trigger.RemoveTriggerFromConfig(); err != nil {
 				return err
 			}
-			if err := triggermesh.RemoveObject(trigger.Name, manifestFile); err != nil {
+
+			if err := trigger.Delete(o.Manifest); err != nil {
 				return err
 			}
 		}
@@ -190,7 +198,7 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 			if err := trigger.UpdateBrokerConfig(); err != nil {
 				return err
 			}
-			if err := trigger.UpdateManifest(); err != nil {
+			if _, err := trigger.Add(o.Manifest); err != nil {
 				return err
 			}
 		}
@@ -225,7 +233,8 @@ func readInput() (string, error) {
 }
 
 func (o *CreateOptions) lookupTarget(ctx context.Context, target string) (string, error) {
-	targetObject, err := o.getObject(target)
+	manifestPath := path.Join(o.ConfigBase, o.Context, manifestFile)
+	targetObject, err := components.GetObject(target, o.CRD, o.Version, manifestPath)
 	if err != nil {
 		return "", fmt.Errorf("transformation target: %w", err)
 	}
@@ -242,7 +251,7 @@ func (o *CreateOptions) updateTargetTriggers(target, targetPort string, transfor
 		return nil, fmt.Errorf("target triggers: %w", err)
 	}
 	for _, et := range transformationEventTypes {
-		if err := o.createTrigger("", target, targetPort, tmbroker.FilterExactType(et)); err != nil {
+		if err := tmbroker.CreateTrigger("", target, targetPort, o.Context, o.ConfigBase, tmbroker.FilterExactType(et)); err != nil {
 			return nil, fmt.Errorf("create trigger: %w", err)
 		}
 	}

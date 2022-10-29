@@ -146,7 +146,7 @@ func DescribeTarget(targets []triggermesh.Component, containers []*docker.Contai
 	fmt.Fprintln(w)
 }
 
-func DescribeTrigger(triggers []*tmbroker.Trigger) {
+func DescribeTrigger(triggers []triggermesh.Component) {
 	if len(triggers) == 0 {
 		return
 	}
@@ -154,13 +154,13 @@ func DescribeTrigger(triggers []*tmbroker.Trigger) {
 	fmt.Fprintln(w, "Trigger\tTarget\tFilter")
 	for _, trigger := range triggers {
 		var filters []string
-		for _, filter := range trigger.GetFilters() {
+		for _, filter := range trigger.(*tmbroker.Trigger).GetFilters() {
 			filters = append(filters, triggerFilterToString(filter))
 		}
 		if len(filters) == 0 {
 			filters = []string{"*"}
 		}
-		fmt.Fprintf(w, "%s\t%v\t%v\n", trigger.Name, trigger.Target.Component, strings.Join(filters, ", "))
+		fmt.Fprintf(w, "%s\t%v\t%v\n", trigger.GetName(), trigger.(*tmbroker.Trigger).GetTarget().Component, strings.Join(filters, ", "))
 	}
 	fmt.Fprintln(w)
 }

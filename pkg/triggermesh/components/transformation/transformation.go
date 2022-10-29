@@ -24,6 +24,7 @@ import (
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
+	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 )
@@ -41,33 +42,57 @@ type Transformation struct {
 	Broker  string
 	Version string
 
-	image string
-	spec  map[string]interface{}
+	spec map[string]interface{}
 }
 
-func (t *Transformation) AsUnstructured() (unstructured.Unstructured, error) {
-	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
+func (t *Transformation) asUnstructured() (unstructured.Unstructured, error) {
+	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec, nil)
 }
 
-func (t *Transformation) AsK8sObject() (kubernetes.Object, error) {
+func (t *Transformation) asK8sObject() (kubernetes.Object, error) {
 	return kubernetes.CreateObject(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
 }
 
-func (t *Transformation) AsContainer(additionalEnvs map[string]string) (*docker.Container, error) {
-	o, err := t.AsUnstructured()
+func (t *Transformation) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {
+	o, err := t.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
-	t.image = adapter.Image(o, t.Version)
-	co, ho, err := adapter.RuntimeParams(o, t.image, additionalEnvs)
+	image := adapter.Image(o, t.Version)
+	co, ho, err := adapter.RuntimeParams(o, image, additionalEnvs)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
 	return &docker.Container{
 		Name:                   t.GetName(),
+		Image:                  image,
 		CreateHostOptions:      ho,
 		CreateContainerOptions: co,
 	}, nil
+}
+
+func (t *Transformation) Add(manifestPath string) (bool, error) {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
+		return false, err
+	}
+	o, err := t.asK8sObject()
+	if err != nil {
+		return false, err
+	}
+	if dirty := manifest.Add(o); !dirty {
+		return false, nil
+	}
+	return true, manifest.Write()
+}
+
+func (t *Transformation) Delete(manifestPath string) error {
+	manifest := manifest.New(manifestPath)
+	if err := manifest.Read(); err != nil {
+		return err
+	}
+	manifest.Remove(t.Name, t.GetKind())
+	return manifest.Write()
 }
 
 func (t *Transformation) GetName() string {
@@ -76,10 +101,6 @@ func (t *Transformation) GetName() string {
 
 func (t *Transformation) GetKind() string {
 	return "transformation"
-}
-
-func (t *Transformation) GetImage() string {
-	return t.image
 }
 
 func (t *Transformation) GetSpec() map[string]interface{} {
@@ -105,7 +126,7 @@ func (t *Transformation) SetEventType(eventType string) error {
 			},
 		},
 	}
-	u, err := t.AsUnstructured()
+	u, err := t.asUnstructured()
 	if err != nil {
 		return err
 	}
@@ -130,21 +151,50 @@ func (t *Transformation) SetEventType(eventType string) error {
 }
 
 func (t *Transformation) GetPort(ctx context.Context) (string, error) {
-	client, err := docker.NewClient()
-	if err != nil {
-		return "", fmt.Errorf("docker client: %w", err)
-	}
-	container, err := t.AsContainer(nil)
+	container, err := t.Info(ctx)
 	if err != nil {
 		return "", fmt.Errorf("container object: %w", err)
-	}
-	if container, err = container.LookupHostConfig(ctx, client); err != nil {
-		return "", fmt.Errorf("container runtime config: %w", err)
 	}
 	return container.HostPort(), nil
 }
 
-func New(name, crdFile, kind, broker, version string, spec map[string]interface{}) *Transformation {
+func (t *Transformation) Start(ctx context.Context, additionalEnvs map[string]string, restart bool) (*docker.Container, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("docker client: %w", err)
+	}
+	container, err := t.asContainer(additionalEnvs)
+	if err != nil {
+		return nil, fmt.Errorf("container object: %w", err)
+	}
+	return container.Start(ctx, client, restart)
+}
+
+func (t *Transformation) Stop(ctx context.Context) error {
+	client, err := docker.NewClient()
+	if err != nil {
+		return fmt.Errorf("docker client: %w", err)
+	}
+	container, err := t.asContainer(nil)
+	if err != nil {
+		return fmt.Errorf("container object: %w", err)
+	}
+	return container.Remove(ctx, client)
+}
+
+func (t *Transformation) Info(ctx context.Context) (*docker.Container, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("docker client: %w", err)
+	}
+	container, err := t.asContainer(nil)
+	if err != nil {
+		return nil, fmt.Errorf("container object: %w", err)
+	}
+	return container.LookupHostConfig(ctx, client)
+}
+
+func New(name, crdFile, kind, broker, version string, spec map[string]interface{}) triggermesh.Component {
 	if name == "" {
 		name = fmt.Sprintf("%s-transformation", broker)
 	}
@@ -161,7 +211,7 @@ func New(name, crdFile, kind, broker, version string, spec map[string]interface{
 // getEventTypeTransformation return the value of "Add" transformation
 // applied on context's "type" attribute. Does not support complex tramsformations.
 func (t *Transformation) getEventTypeTransformation() ([]string, error) {
-	u, err := t.AsUnstructured()
+	u, err := t.asUnstructured()
 	if err != nil {
 		return []string{}, err
 	}

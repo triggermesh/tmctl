@@ -25,7 +25,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/triggermesh/tmctl/pkg/completion"
+	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
@@ -62,15 +64,27 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 }
 
 func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilter []string, target string) error {
+	manifest := manifest.New(path.Join(o.ConfigBase, o.Context, manifestFile))
+	if err := manifest.Read(); err != nil {
+		return fmt.Errorf("manifest read: %w", err)
+	}
+
 	for _, source := range eventSourcesFilter {
-		et, err := o.producersEventTypes(source)
+		s, err := components.GetObject(source, o.CRD, o.Version, o.Manifest)
 		if err != nil {
-			return fmt.Errorf("event types filter: %w", err)
+			return fmt.Errorf("%q event types: %w", source, err)
+		}
+		if _, ok := s.(triggermesh.Producer); !ok {
+			return fmt.Errorf("%q is not an event producer", source)
+		}
+		et, err := s.(triggermesh.Producer).GetEventTypes()
+		if err != nil {
+			return fmt.Errorf("%q event types: %w", source, err)
 		}
 		eventTypesFilter = append(eventTypesFilter, et...)
 	}
 
-	component, err := o.getObject(target)
+	component, err := components.GetObject(target, o.CRD, o.Version, o.Manifest)
 	if err != nil {
 		return fmt.Errorf("%q not found: %w", target, err)
 	}
@@ -87,10 +101,10 @@ func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 
 	log.Println("Creating trigger")
 	if len(eventTypesFilter) == 0 {
-		return o.createTrigger(name, component.GetName(), port, nil)
+		return tmbroker.CreateTrigger(name, component.GetName(), port, o.Context, o.ConfigBase, nil)
 	}
 	for _, et := range eventTypesFilter {
-		if err := o.createTrigger(name, component.GetName(), port, tmbroker.FilterExactType(et)); err != nil {
+		if err := tmbroker.CreateTrigger(name, component.GetName(), port, o.Context, o.ConfigBase, tmbroker.FilterExactType(et)); err != nil {
 			return err
 		}
 	}
