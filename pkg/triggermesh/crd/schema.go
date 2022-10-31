@@ -50,7 +50,6 @@ func GetSchema(schema map[string]interface{}) (*Schema, error) {
 func (s *Schema) Process(spec map[string]interface{}) (map[string]interface{}, error) {
 	for k, v := range spec {
 		schemaKey, exists := s.schema.Properties[k]
-		// Consider support for unknown variables
 		if !exists {
 			return nil, fmt.Errorf("property %q does not exist, available values are: %s",
 				k, propertyKeysAsString(s.schema.Properties))
@@ -75,7 +74,14 @@ func (s *Schema) Process(spec map[string]interface{}) (map[string]interface{}, e
 			}
 			switch schemaKey.Type[0] {
 			case "array":
-				spec[k] = strings.Split(value, ",")
+				values := strings.Split(value, " ")
+				if len(values) == 1 {
+					values = strings.Split(value, ",")
+				}
+				spec[k] = values
+			case "integer":
+				integer, _ := strconv.Atoi(value) // let the CRD validation complain about the type
+				spec[k] = integer
 			case "boolean":
 				spec[k] = (value == "true")
 			case "object":

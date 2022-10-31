@@ -89,7 +89,7 @@ func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructure
 		if err := externalpubsub.EnsureSubscription(ctx, client); err != nil {
 			return nil, err
 		}
-		return map[string]interface{}{"subscription": o.Status.Subscription}, nil
+		return map[string]interface{}{"subscription": o.Status.Subscription.String()}, nil
 	}
 	return nil, nil
 }
