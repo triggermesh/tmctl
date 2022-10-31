@@ -67,27 +67,22 @@ func (o *CreateOptions) initialize() {
 	o.CRD = crds
 }
 
-func parse(args []string) (string, []string, error) {
-	if l := len(args); l < 1 {
-		return "", []string{}, fmt.Errorf("expected at least 2 arguments, got %d", l)
-	}
-	return args[0], args[1:], nil
-}
-
-func parameterFromArgs(parameter string, args []string) (string, []string) {
-	var value, newArgs []string
+func argsToMap(args []string) map[string]string {
+	result := make(map[string]string)
 	for k := 0; k < len(args); k++ {
-		if strings.HasPrefix(args[k], "--"+parameter) {
+		if strings.HasPrefix(args[k], "--") {
+			key := strings.TrimLeft(args[k], "-")
+			var value string
 			if kv := strings.Split(args[k], "="); len(kv) == 2 {
-				value = []string{kv[1]}
+				value = kv[1]
 			}
 			for j := k + 1; j < len(args) && !strings.HasPrefix(args[j], "--"); j++ {
-				value = append(value, args[j])
+				value = fmt.Sprintf("%s %s", value, args[j])
 				k = j
 			}
+			result[key] = strings.TrimSpace(value)
 			continue
 		}
-		newArgs = append(newArgs, args[k])
 	}
-	return strings.Join(value, ","), newArgs
+	return result
 }

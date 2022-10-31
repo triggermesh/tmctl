@@ -17,52 +17,27 @@ limitations under the License.
 package pkg
 
 import (
-	"fmt"
-	"strconv"
 	"strings"
 )
 
-func ParseArgs(args []string) map[string]interface{} {
-	var key string
-	var value interface{}
-	s := make(map[string]interface{}, len(args))
-	for k := 0; k < len(args); k++ {
-		v := strings.TrimLeft(args[k], "-")
-		if kv := strings.Split(v, "="); len(kv) == 2 {
-			key = kv[0]
-			value = kv[1]
-		} else {
-			if len(args) > k+1 && !strings.HasPrefix(args[k+1], "--") {
-				key = v
-				value = args[k+1]
-				k++
-			} else {
-				key = v
-				value = true
-			}
-		}
-		if str, ok := value.(string); ok {
-			if valInt, err := strconv.Atoi(str); err == nil {
-				value = int64(valInt)
-			}
-		}
+func ParseArgs(args map[string]string) map[string]interface{} {
+	result := make(map[string]interface{}, len(args))
+	for key, value := range args {
 		keys := strings.Split(key, ".")
 		if len(keys) == 1 {
-			s[key] = value
-		} else {
-			nestedMap := ParseArgs([]string{fmt.Sprintf("--%s=%v", strings.Join(keys[1:], "."), value)})
-			if val, exists := s[keys[0]]; exists {
-				if _, ok := val.(map[string]interface{}); ok {
-					s[keys[0]] = mergeMaps(nestedMap, val.(map[string]interface{}))
-				} else {
-					s[keys[0]] = nestedMap
-				}
-			} else {
-				s[keys[0]] = nestedMap
-			}
+			result[key] = value
+			continue
 		}
+		result = mergeMaps(result, nestedMap(keys, value))
 	}
-	return s
+	return result
+}
+
+func nestedMap(key []string, value string) map[string]interface{} {
+	if len(key) == 1 {
+		return map[string]interface{}{key[0]: value}
+	}
+	return map[string]interface{}{key[0]: nestedMap(key[1:], value)}
 }
 
 func mergeMaps(src, dst map[string]interface{}) map[string]interface{} {

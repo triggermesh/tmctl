@@ -52,21 +52,22 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 				fmt.Printf("\nAvailable source kinds:\n---\n%s\n", strings.Join(sources, "\n"))
 				return nil
 			}
-			kind, args, err := parse(args)
-			if err != nil {
-				return err
+			params := argsToMap(args[1:])
+			var name string
+			if n, exists := params["name"]; exists {
+				name = n
+				delete(params, "name")
 			}
-			name, args := parameterFromArgs("name", args)
-			version, args := parameterFromArgs("version", args)
-			if version != "" {
-				o.Version = version
+			if v, exists := params["version"]; exists {
+				o.Version = v
+				delete(params, "version")
 			}
-			return o.source(name, kind, args)
+			return o.source(name, args[0], params)
 		},
 	}
 }
 
-func (o *CreateOptions) source(name, kind string, args []string) error {
+func (o *CreateOptions) source(name, kind string, params map[string]string) error {
 	ctx := context.Background()
 
 	broker, err := tmbroker.New(o.Context, path.Join(o.Manifest))
@@ -77,10 +78,9 @@ func (o *CreateOptions) source(name, kind string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("broker offline: %v", err)
 	}
+	params["sink.uri"] = "http://host.docker.internal:" + port
 
-	spec := append(args, fmt.Sprintf("--sink.uri=http://host.docker.internal:%s", port))
-
-	s := source.New(name, o.CRD, kind, o.Context, o.Version, spec)
+	s := source.New(name, o.CRD, kind, o.Context, o.Version, params)
 
 	secretEnv, secretsChanged, err := triggermesh.ProcessSecrets(ctx, s.(triggermesh.Parent), o.Manifest)
 	if err != nil {

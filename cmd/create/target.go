@@ -52,30 +52,37 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 				fmt.Printf("\nAvailable target kinds:\n---\n%s\n", strings.Join(targets, "\n"))
 				return nil
 			}
-			kind, args, err := parse(args)
-			if err != nil {
-				return err
+			params := argsToMap(args[1:])
+			var name string
+			if n, exists := params["name"]; exists {
+				name = n
+				delete(params, "name")
 			}
-			name, args := parameterFromArgs("name", args)
-			version, args := parameterFromArgs("version", args)
-			if version != "" {
-				o.Version = version
+			if v, exists := params["version"]; exists {
+				o.Version = v
+				delete(params, "version")
 			}
-			eventSourcesFilter, args := parameterFromArgs("source", args)
-			eventTypesFilter, args := parameterFromArgs("eventTypes", args)
-			var typeFilter, sourceFilter []string
-			if eventTypesFilter != "" {
-				typeFilter = strings.Split(eventTypesFilter, ",")
+			var eventSourcesFilter, eventTypesFilter []string
+			if sf, exists := params["source"]; exists {
+				eventSourcesFilter = strings.Split(sf, ",")
+				if len(eventSourcesFilter) == 1 {
+					eventSourcesFilter = strings.Split(sf, " ")
+				}
+				delete(params, "source")
 			}
-			if eventSourcesFilter != "" {
-				sourceFilter = strings.Split(eventSourcesFilter, ",")
+			if tf, exists := params["eventTypes"]; exists {
+				eventTypesFilter = strings.Split(tf, ",")
+				if len(eventTypesFilter) == 1 {
+					eventTypesFilter = strings.Split(tf, " ")
+				}
+				delete(params, "eventTypes")
 			}
-			return o.target(name, kind, args, sourceFilter, typeFilter)
+			return o.target(name, args[0], params, eventSourcesFilter, eventTypesFilter)
 		},
 	}
 }
 
-func (o *CreateOptions) target(name, kind string, args []string, eventSourcesFilter, eventTypesFilter []string) error {
+func (o *CreateOptions) target(name, kind string, args map[string]string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
 
 	for _, source := range eventSourcesFilter {

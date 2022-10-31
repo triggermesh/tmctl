@@ -218,8 +218,8 @@ func (s *Source) UpdateStatus(status map[string]interface{}) {
 func New(name, crdFile, kind, broker, version string, params interface{}) triggermesh.Component {
 	var spec map[string]interface{}
 	switch p := params.(type) {
-	case []string:
-		// args slice
+	case map[string]string:
+		// cli args
 		spec = pkg.ParseArgs(p)
 	case map[string]interface{}:
 		// spec map
