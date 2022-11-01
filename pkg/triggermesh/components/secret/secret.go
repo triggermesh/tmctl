@@ -17,8 +17,6 @@ limitations under the License.
 package secret
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
@@ -33,24 +31,13 @@ type Secret struct {
 	data map[string]string
 }
 
-func (s *Secret) asUnstructured() (unstructured.Unstructured, error) {
-	u := unstructured.Unstructured{}
-	u.SetAPIVersion("v1")
-	u.SetKind(s.GetKind())
-	u.SetName(s.Name)
-	u.SetLabels(map[string]string{"context": s.Context})
-	if err := unstructured.SetNestedField(u.Object, "Opaque", "type"); err != nil {
-		return unstructured.Unstructured{}, err
-	}
-	return u, unstructured.SetNestedStringMap(u.Object, s.data, "data")
-}
-
 func (s *Secret) asK8sObject() (kubernetes.Object, error) {
 	return kubernetes.Object{
 		APIVersion: "v1",
 		Kind:       s.GetKind(),
 		Metadata: kubernetes.Metadata{
-			Name: s.Name,
+			Name:      s.Name,
+			Namespace: triggermesh.Namespace,
 			Labels: map[string]string{
 				"triggermesh.io/context": s.Context,
 			},

@@ -25,6 +25,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const Namespace = "local"
+
 func secretToEnv(secret Component) ([]corev1.EnvVar, error) {
 	if kind := secret.GetKind(); kind != "Secret" {
 		return []corev1.EnvVar{}, fmt.Errorf("%q is not convertable to env variables", kind)
