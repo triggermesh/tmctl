@@ -28,10 +28,12 @@ import (
 	sourcesv1alpha1 "github.com/triggermesh/triggermesh/pkg/apis/sources/v1alpha1"
 	externalawseb "github.com/triggermesh/triggermesh/pkg/sources/reconciler/awseventbridgesource"
 	externalawss3 "github.com/triggermesh/triggermesh/pkg/sources/reconciler/awss3source"
+	externalazureservicebus "github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureservicebustopicsource"
 	externalpubsub "github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudpubsubsource"
 
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/awseventbridgesource"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/awss3source"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/azureservicebustopicsource"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/googlepubsubsource"
 )
 
@@ -91,6 +93,30 @@ func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructure
 			return nil, err
 		}
 		return map[string]interface{}{"subscription": o.Status.Subscription.String()}, nil
+	case "AzureServiceBusTopicSource":
+		var o *sourcesv1alpha1.AzureServiceBusTopicSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return nil, err
+		}
+		ctx = commonv1alpha1.WithReconcilable(ctx, o)
+		client, err := azureservicebustopicsource.Client(o, secrets)
+		if err != nil {
+			return nil, err
+		}
+		if err := externalazureservicebus.EnsureSubscription(ctx, client); err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"subscriptionID": o.Status.SubscriptionID}, nil
+	case "AzureActivityLogsSource",
+		"AzureBlobStorageSource",
+		"AzureEventGridSource",
+		"GoogleCloudAuditLogsSource",
+		"GoogleCloudBillingSource",
+		"GoogleCloudIoTSource",
+		"GoogleCloudSourceRepositoriesSource",
+		"GoogleCloudStorageSource",
+		"ZendeskSource":
+		return nil, fmt.Errorf("this component is not suitable for local env yet")
 	}
 	return nil, nil
 }
@@ -145,6 +171,27 @@ func Finalize(ctx context.Context, object unstructured.Unstructured, secrets map
 		if err.Error() != fmt.Sprintf("Unsubscribed from topic %q", o.Spec.Topic) {
 			return err
 		}
+	case "AzureServiceBusTopicSource":
+		var o *sourcesv1alpha1.AzureServiceBusTopicSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return err
+		}
+		ctx = commonv1alpha1.WithReconcilable(ctx, o)
+		client, err := azureservicebustopicsource.Client(o, secrets)
+		if err != nil {
+			return err
+		}
+		return externalazureservicebus.EnsureNoSubscription(ctx, client)
+	case "AzureActivityLogsSource",
+		"AzureBlobStorageSource",
+		"AzureEventGridSource",
+		"GoogleCloudAuditLogsSource",
+		"GoogleCloudBillingSource",
+		"GoogleCloudIoTSource",
+		"GoogleCloudSourceRepositoriesSource",
+		"GoogleCloudStorageSource",
+		"ZendeskSource":
+		return fmt.Errorf("this component is not suitable for local env yet")
 	}
 	return nil
 }

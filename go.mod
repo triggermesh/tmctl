@@ -8,7 +8,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.12.0
-	github.com/triggermesh/triggermesh v1.21.2-0.20221027132042-fd630d7c47c3
+	github.com/triggermesh/triggermesh v1.21.2-0.20221101104234-937dd0b32de9
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.23.9
 	k8s.io/apimachinery v0.23.9
