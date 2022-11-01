@@ -75,7 +75,8 @@ func (t *Trigger) asK8sObject() (kubernetes.Object, error) {
 		APIVersion: "eventing.triggermesh.io/v1alpha1",
 		Kind:       "Trigger",
 		Metadata: kubernetes.Metadata{
-			Name: t.Name,
+			Name:      t.Name,
+			Namespace: triggermesh.Namespace,
 			Labels: map[string]string{
 				"triggermesh.io/context": t.Broker,
 			},

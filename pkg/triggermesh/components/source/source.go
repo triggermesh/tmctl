@@ -56,11 +56,11 @@ type Source struct {
 }
 
 func (s *Source) asUnstructured() (unstructured.Unstructured, error) {
-	return kubernetes.CreateUnstructured(s.GetKind(), s.GetName(), s.Broker, s.CRDFile, s.spec, s.status)
+	return kubernetes.CreateUnstructured(s.GetKind(), s.GetName(), triggermesh.Namespace, s.Broker, s.CRDFile, s.spec, s.status)
 }
 
 func (s *Source) asK8sObject() (kubernetes.Object, error) {
-	return kubernetes.CreateObject(s.GetKind(), s.GetName(), s.Broker, s.CRDFile, s.spec)
+	return kubernetes.CreateObject(s.GetKind(), s.GetName(), triggermesh.Namespace, s.Broker, s.CRDFile, s.spec)
 }
 
 func (s *Source) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {

@@ -18,6 +18,7 @@ package reconciler
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -140,7 +141,10 @@ func Finalize(ctx context.Context, object unstructured.Unstructured, secrets map
 		if err != nil {
 			return err
 		}
-		return externalpubsub.EnsureNoSubscription(ctx, client)
+		err = externalpubsub.EnsureNoSubscription(ctx, client) // err is never nil
+		if err.Error() != fmt.Sprintf("Unsubscribed from topic %q", o.Spec.Topic) {
+			return err
+		}
 	}
 	return nil
 }

@@ -52,7 +52,7 @@ type Metadata struct {
 	} `yaml:"ownerReferences,omitempty"`
 }
 
-func CreateObject(resource, name, broker, crdFile string, spec map[string]interface{}) (Object, error) {
+func CreateObject(resource, name, namespace, broker, crdFile string, spec map[string]interface{}) (Object, error) {
 	crdObject, err := crd.GetResourceCRD(resource, crdFile)
 	if err != nil {
 		return Object{}, fmt.Errorf("CRD schema not found: %w", err)
@@ -71,7 +71,8 @@ func CreateObject(resource, name, broker, crdFile string, spec map[string]interf
 		APIVersion: fmt.Sprintf("%s/%s", crdObject.Spec.Group, version),
 		Kind:       crdObject.Spec.Names.Kind,
 		Metadata: Metadata{
-			Name: name,
+			Name:      name,
+			Namespace: namespace,
 			Labels: map[string]string{
 				labelKey: broker,
 			},
@@ -80,7 +81,7 @@ func CreateObject(resource, name, broker, crdFile string, spec map[string]interf
 	}, nil
 }
 
-func CreateUnstructured(resource, name, broker, crdFile string, spec map[string]interface{}, status map[string]interface{}) (unstructured.Unstructured, error) {
+func CreateUnstructured(resource, name, namespace, broker, crdFile string, spec map[string]interface{}, status map[string]interface{}) (unstructured.Unstructured, error) {
 	crdObject, err := crd.GetResourceCRD(resource, crdFile)
 	if err != nil {
 		return unstructured.Unstructured{}, fmt.Errorf("CRD schema not found: %w", err)
@@ -99,6 +100,7 @@ func CreateUnstructured(resource, name, broker, crdFile string, spec map[string]
 	u.SetAPIVersion(fmt.Sprintf("%s/%s", crdObject.Spec.Group, version))
 	u.SetKind(crdObject.Spec.Names.Kind)
 	u.SetName(name)
+	u.SetNamespace(namespace)
 	u.SetLabels(map[string]string{labelKey: broker})
 	for k, v := range spec {
 		switch val := v.(type) {

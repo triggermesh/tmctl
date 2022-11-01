@@ -59,6 +59,7 @@ func (b *Broker) asUnstructured() (unstructured.Unstructured, error) {
 	u.SetAPIVersion("eventing.triggermesh.io/v1alpha1")
 	u.SetKind("Broker")
 	u.SetName(b.Name)
+	u.SetNamespace(triggermesh.Namespace)
 	u.SetLabels(map[string]string{"context": b.Name})
 	return u, unstructured.SetNestedField(u.Object, nil, "spec")
 }
@@ -68,7 +69,8 @@ func (b *Broker) asK8sObject() (kubernetes.Object, error) {
 		APIVersion: "eventing.triggermesh.io/v1alpha1",
 		Kind:       "Broker",
 		Metadata: kubernetes.Metadata{
-			Name: b.Name,
+			Name:      b.Name,
+			Namespace: triggermesh.Namespace,
 			Labels: map[string]string{
 				"triggermesh.io/context": b.Name,
 			},

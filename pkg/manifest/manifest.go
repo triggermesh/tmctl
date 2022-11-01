@@ -60,6 +60,7 @@ func (m *Manifest) Write() error {
 }
 
 func (m *Manifest) Add(object kubernetes.Object) bool {
+	object.Metadata.Namespace = "" // local manifest should not set namespace
 	for i, o := range m.Objects {
 		if matchObjects(object, o) {
 			if !reflect.DeepEqual(o, object) {

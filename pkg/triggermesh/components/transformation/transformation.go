@@ -46,11 +46,11 @@ type Transformation struct {
 }
 
 func (t *Transformation) asUnstructured() (unstructured.Unstructured, error) {
-	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec, nil)
+	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), triggermesh.Namespace, t.Broker, t.CRDFile, t.spec, nil)
 }
 
 func (t *Transformation) asK8sObject() (kubernetes.Object, error) {
-	return kubernetes.CreateObject(t.GetKind(), t.GetName(), t.Broker, t.CRDFile, t.spec)
+	return kubernetes.CreateObject(t.GetKind(), t.GetName(), triggermesh.Namespace, t.Broker, t.CRDFile, t.spec)
 }
 
 func (t *Transformation) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {
