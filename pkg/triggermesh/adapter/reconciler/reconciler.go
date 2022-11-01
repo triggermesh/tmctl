@@ -28,12 +28,13 @@ import (
 	sourcesv1alpha1 "github.com/triggermesh/triggermesh/pkg/apis/sources/v1alpha1"
 	externalawseb "github.com/triggermesh/triggermesh/pkg/sources/reconciler/awseventbridgesource"
 	externalawss3 "github.com/triggermesh/triggermesh/pkg/sources/reconciler/awss3source"
+	externalazureblobstorage "github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureblobstoragesource"
 	externalazureservicebus "github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureservicebustopicsource"
 	externalpubsub "github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudpubsubsource"
 
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/awseventbridgesource"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/awss3source"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/azureservicebustopicsource"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/azure"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external/googlepubsubsource"
 )
 
@@ -99,16 +100,35 @@ func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructure
 			return nil, err
 		}
 		ctx = commonv1alpha1.WithReconcilable(ctx, o)
-		client, err := azureservicebustopicsource.Client(o, secrets)
+		authorizer, err := azure.Client(secrets)
 		if err != nil {
 			return nil, err
 		}
+		client := azure.ServiceBus(o, authorizer)
 		if err := externalazureservicebus.EnsureSubscription(ctx, client); err != nil {
 			return nil, err
 		}
 		return map[string]interface{}{"subscriptionID": o.Status.SubscriptionID}, nil
+	case "AzureBlobStorageSource":
+		var o *sourcesv1alpha1.AzureBlobStorageSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return nil, err
+		}
+		ctx = commonv1alpha1.WithReconcilable(ctx, o)
+		authorizer, err := azure.Client(secrets)
+		if err != nil {
+			return nil, err
+		}
+		subsAPI, hubsAPI := azure.BlobStorage(o, authorizer)
+		eventHubID, err := externalazureblobstorage.EnsureEventHub(ctx, hubsAPI)
+		if err != nil {
+			return nil, err
+		}
+		if err := externalazureblobstorage.EnsureEventSubscription(ctx, subsAPI, eventHubID); err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"eventHubID": eventHubID}, nil
 	case "AzureActivityLogsSource",
-		"AzureBlobStorageSource",
 		"AzureEventGridSource",
 		"GoogleCloudAuditLogsSource",
 		"GoogleCloudBillingSource",
@@ -177,13 +197,28 @@ func Finalize(ctx context.Context, object unstructured.Unstructured, secrets map
 			return err
 		}
 		ctx = commonv1alpha1.WithReconcilable(ctx, o)
-		client, err := azureservicebustopicsource.Client(o, secrets)
+		authorizer, err := azure.Client(secrets)
 		if err != nil {
 			return err
 		}
+		client := azure.ServiceBus(o, authorizer)
 		return externalazureservicebus.EnsureNoSubscription(ctx, client)
+	case "AzureBlobStorageSource":
+		var o *sourcesv1alpha1.AzureBlobStorageSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return err
+		}
+		ctx = commonv1alpha1.WithReconcilable(ctx, o)
+		authorizer, err := azure.Client(secrets)
+		if err != nil {
+			return err
+		}
+		subsAPI, hubsAPI := azure.BlobStorage(o, authorizer)
+		if err := externalazureblobstorage.EnsureNoEventHub(ctx, hubsAPI); err != nil {
+			return err
+		}
+		return externalazureblobstorage.EnsureNoEventSubscription(ctx, subsAPI)
 	case "AzureActivityLogsSource",
-		"AzureBlobStorageSource",
 		"AzureEventGridSource",
 		"GoogleCloudAuditLogsSource",
 		"GoogleCloudBillingSource",

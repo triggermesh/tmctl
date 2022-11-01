@@ -14,21 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package azureservicebustopicsource
+package azure
 
 import (
 	"fmt"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/latest/servicebus/mgmt/servicebus"
+	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	autorestauth "github.com/Azure/go-autorest/autorest/azure/auth"
-
-	"github.com/triggermesh/triggermesh/pkg/apis/sources/v1alpha1"
-	"github.com/triggermesh/triggermesh/pkg/sources/auth"
-	"github.com/triggermesh/triggermesh/pkg/sources/client/azure/servicebustopics"
 )
 
-func Client(src *v1alpha1.AzureServiceBusTopicSource, secrets map[string]string) (servicebustopics.SubscriptionsClient, error) {
+func Client(secrets map[string]string) (autorest.Authorizer, error) {
 	tenantID, exists := secrets["tenantID"]
 	if !exists {
 		return nil, fmt.Errorf("\"tenantID\" spec value is missing")
@@ -41,7 +37,6 @@ func Client(src *v1alpha1.AzureServiceBusTopicSource, secrets map[string]string)
 	if !exists {
 		return nil, fmt.Errorf("\"clientSecret\" spec value is missing")
 	}
-
 	azureEnv := &azure.PublicCloud
 	authSettings := autorestauth.EnvironmentSettings{
 		Values: map[string]string{
@@ -52,15 +47,5 @@ func Client(src *v1alpha1.AzureServiceBusTopicSource, secrets map[string]string)
 		},
 		Environment: *azureEnv,
 	}
-
-	authorizer, err := authSettings.GetAuthorizer()
-	if err != nil {
-		// GetAuthorizer returns an untyped error when it is unable to
-		// obtain a non-empty value for any of the required auth settings.
-		return nil, auth.NewPermanentCredentialsError(err)
-	}
-
-	subsCli := servicebus.NewSubscriptionsClient(src.Spec.TopicID.SubscriptionID)
-	subsCli.Authorizer = authorizer
-	return subsCli, nil
+	return authSettings.GetAuthorizer()
 }

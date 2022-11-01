@@ -1370,6 +1370,8 @@ github.com/triggermesh/triggermesh v1.21.2-0.20221027132042-fd630d7c47c3 h1:D/i8
 github.com/triggermesh/triggermesh v1.21.2-0.20221027132042-fd630d7c47c3/go.mod h1:uhr9QhQeibNbDsEOcFi+X8J1V2X7UAIOb3AjsvK7Jmk=
 github.com/triggermesh/triggermesh v1.21.2-0.20221101104234-937dd0b32de9 h1:oeJvxtq/Se54yCbU0Y0KySJf9yCkmPs5PePOuyB6n5E=
 github.com/triggermesh/triggermesh v1.21.2-0.20221101104234-937dd0b32de9/go.mod h1:uhr9QhQeibNbDsEOcFi+X8J1V2X7UAIOb3AjsvK7Jmk=
+github.com/triggermesh/triggermesh v1.21.2-0.20221101113304-88aa2fea41e8 h1:AySZLwFtF043PoKz+QKvwtWdNlftiVqZ+8zu0r6r2gY=
+github.com/triggermesh/triggermesh v1.21.2-0.20221101113304-88aa2fea41e8/go.mod h1:uhr9QhQeibNbDsEOcFi+X8J1V2X7UAIOb3AjsvK7Jmk=
 github.com/tsenart/go-tsz v0.0.0-20180814232043-cdeb9e1e981e/go.mod h1:SWZznP1z5Ki7hDT2ioqiFKEse8K9tU2OUvaRI0NeGQo=
 github.com/tsenart/vegeta/v12 v12.8.4/go.mod h1:ZiJtwLn/9M4fTPdMY7bdbIeyNeFVE8/AHbWFqCsUuho=
 github.com/tv42/httpunix v0.0.0-20191220191345-2ba4b9c3382c/go.mod h1:hzIxponao9Kjc7aWznkXaL4U4TWaDSs8zcsY4Ka08nM=
