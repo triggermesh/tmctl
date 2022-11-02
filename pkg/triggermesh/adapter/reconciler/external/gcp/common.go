@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package googlepubsubsource
+package gcp
 
 import (
 	"context"
+	"fmt"
 
 	"cloud.google.com/go/pubsub"
 	"google.golang.org/api/option"
@@ -25,12 +26,19 @@ import (
 	sourcesv1alpha1 "github.com/triggermesh/triggermesh/pkg/apis/sources/v1alpha1"
 )
 
-func Client(src *sourcesv1alpha1.GoogleCloudPubSubSource, secrets map[string]string) (*pubsub.Client, error) {
-	project := src.Spec.Topic.Project
-	saKey := []byte{}
-	for _, v := range secrets {
-		saKey = []byte(v)
-		break
+func pubSubClient(ctx context.Context, spec sourcesv1alpha1.GoogleCloudSourcePubSubSpec, secrets map[string]string) (*pubsub.Client, option.ClientOption, error) {
+	saKey, exists := secrets["serviceAccountKey"]
+	if !exists {
+		return nil, nil, fmt.Errorf("\"serviceAccountKey\" is missing")
 	}
-	return pubsub.NewClient(context.Background(), project, option.WithCredentialsJSON(saKey))
+	credsCliOpt := option.WithCredentialsJSON([]byte(saKey))
+
+	var pubsubProject string
+	if project := spec.Project; project != nil {
+		pubsubProject = *project
+	} else if topic := spec.Topic; topic != nil {
+		pubsubProject = topic.Project
+	}
+	psCli, err := pubsub.NewClient(ctx, pubsubProject, credsCliOpt)
+	return psCli, credsCliOpt, fmt.Errorf("creating Google Cloud Pub/Sub API client: %w", err)
 }

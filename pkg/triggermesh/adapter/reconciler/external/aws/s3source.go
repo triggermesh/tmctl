@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package awss3source
+package aws
 
 import (
 	"fmt"
@@ -26,14 +26,13 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/aws/aws-sdk-go/service/sts"
 
-	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external"
 	sourcesv1alpha1 "github.com/triggermesh/triggermesh/pkg/apis/sources/v1alpha1"
 )
 
 const defaultS3Region = "us-east-1"
 
-func Client(src *sourcesv1alpha1.AWSS3Source, secrets map[string]string) (*s3.S3, *sqs.SQS, error) {
-	accessKey, secretKey, err := external.ReadSecret(secrets)
+func S3Client(src *sourcesv1alpha1.AWSS3Source, secrets map[string]string) (*s3.S3, *sqs.SQS, error) {
+	accessKey, secretKey, err := readSecret(secrets)
 	if err != nil {
 		return nil, nil, fmt.Errorf("secrets read: %w", err)
 	}

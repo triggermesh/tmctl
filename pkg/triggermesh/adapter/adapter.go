@@ -35,8 +35,18 @@ const (
 func Image(object unstructured.Unstructured, version string) string {
 	// components with custom images
 	switch object.GetKind() {
-	case "AWSS3Source":
+	case "AWSS3Source",
+		"AWSEventBridgeSource":
 		return fmt.Sprintf("%s/awssqssource-adapter:%s", registry, version)
+	case "AzureServiceBusTopicSource",
+		"AzureServiceBusQueueSource":
+		return fmt.Sprintf("%s/azureservicebussource-adapter:%s", registry, version)
+	case "AzureBlobStorageSource":
+		return fmt.Sprintf("%s/azureeventhubsource-adapter:%s", registry, version)
+	case "GoogleCloudAuditLogsSource",
+		"GoogleCloudStorageSource",
+		"GoogleCloudSourceRepositoriesSource":
+		return fmt.Sprintf("%s/googlecloudpubsubsource-adapter:%s", registry, version)
 	}
 	return fmt.Sprintf("%s/%s-adapter:%s", registry, strings.ToLower(object.GetKind()), version)
 }
