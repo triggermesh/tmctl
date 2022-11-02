@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package awseventbridgesource
+package aws
 
 import (
 	"fmt"
@@ -25,12 +25,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/eventbridge"
 	"github.com/aws/aws-sdk-go/service/sqs"
 
-	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler/external"
 	sourcesv1alpha1 "github.com/triggermesh/triggermesh/pkg/apis/sources/v1alpha1"
 )
 
-func Client(src *sourcesv1alpha1.AWSEventBridgeSource, secrets map[string]string) (*eventbridge.EventBridge, *sqs.SQS, error) {
-	accessKey, secretKey, err := external.ReadSecret(secrets)
+func EBClient(src *sourcesv1alpha1.AWSEventBridgeSource, secrets map[string]string) (*eventbridge.EventBridge, *sqs.SQS, error) {
+	accessKey, secretKey, err := readSecret(secrets)
 	if err != nil {
 		return nil, nil, fmt.Errorf("secrets read: %w", err)
 	}

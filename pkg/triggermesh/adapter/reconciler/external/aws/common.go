@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package external
+package aws
 
 import "fmt"
 
@@ -23,7 +23,7 @@ const (
 	awsSecretKeyEnv = "secretAccessKey"
 )
 
-func ReadSecret(secrets map[string]string) (string, string, error) {
+func readSecret(secrets map[string]string) (string, string, error) {
 	accessKey, exists := secrets[awsAccessKeyEnv]
 	if !exists {
 		return "", "", fmt.Errorf("%q secret is missing", awsAccessKeyEnv)
