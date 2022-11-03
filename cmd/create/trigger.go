@@ -90,7 +90,7 @@ func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 	}
 
 	log.Println("Creating trigger")
-	if len(eventTypesFilter) == 0 {
+	if len(eventTypesFilter) == 0 && len(eventSourcesFilter) == 0 {
 		return tmbroker.CreateTrigger(name, component.GetName(), port, o.Context, o.ConfigBase, nil)
 	}
 	for _, et := range eventTypesFilter {
