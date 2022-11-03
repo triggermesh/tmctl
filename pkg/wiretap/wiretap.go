@@ -78,7 +78,7 @@ func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
 
 func (w *Wiretap) CreateTrigger(eventTypes []string) error {
 	for _, et := range eventTypes {
-		trigger := tmbroker.NewTrigger("wiretap-trigger", w.Broker, w.ConfigBase, tmbroker.FilterExactType(et))
+		trigger := tmbroker.NewTrigger("wiretap-trigger", w.Broker, w.ConfigBase, tmbroker.FilterExactAttribute("type", et))
 		trigger.(*tmbroker.Trigger).SetTarget("wiretap", w.Destination)
 		if err := trigger.(*tmbroker.Trigger).UpdateBrokerConfig(); err != nil {
 			return err

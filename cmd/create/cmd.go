@@ -24,6 +24,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
@@ -85,4 +87,20 @@ func argsToMap(args []string) map[string]string {
 		}
 	}
 	return result
+}
+
+func (o *CreateOptions) translateEventSource(eventSourcesFilter []string) ([]string, error) {
+	for i, source := range eventSourcesFilter {
+		s, err := components.GetObject(source, o.CRD, o.Version, o.Manifest)
+		if err != nil {
+			return nil, fmt.Errorf("%q event producer object: %w", source, err)
+		}
+		if _, ok := s.(triggermesh.Producer); !ok {
+			return nil, fmt.Errorf("%q is not an event producer", source)
+		}
+		if eventSourcesFilter[i], err = s.(triggermesh.Producer).GetEventSource(); err != nil {
+			return nil, fmt.Errorf("%q event source: %w", source, err)
+		}
+	}
+	return eventSourcesFilter, nil
 }

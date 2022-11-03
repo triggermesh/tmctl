@@ -67,12 +67,9 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 		if len(et) != 0 {
 			result = fmt.Sprintf("%s\nComponent consumes:\t%s", result, strings.Join(et, ", "))
 		}
-		srcMsg := strings.Join(eventTypesFilter, ", ")
-		if len(eventSourcesFilter) != 0 {
-			srcMsg = fmt.Sprintf("%s(%s)", strings.Join(eventSourcesFilter, ", "), srcMsg)
-		}
-		if srcMsg != "" {
-			result = fmt.Sprintf("%s\nSubscribed to:\t\t%s", result, srcMsg)
+		filter := strings.Join(append(eventTypesFilter, eventSourcesFilter...), ", ")
+		if filter != "" {
+			result = fmt.Sprintf("%s\nSubscribed to:\t\t%s", result, filter)
 		}
 		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
 		result = fmt.Sprintf("%s\nNext steps:", result)
@@ -107,13 +104,14 @@ func DescribeSource(sources []triggermesh.Component, containers []*docker.Contai
 		return
 	}
 	defer w.Flush()
-	fmt.Fprintln(w, "Source\tKind\tEventTypes\tStatus")
+	fmt.Fprintln(w, "Source\tKind\tEvents Source/Type\tStatus")
 	for i, source := range sources {
-		et, err := source.(triggermesh.Producer).GetEventTypes()
-		if err != nil {
+		et, _ := source.(triggermesh.Producer).GetEventTypes()
+		if len(et) == 0 {
 			et = []string{"-"}
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", source.GetName(), source.GetKind(), strings.Join(et, ","), status(containers[i]))
+		es, _ := source.(triggermesh.Producer).GetEventSource()
+		fmt.Fprintf(w, "%s\t%s\t%s/%s\t%s\n", source.GetName(), source.GetKind(), es, strings.Join(et, ","), status(containers[i]))
 	}
 	fmt.Fprintln(w)
 }

@@ -202,9 +202,9 @@ func (f *Filter) String() (string, error) {
 	return string(output), err
 }
 
-func FilterExactType(eventType string) *Filter {
+func FilterExactAttribute(attribute, value string) *Filter {
 	return &Filter{
-		Exact: map[string]string{"type": eventType},
+		Exact: map[string]string{attribute: value},
 	}
 }
 

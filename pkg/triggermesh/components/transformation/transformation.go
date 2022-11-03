@@ -108,45 +108,40 @@ func (t *Transformation) GetSpec() map[string]interface{} {
 }
 
 func (t *Transformation) GetEventTypes() ([]string, error) {
-	return t.getEventTypeTransformation()
+	return t.getContextTransformationValue("type"), nil
+}
+
+func (t *Transformation) GetEventSource() (string, error) {
+	if src := t.getContextTransformationValue("source"); len(src) != 0 {
+		return src[0], nil
+	}
+	return "", nil
 }
 
 func (t *Transformation) ConsumedEventTypes() ([]string, error) {
 	return []string{}, nil
 }
 
-// SetEventType sets "type" context attribute transformation.
-func (t *Transformation) SetEventType(eventType string) error {
+// SetEventType sets events context attributes.
+func (t *Transformation) SetEventAttributes(attributes map[string]string) error {
+	var paths []interface{}
+	for key, value := range attributes {
+		paths = append(paths, map[string]interface{}{
+			"key":   key,
+			"value": value,
+		})
+	}
 	operation := map[string]interface{}{
 		"operation": "add",
-		"paths": []interface{}{
-			map[string]interface{}{
-				"key":   "type",
-				"value": eventType,
-			},
-		},
+		"paths":     paths,
 	}
-	u, err := t.asUnstructured()
-	if err != nil {
-		return err
+
+	if contextTransformations, exists := t.spec["context"]; exists {
+		contextTransformations = append(contextTransformations.([]interface{}), operation)
+		t.spec["context"] = contextTransformations
+		return nil
 	}
-	contextTrn, exists, err := unstructured.NestedSlice(u.Object, "spec", "context")
-	if err != nil {
-		return err
-	}
-	if !exists {
-		if err := unstructured.SetNestedSlice(u.Object, []interface{}{
-			operation,
-		}, "spec", "context"); err != nil {
-			return err
-		}
-	} else {
-		contextTrn = append(contextTrn, operation)
-		if err := unstructured.SetNestedSlice(u.Object, contextTrn, "spec", "context"); err != nil {
-			return err
-		}
-	}
-	t.spec = u.Object["spec"].(map[string]interface{})
+	t.spec["context"] = []interface{}{operation}
 	return nil
 }
 
@@ -208,28 +203,21 @@ func New(name, crdFile, kind, broker, version string, spec map[string]interface{
 	}
 }
 
-// getEventTypeTransformation return the value of "Add" transformation
-// applied on context's "type" attribute. Does not support complex tramsformations.
-func (t *Transformation) getEventTypeTransformation() ([]string, error) {
-	u, err := t.asUnstructured()
-	if err != nil {
-		return []string{}, err
-	}
-	contextTrn, exists, err := unstructured.NestedSlice(u.Object, "spec", "context")
-	if err != nil {
-		return []string{}, err
-	}
+// getContextTransformationValue return the value of "Add" transformation
+// applied on context attributes. Does not support complex tramsformations.
+func (t *Transformation) getContextTransformationValue(key string) []string {
+	contextTransformation, exists := t.spec["context"]
 	if !exists {
-		return []string{}, nil
+		return []string{}
 	}
-	for _, op := range contextTrn {
+	for _, op := range contextTransformation.([]interface{}) {
 		if opp, ok := op.(map[string]interface{}); ok {
 			if opp["operation"] == "add" {
 				if p, ok := opp["paths"].([]interface{}); ok {
 					for _, pp := range p {
 						if pm, ok := pp.(map[string]interface{}); ok {
-							if pm["key"] == "type" {
-								return []string{pm["value"].(string)}, nil
+							if pm["key"] == key {
+								return []string{pm["value"].(string)}
 							}
 						}
 					}
@@ -237,5 +225,5 @@ func (t *Transformation) getEventTypeTransformation() ([]string, error) {
 			}
 		}
 	}
-	return []string{}, nil
+	return []string{}
 }

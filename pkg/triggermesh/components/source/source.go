@@ -29,7 +29,6 @@ import (
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
@@ -118,30 +117,55 @@ func (s *Source) GetSpec() map[string]interface{} {
 }
 
 func (s *Source) GetEventTypes() ([]string, error) {
-	if ceOverrides, set := s.spec["ceOverrides"]; set {
-		// interface type is verified by CRD validation
-		if extensions, set := ceOverrides.(map[string]interface{})["extensions"]; set {
-			if typeOverride, exists := extensions.(map[string]string)["type"]; exists {
-				return []string{typeOverride}, nil
-			}
-		}
-	}
+	// First, check if component has explicit eventType in spec
 	if et, exists := s.spec["eventType"]; exists {
 		return []string{et.(string)}, nil
 	}
+	// Second, get event attributes from the core object methods
+	o, err := s.asUnstructured()
+	if err != nil {
+		return []string{}, err
+	}
+	eventAttributes, err := adapter.EventAttributes(o)
+	if err != nil {
+		return []string{}, err
+	}
+	if len(eventAttributes.ProducedEventTypes) != 0 {
+		if eventAttributes.ProducedEventTypes[0] == "*" {
+			return []string{}, nil
+		}
+		return eventAttributes.ProducedEventTypes, nil
+	}
+	// Last, read attributes from CRD
 	sourceCRD, err := crd.GetResourceCRD(s.Kind, s.CRDFile)
 	if err != nil {
 		return []string{}, fmt.Errorf("source CRD: %w", err)
 	}
 	var et crd.EventTypes
 	if err := json.Unmarshal([]byte(sourceCRD.Metadata.Annotations.EventTypes), &et); err != nil {
-		return []string{}, fmt.Errorf("event types: %w", err)
+		return []string{}, fmt.Errorf("event producer CRD: %w", err)
 	}
 	var result []string
 	for _, v := range et {
 		result = append(result, v.Type)
 	}
 	return result, nil
+}
+
+func (s *Source) GetEventSource() (string, error) {
+	// Second, get event attributes from the core object methods
+	o, err := s.asUnstructured()
+	if err != nil {
+		return "", err
+	}
+	eventAttributes, err := adapter.EventAttributes(o)
+	if err != nil {
+		return "", err
+	}
+	if eventAttributes.ProducedEventSource == "" {
+		return "", fmt.Errorf("%q does not expose event source attribute", s.Kind)
+	}
+	return eventAttributes.ProducedEventSource, nil
 }
 
 func (s *Source) GetChildren() ([]triggermesh.Component, error) {
@@ -155,7 +179,7 @@ func (s *Source) GetChildren() ([]triggermesh.Component, error) {
 	return []triggermesh.Component{secret.New(strings.ToLower(s.Name), s.Broker, secrets)}, nil
 }
 
-func (s *Source) SetEventType(string) error {
+func (s *Source) SetEventAttributes(map[string]string) error {
 	return fmt.Errorf("event source does not support context attributes override")
 }
 
@@ -200,7 +224,7 @@ func (s *Source) Initialize(ctx context.Context, secrets map[string]string) (map
 	if err != nil {
 		return nil, err
 	}
-	return reconciler.InitializeAndGetStatus(ctx, u, secrets)
+	return adapter.InitializeAndGetStatus(ctx, u, secrets)
 }
 
 func (s *Source) Finalize(ctx context.Context, secrets map[string]string) error {
@@ -208,7 +232,7 @@ func (s *Source) Finalize(ctx context.Context, secrets map[string]string) error 
 	if err != nil {
 		return err
 	}
-	return reconciler.Finalize(ctx, u, secrets)
+	return adapter.Finalize(ctx, u, secrets)
 }
 
 func (s *Source) UpdateStatus(status map[string]interface{}) {
