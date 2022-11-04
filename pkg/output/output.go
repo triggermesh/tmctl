@@ -25,7 +25,6 @@ import (
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -164,14 +163,9 @@ func DescribeTrigger(triggers []triggermesh.Component) {
 }
 
 func triggerFilterToString(filter tmbroker.Filter) string {
-	// that works with "exact type" filtering
-	// needs to be tested for other cases
-	f, err := yaml.Marshal(filter)
-	if err != nil {
-		return ""
+	var result []string
+	for k, v := range filter.Exact {
+		result = append(result, fmt.Sprintf("%s is %s", k, v))
 	}
-	result := strings.ReplaceAll(string(f), "\n", "")
-	result = strings.ReplaceAll(result, " ", "")
-	result = strings.ReplaceAll(result, ":", " ")
-	return result
+	return strings.Join(result, ", ")
 }

@@ -115,5 +115,20 @@ func Finalize(ctx context.Context, object unstructured.Unstructured, secrets map
 }
 
 func EventAttributes(object unstructured.Unstructured) (ce.EventAttributes, error) {
-	return ce.Attributes(object)
+	attributes, err := ce.Attributes(object)
+	if err != nil {
+		return ce.EventAttributes{}, err
+	}
+	if attributes.ProducedEventSource == "*" || attributes.ProducedEventSource == "-" {
+		attributes.ProducedEventSource = ""
+	}
+	if len(attributes.AcceptedEventTypes) == 1 &&
+		(attributes.AcceptedEventTypes[0] == "*" || attributes.AcceptedEventTypes[0] == "-") {
+		attributes.AcceptedEventTypes = []string{}
+	}
+	if len(attributes.ProducedEventTypes) == 1 &&
+		(attributes.ProducedEventTypes[0] == "*" || attributes.ProducedEventTypes[0] == "-") {
+		attributes.ProducedEventTypes = []string{}
+	}
+	return attributes, nil
 }

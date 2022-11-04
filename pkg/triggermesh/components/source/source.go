@@ -131,9 +131,6 @@ func (s *Source) GetEventTypes() ([]string, error) {
 		return []string{}, err
 	}
 	if len(eventAttributes.ProducedEventTypes) != 0 {
-		if eventAttributes.ProducedEventTypes[0] == "*" {
-			return []string{}, nil
-		}
 		return eventAttributes.ProducedEventTypes, nil
 	}
 	// Last, read attributes from CRD
