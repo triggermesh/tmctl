@@ -18,7 +18,6 @@ package secret
 
 import (
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
-	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
 
@@ -31,7 +30,7 @@ type Secret struct {
 	data map[string]string
 }
 
-func (s *Secret) asK8sObject() (kubernetes.Object, error) {
+func (s *Secret) AsK8sObject() (kubernetes.Object, error) {
 	return kubernetes.Object{
 		APIVersion: "v1",
 		Kind:       s.GetKind(),
@@ -61,30 +60,6 @@ func (s *Secret) GetSpec() map[string]interface{} {
 		spec[k] = v
 	}
 	return spec
-}
-
-func (s *Secret) Add(manifestPath string) (bool, error) {
-	manifest := manifest.New(manifestPath)
-	if err := manifest.Read(); err != nil {
-		return false, err
-	}
-	o, err := s.asK8sObject()
-	if err != nil {
-		return false, err
-	}
-	if dirty := manifest.Add(o); !dirty {
-		return false, nil
-	}
-	return true, manifest.Write()
-}
-
-func (s *Secret) Delete(manifestPath string) error {
-	manifest := manifest.New(manifestPath)
-	if err := manifest.Read(); err != nil {
-		return err
-	}
-	manifest.Remove(s.Name, s.GetKind())
-	return manifest.Write()
 }
 
 func New(name, context string, data map[string]string) triggermesh.Component {

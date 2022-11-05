@@ -20,13 +20,13 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"path"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/triggermesh/tmctl/pkg/output"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
@@ -50,6 +50,9 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 				fmt.Printf("\nAvailable source kinds:\n---\n%s\n", strings.Join(sources, "\n"))
 				return nil
 			}
+			if err := o.Manifest.Read(); err != nil {
+				return err
+			}
 			params := argsToMap(args[1:])
 			var name string
 			if n, exists := params["name"]; exists {
@@ -67,8 +70,7 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 
 func (o *CreateOptions) source(name, kind string, params map[string]string) error {
 	ctx := context.Background()
-
-	broker, err := tmbroker.New(o.Context, path.Join(o.Manifest))
+	broker, err := tmbroker.New(o.Context, o.Manifest.Path)
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}
@@ -80,22 +82,24 @@ func (o *CreateOptions) source(name, kind string, params map[string]string) erro
 
 	s := source.New(name, o.CRD, kind, o.Context, o.Version, params)
 
-	secretEnv, secretsChanged, err := triggermesh.ProcessSecrets(ctx, s.(triggermesh.Parent), o.Manifest)
+	secrets, secretsChanged, err := components.ProcessSecrets(s.(triggermesh.Parent), o.Manifest)
 	if err != nil {
-		return fmt.Errorf("spec processing: %w", err)
+		return fmt.Errorf("processing secrets: %v", err)
 	}
+
 	log.Println("Updating manifest")
-	restart, err := s.Add(o.Manifest)
+	restart, err := o.Manifest.Add(s)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to update manifest: %w", err)
 	}
-	status, err := s.(triggermesh.Reconcilable).Initialize(ctx, secretEnv)
+
+	status, err := s.(triggermesh.Reconcilable).Initialize(ctx, secrets)
 	if err != nil {
 		return fmt.Errorf("source initialization: %w", err)
 	}
 	s.(triggermesh.Reconcilable).UpdateStatus(status)
 	log.Println("Starting container")
-	if _, err := s.(triggermesh.Runnable).Start(ctx, secretEnv, (restart || secretsChanged)); err != nil {
+	if _, err := s.(triggermesh.Runnable).Start(ctx, secrets, (restart || secretsChanged)); err != nil {
 		return err
 	}
 	output.PrintStatus("producer", s, []string{}, []string{})

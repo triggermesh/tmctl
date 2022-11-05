@@ -27,7 +27,6 @@ import (
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
-	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 )
@@ -64,7 +63,7 @@ func (b *Broker) asUnstructured() (unstructured.Unstructured, error) {
 	return u, unstructured.SetNestedField(u.Object, nil, "spec")
 }
 
-func (b *Broker) asK8sObject() (kubernetes.Object, error) {
+func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
 	return kubernetes.Object{
 		APIVersion: "eventing.triggermesh.io/v1alpha1",
 		Kind:       "Broker",
@@ -105,30 +104,6 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 	}, nil
 }
 
-func (b *Broker) Add(manifestPath string) (bool, error) {
-	manifest := manifest.New(manifestPath)
-	if err := manifest.Read(); err != nil {
-		return false, err
-	}
-	o, err := b.asK8sObject()
-	if err != nil {
-		return false, err
-	}
-	if dirty := manifest.Add(o); !dirty {
-		return false, nil
-	}
-	return true, manifest.Write()
-}
-
-func (b *Broker) Delete(manifestPath string) error {
-	manifest := manifest.New(manifestPath)
-	if err := manifest.Read(); err != nil {
-		return err
-	}
-	manifest.Remove(b.Name, b.GetKind())
-	return manifest.Write()
-}
-
 func (b *Broker) GetKind() string {
 	return "Broker"
 }
@@ -153,24 +128,27 @@ func (b *Broker) ConsumedEventTypes() ([]string, error) {
 	return []string{}, nil
 }
 
-func GetTargetTriggers(brokerConfigDir, target string) (map[string]Trigger, error) {
-	config, err := readBrokerConfig(path.Join(brokerConfigDir, brokerConfigFile))
+func GetTargetTriggers(broker, configBase, target string) ([]triggermesh.Component, error) {
+	config, err := readBrokerConfig(path.Join(configBase, broker, brokerConfigFile))
 	if err != nil {
 		return nil, fmt.Errorf("read broker config: %w", err)
 	}
+	var triggers []triggermesh.Component
 	for name, trigger := range config.Triggers {
 		if trigger.GetTarget().Component != target {
-			delete(config.Triggers, name)
 			continue
 		}
-		config.Triggers[name] = Trigger{
-			BrokerConfigDir: brokerConfigDir,
-			Name:            name,
-			Filters:         trigger.Filters,
-			Target:          trigger.Target,
+		f := Filter{}
+		if len(trigger.Filters) != 0 {
+			f = trigger.Filters[0]
 		}
+		t, err := NewTrigger(name, broker, configBase, trigger.Target.URL, trigger.Target.Component, f)
+		if err != nil {
+			return nil, fmt.Errorf("creating trigger object: %w", err)
+		}
+		triggers = append(triggers, t)
 	}
-	return config.Triggers, nil
+	return triggers, nil
 }
 
 func (b *Broker) Start(ctx context.Context, additionalEnvs map[string]string, restart bool) (*docker.Container, error) {
@@ -226,8 +204,10 @@ func New(name, manifestPath string) (triggermesh.Component, error) {
 	config := path.Join(path.Dir(manifestPath), brokerConfigFile)
 	if _, err := os.Stat(config); os.IsNotExist(err) {
 		if _, err := os.Create(config); err != nil {
-			return nil, fmt.Errorf("config file: %w", err)
+			return nil, fmt.Errorf("creating broker config: %w", err)
 		}
+	} else if err != nil {
+		return nil, fmt.Errorf("broker config read: %w", err)
 	}
 
 	return &Broker{

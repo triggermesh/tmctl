@@ -46,6 +46,7 @@ type DeleteOptions struct {
 	Context    string
 	Version    string
 	CRD        string
+	Manifest   *manifest.Manifest
 }
 
 func NewCmd() *cobra.Command {
@@ -57,6 +58,9 @@ func NewCmd() *cobra.Command {
 		ValidArgsFunction: o.deleteCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if broker != "" {
+				o.Context = broker
+				o.Manifest = manifest.New(path.Join(o.ConfigBase, broker, manifestFile))
+				cobra.CheckErr(o.Manifest.Read())
 				return o.deleteBroker(broker)
 			}
 			return o.deleteComponents(args, false)
@@ -78,15 +82,18 @@ func (o *DeleteOptions) initialize() {
 	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
+	o.Manifest = manifest.New(path.Join(o.ConfigBase, o.Context, manifestFile))
 	crds, err := crd.Fetch(o.ConfigBase, o.Version)
 	cobra.CheckErr(err)
 	o.CRD = crds
+
+	// try to read manifest even if it does not exists.
+	// required for autocompletion.
+	o.Manifest.Read()
 }
 
 func (o *DeleteOptions) deleteBroker(broker string) error {
-	oo := *o
-	oo.Context = broker
-	if err := oo.deleteComponents([]string{}, true); err != nil {
+	if err := o.deleteComponents([]string{}, true); err != nil {
 		return fmt.Errorf("deleting component: %w", err)
 	}
 	if err := os.RemoveAll(path.Join(o.ConfigBase, broker)); err != nil {
@@ -104,11 +111,7 @@ func (o *DeleteOptions) deleteComponents(names []string, force bool) error {
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
-	manifest := manifest.New(path.Join(o.ConfigBase, o.Context, manifestFile))
-	if err := manifest.Read(); err != nil {
-		return fmt.Errorf("manifest read: %w", err)
-	}
-	for _, object := range manifest.Objects {
+	for _, object := range o.Manifest.Objects {
 		if object.Kind == "Secret" {
 			continue
 		}
@@ -135,59 +138,67 @@ func (o *DeleteOptions) deleteComponents(names []string, force bool) error {
 		if err := o.removeExternalServices(ctx, object); err != nil {
 			log.Printf("WARN: external services are not deleted: %v", err)
 		}
-		o.stopContainer(ctx, object.Metadata.Name, client)
-		o.removeObject(object.Metadata.Name, manifest)
-		o.cleanupTriggers(object.Metadata.Name, manifest)
-		o.cleanupSecrets(object.Metadata.Name, manifest)
+		o.deleteContainer(ctx, object.Metadata.Name, client)
+		o.removeObject(object.Metadata.Name)
+		o.cleanupTriggers(object.Metadata.Name)
+		o.cleanupSecrets(object.Metadata.Name)
 	}
-	return manifest.Write()
+	return nil
 }
 
-func (o *DeleteOptions) removeObject(component string, manifest *manifest.Manifest) {
-	for _, object := range manifest.Objects {
+func (o *DeleteOptions) removeObject(component string) {
+	for _, object := range o.Manifest.Objects {
 		if component != object.Metadata.Name {
 			continue
 		}
 		if object.Kind == "Trigger" {
-			trigger := tmbroker.NewTrigger(object.Metadata.Name, o.Context, o.ConfigBase, nil)
-			if err := trigger.(*tmbroker.Trigger).RemoveTriggerFromConfig(); err != nil {
-				log.Printf("Deleting %q: %v", object.Metadata.Name, err)
+			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, o.Context, o.ConfigBase, "", "", tmbroker.Filter{})
+			if err != nil {
+				log.Printf("Creating trigger object %q: %v", object.Metadata.Name, err)
 				continue
 			}
+			if err := trigger.(*tmbroker.Trigger).RemoveTriggerFromConfig(); err != nil {
+				log.Printf("Updating broker config %q: %v", object.Metadata.Name, err)
+			}
 		}
-		manifest.Remove(object.Metadata.Name, object.Kind)
+		if err := o.Manifest.Remove(object.Metadata.Name, object.Kind); err != nil {
+			log.Printf("Deleting %q: %v", object.Metadata.Name, err)
+		}
 	}
 }
 
-func (o *DeleteOptions) stopContainer(ctx context.Context, name string, client *client.Client) error {
+func (o *DeleteOptions) deleteContainer(ctx context.Context, name string, client *client.Client) error {
 	return docker.ForceStop(ctx, name, client)
 }
 
-func (o *DeleteOptions) cleanupTriggers(component string, manifest *manifest.Manifest) {
-	triggers, err := tmbroker.GetTargetTriggers(path.Join(o.ConfigBase, o.Context), component)
+func (o *DeleteOptions) cleanupTriggers(component string) {
+	triggers, err := tmbroker.GetTargetTriggers(o.Context, o.ConfigBase, component)
 	if err != nil {
 		return
 	}
-	for name, trigger := range triggers {
-		if err := trigger.RemoveTriggerFromConfig(); err != nil {
-			log.Printf("Deleting trigger %q: %v", trigger.Name, err)
+	for _, trigger := range triggers {
+		if err := trigger.(*tmbroker.Trigger).RemoveTriggerFromConfig(); err != nil {
+			log.Printf("Updating broker config %q: %v", trigger.GetName(), err)
 			continue
 		}
-		manifest.Remove(name, trigger.GetKind())
+		if err := o.Manifest.Remove(trigger.GetName(), trigger.GetKind()); err != nil {
+			log.Printf("Deleting trigger %q: %v", trigger.GetName(), err)
+		}
 	}
 }
 
-func (o *DeleteOptions) cleanupSecrets(component string, manifest *manifest.Manifest) {
-	for _, object := range manifest.Objects {
+func (o *DeleteOptions) cleanupSecrets(component string) {
+	for _, object := range o.Manifest.Objects {
 		if object.Metadata.Name == component && object.Kind == "Secret" {
-			manifest.Remove(component, object.Kind)
+			if err := o.Manifest.Remove(component, object.Kind); err != nil {
+				log.Printf("Deleting secret %q: %v", object.Metadata.Name, err)
+			}
 		}
 	}
 }
 
 func (o *DeleteOptions) removeExternalServices(ctx context.Context, object kubernetes.Object) error {
-	manifestFile := path.Join(o.ConfigBase, o.Context, manifestFile)
-	component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, manifestFile)
+	component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest)
 	if err != nil {
 		return err
 	}
@@ -199,9 +210,9 @@ func (o *DeleteOptions) removeExternalServices(ctx context.Context, object kuber
 	if !ok {
 		return nil
 	}
-	secrets, _, err := triggermesh.ProcessSecrets(ctx, p, manifestFile)
+	secrets, _, err := components.ProcessSecrets(p, o.Manifest)
 	if err != nil {
-		return err
+		return fmt.Errorf("secrets extraction: %w", err)
 	}
 	return r.Finalize(ctx, secrets)
 }
@@ -222,7 +233,7 @@ func (o *DeleteOptions) switchContext() error {
 
 func (o *DeleteOptions) deleteCompletion(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
-		return append(completion.ListAll(path.Join(o.ConfigBase, o.Context, manifestFile)), "--broker"),
+		return append(completion.ListAll(o.Manifest), "--broker"),
 			cobra.ShellCompDirectiveNoFileComp
 	}
 	return nil, cobra.ShellCompDirectiveNoFileComp

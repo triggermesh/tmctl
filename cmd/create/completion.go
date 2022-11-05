@@ -18,7 +18,6 @@ package create
 
 import (
 	"fmt"
-	"path"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -104,12 +103,11 @@ func (o *CreateOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 		toComplete == "--name" {
 		return []string{toComplete}, cobra.ShellCompDirectiveNoFileComp
 	}
-	manifestPath := path.Join(o.ConfigBase, o.Context, manifestFile)
 	switch args[len(args)-1] {
 	case "--source":
-		return completion.ListSources(manifestPath), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	case "--eventTypes":
-		return completion.ListEventTypes(manifestPath, o.CRD), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListEventTypes(o.Manifest, o.CRD), cobra.ShellCompDirectiveNoFileComp
 	case "--broker":
 		list, err := brokers.List(o.ConfigBase, "")
 		if err != nil {

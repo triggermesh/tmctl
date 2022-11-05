@@ -32,7 +32,8 @@ import (
 const manifestFile = "manifest.yaml"
 
 type StopOptions struct {
-	ConfigDir string
+	ConfigBase string
+	Manifest   *manifest.Manifest
 }
 
 func NewCmd() *cobra.Command {
@@ -42,11 +43,14 @@ func NewCmd() *cobra.Command {
 		Short:     "Stops TriggerMesh components",
 		ValidArgs: []string{},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
+			broker := viper.GetString("context")
 			if len(args) == 1 {
-				return o.stop(args[0])
+				broker = args[0]
 			}
-			return o.stop(viper.GetString("context"))
+			o.ConfigBase = path.Dir(viper.ConfigFileUsed())
+			o.Manifest = manifest.New(path.Join(o.ConfigBase, broker, manifestFile))
+			cobra.CheckErr(o.Manifest.Read())
+			return o.stop(broker)
 		},
 	}
 
@@ -55,17 +59,12 @@ func NewCmd() *cobra.Command {
 
 func (o *StopOptions) stop(broker string) error {
 	ctx := context.Background()
-	manifest := manifest.New(path.Join(o.ConfigDir, broker, manifestFile))
-	if err := manifest.Read(); err != nil {
-		return fmt.Errorf("cannot parse manifest: %w", err)
-	}
-
 	client, err := docker.NewClient()
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
 
-	for _, object := range manifest.Objects {
+	for _, object := range o.Manifest.Objects {
 		if object.Kind == "Trigger" || object.Kind == "Secret" {
 			continue
 		}

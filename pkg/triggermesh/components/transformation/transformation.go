@@ -24,7 +24,6 @@ import (
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
-	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 )
@@ -49,7 +48,7 @@ func (t *Transformation) asUnstructured() (unstructured.Unstructured, error) {
 	return kubernetes.CreateUnstructured(t.GetKind(), t.GetName(), triggermesh.Namespace, t.Broker, t.CRDFile, t.spec, nil)
 }
 
-func (t *Transformation) asK8sObject() (kubernetes.Object, error) {
+func (t *Transformation) AsK8sObject() (kubernetes.Object, error) {
 	return kubernetes.CreateObject(t.GetKind(), t.GetName(), triggermesh.Namespace, t.Broker, t.CRDFile, t.spec)
 }
 
@@ -69,30 +68,6 @@ func (t *Transformation) asContainer(additionalEnvs map[string]string) (*docker.
 		CreateHostOptions:      ho,
 		CreateContainerOptions: co,
 	}, nil
-}
-
-func (t *Transformation) Add(manifestPath string) (bool, error) {
-	manifest := manifest.New(manifestPath)
-	if err := manifest.Read(); err != nil {
-		return false, err
-	}
-	o, err := t.asK8sObject()
-	if err != nil {
-		return false, err
-	}
-	if dirty := manifest.Add(o); !dirty {
-		return false, nil
-	}
-	return true, manifest.Write()
-}
-
-func (t *Transformation) Delete(manifestPath string) error {
-	manifest := manifest.New(manifestPath)
-	if err := manifest.Read(); err != nil {
-		return err
-	}
-	manifest.Remove(t.Name, t.GetKind())
-	return manifest.Write()
 }
 
 func (t *Transformation) GetName() string {

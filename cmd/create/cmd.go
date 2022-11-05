@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
@@ -36,7 +37,7 @@ type CreateOptions struct {
 	Context    string
 	Version    string
 	CRD        string
-	Manifest   string
+	Manifest   *manifest.Manifest
 }
 
 func NewCmd() *cobra.Command {
@@ -63,10 +64,14 @@ func (o *CreateOptions) initialize() {
 	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
-	o.Manifest = path.Join(o.ConfigBase, o.Context, manifestFile)
+	o.Manifest = manifest.New(path.Join(o.ConfigBase, o.Context, manifestFile))
 	crds, err := crd.Fetch(o.ConfigBase, o.Version)
 	cobra.CheckErr(err)
 	o.CRD = crds
+
+	// try to read manifest even if it does not exists.
+	// required for autocompletion.
+	o.Manifest.Read()
 }
 
 func argsToMap(args []string) map[string]string {
