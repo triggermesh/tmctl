@@ -61,7 +61,7 @@ func NewCmd() *cobra.Command {
 
 func (o *SendOptions) send(data string) error {
 	ctx := context.Background()
-	broker, err := tmbroker.New(o.Context, o.ConfigDir)
+	broker, err := tmbroker.New(o.Context, path.Join(o.ConfigDir, o.Context, "manifest.yaml"))
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}

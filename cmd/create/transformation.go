@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -44,19 +45,18 @@ context:
 - operation: add
   paths:
   - key: source
-    value: some-test-source
+    value: triggermesh-local-source
 data:
-- operation: store
-  paths:
-  - key: $foo
-    value: Body
-- operation: delete
-  paths:
-  - key:
 - operation: add
   paths:
   - key: foo
-    value: $foo
+    value: bar
+- operation: delete
+  paths:
+  - key: delete-me
+- operation: shift
+  paths:
+  - key: old-path:new-path
 
 For more samples please visit:
 https://github.com/triggermesh/triggermesh/tree/main/config/samples/bumblebee`
@@ -106,16 +106,17 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 		targetPort = port
 	}
 
-	eventSourcesFilter, err := o.translateEventSource(eventSourcesFilter)
+	et, err := o.translateEventSource(eventSourcesFilter)
 	if err != nil {
 		return err
 	}
+	eventTypesFilter = append(eventTypesFilter, et...)
 
 	var data []byte
 	if file == "" {
 		input, err := fromStdIn()
 		if err != nil {
-			return fmt.Errorf("spec read: %w", err)
+			return fmt.Errorf("stdin read: %w", err)
 		}
 		data = []byte(input)
 	} else {
@@ -124,6 +125,9 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 			return fmt.Errorf("spec file read: %w", err)
 		}
 		data = specFile
+	}
+	if len(data) == 0 {
+		return fmt.Errorf("empty spec")
 	}
 	var spec map[string]interface{}
 	if err := yaml.Unmarshal(data, &spec); err != nil {
@@ -173,7 +177,7 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 		}
 		for _, component := range targetTriggers {
 			trigger := component.(*tmbroker.Trigger)
-			if len(trigger.Filters) != 1 || &trigger.Filters[0] != &filter {
+			if len(trigger.Filters) != 1 || !reflect.DeepEqual(trigger.Filters[0], *filter) {
 				continue
 			}
 			if err := trigger.RemoveTriggerFromConfig(); err != nil {
@@ -185,26 +189,7 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 		}
 	}
 
-	for _, es := range eventSourcesFilter {
-		filter := tmbroker.FilterExactAttribute("source", es)
-		if _, err := o.createTrigger("", container.HostPort(), container.Name, filter); err != nil {
-			return err
-		}
-		for _, component := range targetTriggers {
-			trigger := component.(*tmbroker.Trigger)
-			if len(trigger.Filters) != 1 || &trigger.Filters[0] != &filter {
-				continue
-			}
-			if err := trigger.RemoveTriggerFromConfig(); err != nil {
-				return err
-			}
-			if err := o.Manifest.Remove(trigger.GetName(), trigger.GetKind()); err != nil {
-				return err
-			}
-		}
-	}
-
-	if len(eventTypesFilter) == 0 && len(eventSourcesFilter) == 0 {
+	if len(eventTypesFilter) == 0 {
 		for _, trigger := range targetTriggers {
 			trigger.(*tmbroker.Trigger).SetTarget(container.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
 			if err := trigger.(*tmbroker.Trigger).UpdateBrokerConfig(); err != nil {

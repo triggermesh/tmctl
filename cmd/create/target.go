@@ -83,10 +83,11 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 func (o *CreateOptions) target(name, kind string, args map[string]string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
 
-	eventSourcesFilter, err := o.translateEventSource(eventSourcesFilter)
+	et, err := o.translateEventSource(eventSourcesFilter)
 	if err != nil {
 		return err
 	}
+	eventTypesFilter = append(eventTypesFilter, et...)
 
 	t := target.New(name, o.CRD, kind, o.Context, o.Version, args)
 
@@ -107,11 +108,6 @@ func (o *CreateOptions) target(name, kind string, args map[string]string, eventS
 		return err
 	}
 
-	for _, es := range eventSourcesFilter {
-		if _, err := o.createTrigger("", container.HostPort(), container.Name, tmbroker.FilterExactAttribute("source", es)); err != nil {
-			return fmt.Errorf("creating trigger: %w", err)
-		}
-	}
 	for _, et := range eventTypesFilter {
 		if _, err := o.createTrigger("", container.HostPort(), container.Name, tmbroker.FilterExactAttribute("type", et)); err != nil {
 			return fmt.Errorf("creating trigger: %w", err)
@@ -122,7 +118,7 @@ func (o *CreateOptions) target(name, kind string, args map[string]string, eventS
 	return nil
 }
 
-func (o *CreateOptions) createTrigger(name, targetPort, targetName string, filter tmbroker.Filter) (triggermesh.Component, error) {
+func (o *CreateOptions) createTrigger(name, targetPort, targetName string, filter *tmbroker.Filter) (triggermesh.Component, error) {
 	trigger, err := tmbroker.NewTrigger(name, o.Context, o.ConfigBase,
 		fmt.Sprintf("http://host.docker.internal:%s", targetPort), targetName, filter)
 	if err != nil {

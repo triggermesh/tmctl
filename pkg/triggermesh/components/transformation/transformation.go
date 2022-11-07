@@ -83,14 +83,17 @@ func (t *Transformation) GetSpec() map[string]interface{} {
 }
 
 func (t *Transformation) GetEventTypes() ([]string, error) {
-	return t.getContextTransformationValue("type"), nil
+	if et := t.getContextTransformationValue("type"); len(et) != 0 {
+		return et, nil
+	}
+	return []string{}, fmt.Errorf("%q does not expose event type attributes", t.Name)
 }
 
 func (t *Transformation) GetEventSource() (string, error) {
 	if src := t.getContextTransformationValue("source"); len(src) != 0 {
 		return src[0], nil
 	}
-	return "", nil
+	return "", fmt.Errorf("%q does not expose event source attribute", t.Name)
 }
 
 func (t *Transformation) ConsumedEventTypes() ([]string, error) {

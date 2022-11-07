@@ -152,7 +152,7 @@ func (o *DeleteOptions) removeObject(component string) {
 			continue
 		}
 		if object.Kind == "Trigger" {
-			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, o.Context, o.ConfigBase, "", "", tmbroker.Filter{})
+			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, o.Context, o.ConfigBase, "", "", nil)
 			if err != nil {
 				log.Printf("Creating trigger object %q: %v", object.Metadata.Name, err)
 				continue
