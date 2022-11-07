@@ -58,10 +58,10 @@ func NewCmd() *cobra.Command {
 		ValidArgsFunction: o.deleteCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if broker != "" {
-				o.Context = broker
-				o.Manifest = manifest.New(path.Join(o.ConfigBase, broker, manifestFile))
-				cobra.CheckErr(o.Manifest.Read())
 				return o.deleteBroker(broker)
+			}
+			if len(args) == 0 {
+				return fmt.Errorf("expected at least 1 component name, got 0")
 			}
 			return o.deleteComponents(args, false)
 		},
@@ -93,10 +93,15 @@ func (o *DeleteOptions) initialize() {
 }
 
 func (o *DeleteOptions) deleteBroker(broker string) error {
-	if err := o.deleteComponents([]string{}, true); err != nil {
+	oo := *o
+	oo.Context = broker
+	oo.Manifest = manifest.New(path.Join(oo.ConfigBase, broker, manifestFile))
+	cobra.CheckErr(oo.Manifest.Read())
+
+	if err := oo.deleteComponents([]string{}, true); err != nil {
 		return fmt.Errorf("deleting component: %w", err)
 	}
-	if err := os.RemoveAll(path.Join(o.ConfigBase, broker)); err != nil {
+	if err := os.RemoveAll(path.Join(oo.ConfigBase, broker)); err != nil {
 		return fmt.Errorf("delete broker %q: %v", broker, err)
 	}
 	if broker == o.Context {
@@ -105,45 +110,53 @@ func (o *DeleteOptions) deleteBroker(broker string) error {
 	return nil
 }
 
-func (o *DeleteOptions) deleteComponents(names []string, force bool) error {
+func (o *DeleteOptions) deleteComponents(names []string, deleteBroker bool) error {
 	ctx := context.Background()
 	client, err := docker.NewClient()
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
 	for _, object := range o.Manifest.Objects {
-		if object.Kind == "Secret" {
+		if deleteBroker {
+			o.deleteEverything(ctx, object, client)
 			continue
 		}
-		skip := false
-		if len(names) > 0 {
-			skip = true
-			for _, v := range names {
-				if v == object.Metadata.Name {
-					skip = false
-					break
-				}
+		if object.Kind == "Secret" {
+			// do not remove secrets implicitly,
+			/// we may need them to finalize external services
+			continue
+		}
+		skip := true
+		for _, v := range names {
+			if v == object.Metadata.Name {
+				skip = false
+				break
 			}
 		}
 		if skip {
 			continue
 		}
 		if object.Kind == "Broker" {
-			if !force {
-				continue
-			}
-			object.Metadata.Name += "-broker"
+			log.Printf("use \"tmctl delete --broker %s\" to delete the broker. Skipping", object.Metadata.Name)
+			continue
 		}
-		log.Printf("Deleting %q %s", object.Metadata.Name, strings.ToLower(object.Kind))
-		if err := o.removeExternalServices(ctx, object); err != nil {
-			log.Printf("WARN: external services are not deleted: %v", err)
-		}
-		o.deleteContainer(ctx, object.Metadata.Name, client)
-		o.removeObject(object.Metadata.Name)
-		o.cleanupTriggers(object.Metadata.Name)
-		o.cleanupSecrets(object.Metadata.Name)
+		o.deleteEverything(ctx, object, client)
 	}
 	return nil
+}
+
+func (o *DeleteOptions) deleteEverything(ctx context.Context, object kubernetes.Object, client *client.Client) {
+	log.Printf("Deleting %q %s", object.Metadata.Name, strings.ToLower(object.Kind))
+	if object.Kind == "Broker" {
+		object.Metadata.Name = object.Metadata.Name + "-broker"
+	}
+	if err := o.removeExternalServices(ctx, object); err != nil {
+		log.Printf("WARN: external services are not deleted: %v", err)
+	}
+	o.removeContainer(ctx, object.Metadata.Name, client)
+	o.removeObject(object.Metadata.Name)
+	o.cleanupTriggers(object.Metadata.Name)
+	o.cleanupSecrets(object.Metadata.Name)
 }
 
 func (o *DeleteOptions) removeObject(component string) {
@@ -167,7 +180,7 @@ func (o *DeleteOptions) removeObject(component string) {
 	}
 }
 
-func (o *DeleteOptions) deleteContainer(ctx context.Context, name string, client *client.Client) error {
+func (o *DeleteOptions) removeContainer(ctx context.Context, name string, client *client.Client) error {
 	return docker.ForceStop(ctx, name, client)
 }
 
