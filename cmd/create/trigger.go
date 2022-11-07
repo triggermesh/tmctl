@@ -69,19 +69,9 @@ func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 		return fmt.Errorf("manifest read: %w", err)
 	}
 
-	for _, source := range eventSourcesFilter {
-		s, err := components.GetObject(source, o.CRD, o.Version, o.Manifest)
-		if err != nil {
-			return fmt.Errorf("%q event types: %w", source, err)
-		}
-		if _, ok := s.(triggermesh.Producer); !ok {
-			return fmt.Errorf("%q is not an event producer", source)
-		}
-		et, err := s.(triggermesh.Producer).GetEventTypes()
-		if err != nil {
-			return fmt.Errorf("%q event types: %w", source, err)
-		}
-		eventTypesFilter = append(eventTypesFilter, et...)
+	eventSourcesFilter, err := o.translateEventSource(eventSourcesFilter)
+	if err != nil {
+		return err
 	}
 
 	component, err := components.GetObject(target, o.CRD, o.Version, o.Manifest)
@@ -100,11 +90,16 @@ func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 	}
 
 	log.Println("Creating trigger")
-	if len(eventTypesFilter) == 0 {
+	if len(eventTypesFilter) == 0 && len(eventSourcesFilter) == 0 {
 		return tmbroker.CreateTrigger(name, component.GetName(), port, o.Context, o.ConfigBase, nil)
 	}
 	for _, et := range eventTypesFilter {
-		if err := tmbroker.CreateTrigger(name, component.GetName(), port, o.Context, o.ConfigBase, tmbroker.FilterExactType(et)); err != nil {
+		if err := tmbroker.CreateTrigger(name, component.GetName(), port, o.Context, o.ConfigBase, tmbroker.FilterExactAttribute("type", et)); err != nil {
+			return err
+		}
+	}
+	for _, es := range eventSourcesFilter {
+		if err := tmbroker.CreateTrigger(name, component.GetName(), port, o.Context, o.ConfigBase, tmbroker.FilterExactAttribute("source", es)); err != nil {
 			return err
 		}
 	}

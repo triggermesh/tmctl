@@ -41,8 +41,10 @@ type Runnable interface {
 
 // Producer is implemeted by all components that produce events.
 type Producer interface {
-	SetEventType(string) error
+	SetEventAttributes(map[string]string) error
+
 	GetEventTypes() ([]string, error)
+	GetEventSource() (string, error)
 }
 
 // Consumer is implemented by all components that consume events.

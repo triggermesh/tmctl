@@ -25,7 +25,6 @@ import (
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -67,12 +66,9 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 		if len(et) != 0 {
 			result = fmt.Sprintf("%s\nComponent consumes:\t%s", result, strings.Join(et, ", "))
 		}
-		srcMsg := strings.Join(eventTypesFilter, ", ")
-		if len(eventSourcesFilter) != 0 {
-			srcMsg = fmt.Sprintf("%s(%s)", strings.Join(eventSourcesFilter, ", "), srcMsg)
-		}
-		if srcMsg != "" {
-			result = fmt.Sprintf("%s\nSubscribed to:\t\t%s", result, srcMsg)
+		filter := strings.Join(append(eventTypesFilter, eventSourcesFilter...), ", ")
+		if filter != "" {
+			result = fmt.Sprintf("%s\nSubscribed to:\t\t%s", result, filter)
 		}
 		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
 		result = fmt.Sprintf("%s\nNext steps:", result)
@@ -107,13 +103,14 @@ func DescribeSource(sources []triggermesh.Component, containers []*docker.Contai
 		return
 	}
 	defer w.Flush()
-	fmt.Fprintln(w, "Source\tKind\tEventTypes\tStatus")
+	fmt.Fprintln(w, "Source\tKind\tEventSource\tEventTypes\tStatus")
 	for i, source := range sources {
-		et, err := source.(triggermesh.Producer).GetEventTypes()
-		if err != nil {
+		et, _ := source.(triggermesh.Producer).GetEventTypes()
+		if len(et) == 0 {
 			et = []string{"-"}
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", source.GetName(), source.GetKind(), strings.Join(et, ","), status(containers[i]))
+		es, _ := source.(triggermesh.Producer).GetEventSource()
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", source.GetName(), source.GetKind(), es, strings.Join(et, ","), status(containers[i]))
 	}
 	fmt.Fprintln(w)
 }
@@ -166,14 +163,9 @@ func DescribeTrigger(triggers []triggermesh.Component) {
 }
 
 func triggerFilterToString(filter tmbroker.Filter) string {
-	// that works with "exact type" filtering
-	// needs to be tested for other cases
-	f, err := yaml.Marshal(filter)
-	if err != nil {
-		return ""
+	var result []string
+	for k, v := range filter.Exact {
+		result = append(result, fmt.Sprintf("%s is %s", k, v))
 	}
-	result := strings.ReplaceAll(string(f), "\n", "")
-	result = strings.ReplaceAll(result, " ", "")
-	result = strings.ReplaceAll(result, ":", " ")
-	return result
+	return strings.Join(result, ", ")
 }

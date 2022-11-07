@@ -17,6 +17,7 @@ limitations under the License.
 package adapter
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -24,7 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/ce"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/env"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler"
 )
 
 const (
@@ -101,4 +104,31 @@ func envsToString(envs []corev1.EnvVar) []string {
 		result = append(result, fmt.Sprintf("%s=%s", env.Name, env.Value))
 	}
 	return result
+}
+
+func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructured, secrets map[string]string) (map[string]interface{}, error) {
+	return reconciler.InitializeAndGetStatus(ctx, object, secrets)
+}
+
+func Finalize(ctx context.Context, object unstructured.Unstructured, secrets map[string]string) error {
+	return reconciler.Finalize(ctx, object, secrets)
+}
+
+func EventAttributes(object unstructured.Unstructured) (ce.EventAttributes, error) {
+	attributes, err := ce.Attributes(object)
+	if err != nil {
+		return ce.EventAttributes{}, err
+	}
+	if attributes.ProducedEventSource == "*" || attributes.ProducedEventSource == "-" {
+		attributes.ProducedEventSource = ""
+	}
+	if len(attributes.AcceptedEventTypes) == 1 &&
+		(attributes.AcceptedEventTypes[0] == "*" || attributes.AcceptedEventTypes[0] == "-") {
+		attributes.AcceptedEventTypes = []string{}
+	}
+	if len(attributes.ProducedEventTypes) == 1 &&
+		(attributes.ProducedEventTypes[0] == "*" || attributes.ProducedEventTypes[0] == "-") {
+		attributes.ProducedEventTypes = []string{}
+	}
+	return attributes, nil
 }

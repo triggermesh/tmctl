@@ -14,268 +14,335 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package env
+package ce
 
 import (
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	sourcesv1alpha1 "github.com/triggermesh/triggermesh/pkg/apis/sources/v1alpha1"
-
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/awscloudwatchlogssource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/awscloudwatchsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/awscodecommitsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/awscognitoidentitysource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/awscognitouserpoolsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/awsdynamodbsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/awseventbridgesource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/awskinesissource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/awsperformanceinsightssource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/awss3source"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/awssqssource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureactivitylogssource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureblobstoragesource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureeventgridsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureeventhubsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureiothubsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azurequeuestoragesource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureservicebusqueuesource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureservicebustopicsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/cloudeventssource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudauditlogssource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudbillingsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudiotsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudpubsubsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudsourcerepositoriessource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudstoragesource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/httppollersource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/ibmmqsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/kafkasource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/ocimetricssource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/salesforcesource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/slacksource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/webhooksource"
 )
 
-func sources(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
+func sources(object unstructured.Unstructured) (EventAttributes, error) {
 	switch object.GetKind() {
 	case "AWSCloudWatchLogsSource":
 		var o *sourcesv1alpha1.AWSCloudWatchLogsSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return awscloudwatchlogssource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AWSCloudWatchSource":
 		var o *sourcesv1alpha1.AWSCloudWatchSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return awscloudwatchsource.MakeAppEnv(o)
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AWSCodeCommitSource":
 		var o *sourcesv1alpha1.AWSCodeCommitSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return awscodecommitsource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AWSCognitoIdentitySource":
 		var o *sourcesv1alpha1.AWSCognitoIdentitySource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return awscognitoidentitysource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AWSCognitoUserPoolSource":
 		var o *sourcesv1alpha1.AWSCognitoUserPoolSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return awscognitouserpoolsource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AWSDynamoDBSource":
 		var o *sourcesv1alpha1.AWSDynamoDBSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return awsdynamodbsource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AWSEventBridgeSource":
 		var o *sourcesv1alpha1.AWSEventBridgeSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return awseventbridgesource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AWSKinesisSource":
 		var o *sourcesv1alpha1.AWSKinesisSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return awskinesissource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AWSPerformanceInsightsSource":
 		var o *sourcesv1alpha1.AWSPerformanceInsightsSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return awsperformanceinsightssource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AWSS3Source":
 		var o *sourcesv1alpha1.AWSS3Source
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return awss3source.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 		// Multitenant
 		// case "AWSSNSSource":
 		// 	var o *sourcesv1alpha1.AWSSNSSource
-		// 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+		// 					if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
 		// 		return nil, err
 		// 	}
 		// 	return awssnssource.MakeAppEnv(o), nil
 	case "AWSSQSSource":
 		var o *sourcesv1alpha1.AWSSQSSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return awssqssource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AzureActivityLogsSource":
 		var o *sourcesv1alpha1.AzureActivityLogsSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return azureactivitylogssource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AzureBlobStorageSource":
 		var o *sourcesv1alpha1.AzureBlobStorageSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return azureblobstoragesource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AzureEventGridSource":
 		var o *sourcesv1alpha1.AzureEventGridSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return azureeventgridsource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AzureEventHubSource":
 		var o *sourcesv1alpha1.AzureEventHubSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return azureeventhubsource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AzureIOTHubSource":
 		var o *sourcesv1alpha1.AzureIOTHubSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return azureiothubsource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AzureQueueStorageSource":
 		var o *sourcesv1alpha1.AzureQueueStorageSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return azurequeuestoragesource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AzureServiceBusQueueSource":
 		var o *sourcesv1alpha1.AzureServiceBusQueueSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return azureservicebusqueuesource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "AzureServiceBusTopicSource":
 		var o *sourcesv1alpha1.AzureServiceBusTopicSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return azureservicebustopicsource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "CloudEventsSource":
 		var o *sourcesv1alpha1.CloudEventsSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return cloudeventssource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "GoogleCloudAuditLogsSource":
 		var o *sourcesv1alpha1.GoogleCloudAuditLogsSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return googlecloudauditlogssource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "GoogleCloudBillingSource":
 		var o *sourcesv1alpha1.GoogleCloudBillingSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return googlecloudbillingsource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "GoogleCloudIoTSource":
 		var o *sourcesv1alpha1.GoogleCloudIoTSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return googlecloudiotsource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "GoogleCloudPubSubSource":
 		var o *sourcesv1alpha1.GoogleCloudPubSubSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return googlecloudpubsubsource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "GoogleCloudSourceRepositoriesSource":
 		var o *sourcesv1alpha1.GoogleCloudSourceRepositoriesSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return googlecloudsourcerepositoriessource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "GoogleCloudStorageSource":
 		var o *sourcesv1alpha1.GoogleCloudStorageSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return googlecloudstoragesource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "HTTPPollerSource":
 		var o *sourcesv1alpha1.HTTPPollerSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return httppollersource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "IBMMQSource":
 		var o *sourcesv1alpha1.IBMMQSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return ibmmqsource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "KafkaSource":
-		var o *sourcesv1alpha1.KafkaSource
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
-		}
-		return kafkasource.MakeAppEnv(o), nil
+		// var o *sourcesv1alpha1.KafkaSource
+		// 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+		// return o.GetEventTypes(), o.AsEventSource(), nil
 	case "OCIMetricsSource":
 		var o *sourcesv1alpha1.OCIMetricsSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return ocimetricssource.MakeAppEnv(o)
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "SalesforceSource":
 		var o *sourcesv1alpha1.SalesforceSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return salesforcesource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "SlackSource":
 		var o *sourcesv1alpha1.SlackSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return slacksource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "TwilioSource":
-		return []corev1.EnvVar{}, nil
+		var o *sourcesv1alpha1.TwilioSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return EventAttributes{}, err
+		}
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "WebhookSource":
 		var o *sourcesv1alpha1.WebhookSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
+			return EventAttributes{}, err
 		}
-		return webhooksource.MakeAppEnv(o), nil
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 		// Multitenant
 		// case "ZendeskSource":
 		// 	var o *sourcesv1alpha1.ZendeskSource
-		// 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+		// 					if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
 		// 		return nil, err
 		// 	}
 		// 	return zendesksource.MakeAppEnv(o), nil
 	}
-	return nil, fmt.Errorf("kind %q is not supported", object.GetKind())
+
+	return EventAttributes{}, fmt.Errorf("kind %q is not supported", object.GetKind())
 }

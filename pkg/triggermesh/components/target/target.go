@@ -132,7 +132,15 @@ func (t *Target) GetChildren() ([]triggermesh.Component, error) {
 }
 
 func (t *Target) ConsumedEventTypes() ([]string, error) {
-	return []string{}, nil
+	o, err := t.asUnstructured()
+	if err != nil {
+		return nil, err
+	}
+	eventAttributes, err := adapter.EventAttributes(o)
+	if err != nil {
+		return []string{}, err
+	}
+	return eventAttributes.AcceptedEventTypes, nil
 }
 
 func (t *Target) Start(ctx context.Context, additionalEnvs map[string]string, restart bool) (*docker.Container, error) {

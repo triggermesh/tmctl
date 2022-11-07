@@ -107,20 +107,11 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 		targetPort = port
 	}
 
-	for _, source := range eventSourcesFilter {
-		s, err := components.GetObject(source, o.CRD, o.Version, o.Manifest)
-		if err != nil {
-			return fmt.Errorf("%q event types: %w", source, err)
-		}
-		if _, ok := s.(triggermesh.Producer); !ok {
-			return fmt.Errorf("%q is not an event producer", source)
-		}
-		et, err := s.(triggermesh.Producer).GetEventTypes()
-		if err != nil {
-			return fmt.Errorf("%q event types: %w", source, err)
-		}
-		eventTypesFilter = append(eventTypesFilter, et...)
+	eventSourcesFilter, err := o.translateEventSource(eventSourcesFilter)
+	if err != nil {
+		return err
 	}
+
 	var data []byte
 	if file == "" {
 		input, err := fromStdIn()
@@ -139,11 +130,16 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 	if err := yaml.Unmarshal(data, &spec); err != nil {
 		return fmt.Errorf("decode spec: %w", err)
 	}
+
 	t := transformation.New(name, o.CRD, "transformation", o.Context, o.Version, spec)
+
+	transformationEventType := fmt.Sprintf("%s.output", t.GetName())
 	if et, _ := t.(triggermesh.Producer).GetEventTypes(); len(et) == 0 {
-		if err := t.(triggermesh.Producer).SetEventType(fmt.Sprintf("%s.output", t.GetName())); err != nil {
+		if err := t.(triggermesh.Producer).SetEventAttributes(map[string]string{"type": transformationEventType}); err != nil {
 			return fmt.Errorf("setting event type: %w", err)
 		}
+	} else {
+		transformationEventType = et[0]
 	}
 	log.Println("Updating manifest")
 	restart, err := t.Add(o.Manifest)
@@ -157,42 +153,55 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 	}
 
 	targetTriggers := make(map[string]tmbroker.Trigger)
+	// creating new trigger from transformation to target
 	if target != "" {
-		transformationEventTypes, err := t.(triggermesh.Producer).GetEventTypes()
-		if err != nil {
-			return fmt.Errorf("transformation event type: %w", err)
+		if targetTriggers, err = tmbroker.GetTargetTriggers(path.Join(o.ConfigBase, o.Context), target); err != nil {
+			return fmt.Errorf("target triggers: %w", err)
 		}
-		if targetTriggers, err = o.updateTargetTriggers(target, targetPort, transformationEventTypes); err != nil {
-			return fmt.Errorf("updating target: %w", err)
+		if err := tmbroker.CreateTrigger("", target, targetPort, o.Context, o.ConfigBase,
+			tmbroker.FilterExactAttribute("type", transformationEventType)); err != nil {
+			return fmt.Errorf("create trigger: %w", err)
 		}
 	}
 
+	// updating existing triggers from sources to target
 	for _, et := range eventTypesFilter {
-		filter := tmbroker.FilterExactType(et)
+		filter := tmbroker.FilterExactAttribute("type", et)
 		if err := tmbroker.CreateTrigger("", container.Name, container.HostPort(), o.Context, o.ConfigBase, filter); err != nil {
 			return err
 		}
 		for _, trigger := range targetTriggers {
-			if len(trigger.Filters) != 1 {
-				continue
-			}
-			if trigger.Filters[0].Exact == nil {
-				continue
-			}
-			if trigger.Filters[0].Exact["type"] != filter.Exact["type"] {
+			if len(trigger.Filters) != 1 || &trigger.Filters[0] != filter {
 				continue
 			}
 			if err := trigger.RemoveTriggerFromConfig(); err != nil {
 				return err
 			}
-
 			if err := trigger.Delete(o.Manifest); err != nil {
 				return err
 			}
 		}
 	}
 
-	if len(eventTypesFilter) == 0 {
+	for _, es := range eventSourcesFilter {
+		filter := tmbroker.FilterExactAttribute("source", es)
+		if err := tmbroker.CreateTrigger("", container.Name, container.HostPort(), o.Context, o.ConfigBase, filter); err != nil {
+			return err
+		}
+		for _, trigger := range targetTriggers {
+			if len(trigger.Filters) != 1 || &trigger.Filters[0] != filter {
+				continue
+			}
+			if err := trigger.RemoveTriggerFromConfig(); err != nil {
+				return err
+			}
+			if err := trigger.Delete(o.Manifest); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(eventTypesFilter) == 0 && len(eventSourcesFilter) == 0 {
 		for _, trigger := range targetTriggers {
 			trigger.SetTarget(container.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
 			if err := trigger.UpdateBrokerConfig(); err != nil {
@@ -243,17 +252,4 @@ func (o *CreateOptions) lookupTarget(ctx context.Context, target string) (string
 		return "", fmt.Errorf("%q is not an event consumer", target)
 	}
 	return consumer.GetPort(ctx)
-}
-
-func (o *CreateOptions) updateTargetTriggers(target, targetPort string, transformationEventTypes []string) (map[string]tmbroker.Trigger, error) {
-	targetTriggers, err := tmbroker.GetTargetTriggers(path.Join(o.ConfigBase, o.Context), target)
-	if err != nil {
-		return nil, fmt.Errorf("target triggers: %w", err)
-	}
-	for _, et := range transformationEventTypes {
-		if err := tmbroker.CreateTrigger("", target, targetPort, o.Context, o.ConfigBase, tmbroker.FilterExactType(et)); err != nil {
-			return nil, fmt.Errorf("create trigger: %w", err)
-		}
-	}
-	return targetTriggers, nil
 }
