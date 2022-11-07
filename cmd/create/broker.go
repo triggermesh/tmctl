@@ -39,7 +39,6 @@ func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.Manifest = path.Join(o.ConfigBase, args[0], manifestFile)
 			return o.broker(args[0])
 		},
 	}
@@ -47,15 +46,19 @@ func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 
 func (o *CreateOptions) broker(name string) error {
 	ctx := context.Background()
-	broker, err := tmbroker.New(name, o.Manifest)
+
+	o.Manifest.Path = path.Join(o.ConfigBase, name, manifestFile)
+	broker, err := tmbroker.New(name, o.Manifest.Path)
 	if err != nil {
 		return fmt.Errorf("broker: %w", err)
 	}
 
+	o.Manifest.Read()
+
 	log.Println("Updating manifest")
-	restart, err := broker.Add(o.Manifest)
+	restart, err := o.Manifest.Add(broker)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to update manifest: %w", err)
 	}
 
 	log.Println("Starting container")

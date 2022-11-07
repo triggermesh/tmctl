@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -71,6 +70,7 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 		// Short:     "TriggerMesh transformation",
 		ValidArgs: []string{"--name", "--target", "--source", "--eventTypes", "--from"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cobra.CheckErr(o.Manifest.Read())
 			return o.transformation(name, target, file, eventSourcesFilter, eventTypesFilter)
 		},
 	}
@@ -84,20 +84,19 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 		return []string{}, cobra.ShellCompDirectiveNoFileComp
 	})
 	transformationCmd.RegisterFlagCompletionFunc("source", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return completion.ListSources(path.Join(o.ConfigBase, o.Context, manifestFile)), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	})
 	transformationCmd.RegisterFlagCompletionFunc("eventTypes", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return completion.ListEventTypes(path.Join(o.ConfigBase, o.Context, manifestFile), o.CRD), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListEventTypes(o.Manifest, o.CRD), cobra.ShellCompDirectiveNoFileComp
 	})
 	transformationCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return completion.ListTargets(path.Join(o.ConfigBase, o.Context, manifestFile)), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListTargets(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	})
 	return transformationCmd
 }
 
 func (o *CreateOptions) transformation(name, target, file string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
-
 	var targetPort string
 	if target != "" {
 		port, err := o.lookupTarget(ctx, target)
@@ -135,31 +134,33 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 
 	transformationEventType := fmt.Sprintf("%s.output", t.GetName())
 	if et, _ := t.(triggermesh.Producer).GetEventTypes(); len(et) == 0 {
-		if err := t.(triggermesh.Producer).SetEventAttributes(map[string]string{"type": transformationEventType}); err != nil {
+		if err := t.(triggermesh.Producer).SetEventAttributes(map[string]string{
+			"type": transformationEventType,
+		}); err != nil {
 			return fmt.Errorf("setting event type: %w", err)
 		}
 	} else {
 		transformationEventType = et[0]
 	}
 	log.Println("Updating manifest")
-	restart, err := t.Add(o.Manifest)
+	restart, err := o.Manifest.Add(t)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to update manifest: %w", err)
 	}
+
 	log.Println("Starting container")
 	container, err := t.(triggermesh.Runnable).Start(ctx, nil, restart)
 	if err != nil {
 		return err
 	}
 
-	targetTriggers := make(map[string]tmbroker.Trigger)
+	var targetTriggers []triggermesh.Component
 	// creating new trigger from transformation to target
 	if target != "" {
-		if targetTriggers, err = tmbroker.GetTargetTriggers(path.Join(o.ConfigBase, o.Context), target); err != nil {
+		if targetTriggers, err = tmbroker.GetTargetTriggers(o.Context, o.ConfigBase, target); err != nil {
 			return fmt.Errorf("target triggers: %w", err)
 		}
-		if err := tmbroker.CreateTrigger("", target, targetPort, o.Context, o.ConfigBase,
-			tmbroker.FilterExactAttribute("type", transformationEventType)); err != nil {
+		if _, err := o.createTrigger("", targetPort, target, tmbroker.FilterExactAttribute("type", transformationEventType)); err != nil {
 			return fmt.Errorf("create trigger: %w", err)
 		}
 	}
@@ -167,17 +168,18 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 	// updating existing triggers from sources to target
 	for _, et := range eventTypesFilter {
 		filter := tmbroker.FilterExactAttribute("type", et)
-		if err := tmbroker.CreateTrigger("", container.Name, container.HostPort(), o.Context, o.ConfigBase, filter); err != nil {
+		if _, err := o.createTrigger("", container.HostPort(), container.Name, filter); err != nil {
 			return err
 		}
-		for _, trigger := range targetTriggers {
-			if len(trigger.Filters) != 1 || &trigger.Filters[0] != filter {
+		for _, component := range targetTriggers {
+			trigger := component.(*tmbroker.Trigger)
+			if len(trigger.Filters) != 1 || &trigger.Filters[0] != &filter {
 				continue
 			}
 			if err := trigger.RemoveTriggerFromConfig(); err != nil {
 				return err
 			}
-			if err := trigger.Delete(o.Manifest); err != nil {
+			if err := o.Manifest.Remove(trigger.GetName(), trigger.GetKind()); err != nil {
 				return err
 			}
 		}
@@ -185,17 +187,18 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 
 	for _, es := range eventSourcesFilter {
 		filter := tmbroker.FilterExactAttribute("source", es)
-		if err := tmbroker.CreateTrigger("", container.Name, container.HostPort(), o.Context, o.ConfigBase, filter); err != nil {
+		if _, err := o.createTrigger("", container.HostPort(), container.Name, filter); err != nil {
 			return err
 		}
-		for _, trigger := range targetTriggers {
-			if len(trigger.Filters) != 1 || &trigger.Filters[0] != filter {
+		for _, component := range targetTriggers {
+			trigger := component.(*tmbroker.Trigger)
+			if len(trigger.Filters) != 1 || &trigger.Filters[0] != &filter {
 				continue
 			}
 			if err := trigger.RemoveTriggerFromConfig(); err != nil {
 				return err
 			}
-			if err := trigger.Delete(o.Manifest); err != nil {
+			if err := o.Manifest.Remove(trigger.GetName(), trigger.GetKind()); err != nil {
 				return err
 			}
 		}
@@ -203,11 +206,11 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 
 	if len(eventTypesFilter) == 0 && len(eventSourcesFilter) == 0 {
 		for _, trigger := range targetTriggers {
-			trigger.SetTarget(container.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
-			if err := trigger.UpdateBrokerConfig(); err != nil {
+			trigger.(*tmbroker.Trigger).SetTarget(container.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
+			if err := trigger.(*tmbroker.Trigger).UpdateBrokerConfig(); err != nil {
 				return err
 			}
-			if _, err := trigger.Add(o.Manifest); err != nil {
+			if _, err := o.Manifest.Add(trigger); err != nil {
 				return err
 			}
 		}
@@ -242,8 +245,7 @@ func readInput() (string, error) {
 }
 
 func (o *CreateOptions) lookupTarget(ctx context.Context, target string) (string, error) {
-	manifestPath := path.Join(o.ConfigBase, o.Context, manifestFile)
-	targetObject, err := components.GetObject(target, o.CRD, o.Version, manifestPath)
+	targetObject, err := components.GetObject(target, o.CRD, o.Version, o.Manifest)
 	if err != nil {
 		return "", fmt.Errorf("transformation target: %w", err)
 	}

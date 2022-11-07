@@ -20,12 +20,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"path"
 
 	"github.com/spf13/cobra"
 
 	"github.com/triggermesh/tmctl/pkg/completion"
-	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
@@ -39,6 +37,7 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 		// Short:     "TriggerMesh trigger",
 		ValidArgs: []string{"--target", "--name", "--source", "--eventTypes"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cobra.CheckErr(o.Manifest.Read())
 			return o.trigger(name, eventSourcesFilter, eventTypesFilter, target)
 		},
 	}
@@ -52,23 +51,18 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 		return []string{}, cobra.ShellCompDirectiveNoFileComp
 	})
 	triggerCmd.RegisterFlagCompletionFunc("source", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return completion.ListSources(path.Join(o.ConfigBase, o.Context, manifestFile)), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	})
 	triggerCmd.RegisterFlagCompletionFunc("eventTypes", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return completion.ListEventTypes(path.Join(o.ConfigBase, o.Context, manifestFile), o.CRD), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListEventTypes(o.Manifest, o.CRD), cobra.ShellCompDirectiveNoFileComp
 	})
 	triggerCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return completion.ListTargets(path.Join(o.ConfigBase, o.Context, manifestFile)), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListTargets(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	})
 	return triggerCmd
 }
 
 func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilter []string, target string) error {
-	manifest := manifest.New(path.Join(o.ConfigBase, o.Context, manifestFile))
-	if err := manifest.Read(); err != nil {
-		return fmt.Errorf("manifest read: %w", err)
-	}
-
 	eventSourcesFilter, err := o.translateEventSource(eventSourcesFilter)
 	if err != nil {
 		return err
@@ -91,15 +85,17 @@ func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 
 	log.Println("Creating trigger")
 	if len(eventTypesFilter) == 0 && len(eventSourcesFilter) == 0 {
-		return tmbroker.CreateTrigger(name, component.GetName(), port, o.Context, o.ConfigBase, nil)
+		if _, err = o.createTrigger(name, port, component.GetName(), tmbroker.Filter{}); err != nil {
+			return err
+		}
 	}
 	for _, et := range eventTypesFilter {
-		if err := tmbroker.CreateTrigger(name, component.GetName(), port, o.Context, o.ConfigBase, tmbroker.FilterExactAttribute("type", et)); err != nil {
+		if _, err = o.createTrigger(name, port, component.GetName(), tmbroker.FilterExactAttribute("type", et)); err != nil {
 			return err
 		}
 	}
 	for _, es := range eventSourcesFilter {
-		if err := tmbroker.CreateTrigger(name, component.GetName(), port, o.Context, o.ConfigBase, tmbroker.FilterExactAttribute("source", es)); err != nil {
+		if _, err = o.createTrigger(name, port, component.GetName(), tmbroker.FilterExactAttribute("source", es)); err != nil {
 			return err
 		}
 	}

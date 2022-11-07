@@ -26,6 +26,7 @@ import (
 
 	"github.com/triggermesh/tmctl/pkg/output"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/target"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
@@ -48,6 +49,7 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 				fmt.Printf("\nAvailable target kinds:\n---\n%s\n", strings.Join(targets, "\n"))
 				return nil
 			}
+			cobra.CheckErr(o.Manifest.Read())
 			params := argsToMap(args[1:])
 			var name string
 			if n, exists := params["name"]; exists {
@@ -88,33 +90,49 @@ func (o *CreateOptions) target(name, kind string, args map[string]string, eventS
 
 	t := target.New(name, o.CRD, kind, o.Context, o.Version, args)
 
-	secretEnv, secretsChanged, err := triggermesh.ProcessSecrets(ctx, t.(triggermesh.Parent), o.Manifest)
+	secrets, secretsChanged, err := components.ProcessSecrets(t.(triggermesh.Parent), o.Manifest)
 	if err != nil {
-		return fmt.Errorf("spec processing: %w", err)
+		return fmt.Errorf("processing secrets: %v", err)
 	}
 
 	log.Println("Updating manifest")
-	restart, err := t.Add(o.Manifest)
+	restart, err := o.Manifest.Add(t)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to update manifest: %w", err)
 	}
+
 	log.Println("Starting container")
-	container, err := t.(triggermesh.Runnable).Start(ctx, secretEnv, (restart || secretsChanged))
+	container, err := t.(triggermesh.Runnable).Start(ctx, secrets, (restart || secretsChanged))
 	if err != nil {
 		return err
 	}
 
 	for _, es := range eventSourcesFilter {
-		if err := tmbroker.CreateTrigger("", container.Name, container.HostPort(), o.Context, o.ConfigBase, tmbroker.FilterExactAttribute("source", es)); err != nil {
-			return err
+		if _, err := o.createTrigger("", container.HostPort(), container.Name, tmbroker.FilterExactAttribute("source", es)); err != nil {
+			return fmt.Errorf("creating trigger: %w", err)
 		}
 	}
 	for _, et := range eventTypesFilter {
-		if err := tmbroker.CreateTrigger("", container.Name, container.HostPort(), o.Context, o.ConfigBase, tmbroker.FilterExactAttribute("type", et)); err != nil {
-			return err
+		if _, err := o.createTrigger("", container.HostPort(), container.Name, tmbroker.FilterExactAttribute("type", et)); err != nil {
+			return fmt.Errorf("creating trigger: %w", err)
 		}
 	}
 
 	output.PrintStatus("consumer", t, eventSourcesFilter, eventTypesFilter)
 	return nil
+}
+
+func (o *CreateOptions) createTrigger(name, targetPort, targetName string, filter tmbroker.Filter) (triggermesh.Component, error) {
+	trigger, err := tmbroker.NewTrigger(name, o.Context, o.ConfigBase,
+		fmt.Sprintf("http://host.docker.internal:%s", targetPort), targetName, filter)
+	if err != nil {
+		return nil, err
+	}
+	if err := trigger.(*tmbroker.Trigger).UpdateBrokerConfig(); err != nil {
+		return nil, err
+	}
+	if _, err := o.Manifest.Add(trigger); err != nil {
+		return nil, err
+	}
+	return trigger, nil
 }

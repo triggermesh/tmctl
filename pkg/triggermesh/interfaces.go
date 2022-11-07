@@ -20,12 +20,12 @@ import (
 	"context"
 
 	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/kubernetes"
 )
 
 // Component is the common interface for all TriggerMesh components.
 type Component interface {
-	Add(manifest string) (bool, error)
-	Delete(manifest string) error
+	AsK8sObject() (kubernetes.Object, error)
 
 	GetName() string
 	GetKind() string

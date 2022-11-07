@@ -31,8 +31,8 @@ import (
 const manifestFile = "manifest.yaml"
 
 type DumpOptions struct {
-	ConfigDir string
-	Format    string
+	Format   string
+	Manifest *manifest.Manifest
 }
 
 func NewCmd() *cobra.Command {
@@ -41,11 +41,13 @@ func NewCmd() *cobra.Command {
 		Use:   "dump [broker]",
 		Short: "Generate Kubernetes manifest",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
+			broker := viper.GetString("context")
 			if len(args) == 1 {
-				return o.dump(args[0])
+				broker = args[0]
 			}
-			return o.dump(viper.GetString("context"))
+			o.Manifest = manifest.New(path.Join(path.Dir(viper.ConfigFileUsed()), broker, manifestFile))
+			cobra.CheckErr(o.Manifest.Read())
+			return o.dump(broker)
 		},
 	}
 	dumpCmd.Flags().StringVarP(&o.Format, "output", "o", "yaml", "Output format")
@@ -53,13 +55,9 @@ func NewCmd() *cobra.Command {
 }
 
 func (o *DumpOptions) dump(broker string) error {
-	manifest := manifest.New(path.Join(o.ConfigDir, broker, manifestFile))
-	if err := manifest.Read(); err != nil {
-		return err
-	}
 	switch o.Format {
 	case "json":
-		for _, v := range manifest.Objects {
+		for _, v := range o.Manifest.Objects {
 			jsn, err := json.MarshalIndent(v, "", "  ")
 			if err != nil {
 				return err
@@ -67,7 +65,7 @@ func (o *DumpOptions) dump(broker string) error {
 			fmt.Println(string(jsn))
 		}
 	case "yaml":
-		for _, v := range manifest.Objects {
+		for _, v := range o.Manifest.Objects {
 			yml, err := yaml.Marshal(v)
 			if err != nil {
 				return err

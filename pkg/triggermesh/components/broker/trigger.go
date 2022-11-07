@@ -26,7 +26,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
-	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
 
@@ -35,9 +34,9 @@ const manifestFile = "manifest.yaml"
 var _ triggermesh.Component = (*Trigger)(nil)
 
 type Trigger struct {
-	Broker          string `yaml:"-"`
-	BrokerConfigDir string `yaml:"-"`
-	Name            string `yaml:"-"`
+	Broker     string `yaml:"-"`
+	ConfigBase string `yaml:"-"`
+	Name       string `yaml:"-"`
 
 	Filters []Filter `yaml:"filters,omitempty"`
 	Target  Target   `yaml:"target"`
@@ -64,7 +63,7 @@ type Target struct {
 	} `yaml:"deliveryOptions,omitempty"`
 }
 
-func (t *Trigger) asK8sObject() (kubernetes.Object, error) {
+func (t *Trigger) AsK8sObject() (kubernetes.Object, error) {
 	spec := map[string]interface{}{
 		"target": t.Target,
 	}
@@ -83,30 +82,6 @@ func (t *Trigger) asK8sObject() (kubernetes.Object, error) {
 		},
 		Spec: spec,
 	}, nil
-}
-
-func (t *Trigger) Add(manifestPath string) (bool, error) {
-	manifest := manifest.New(manifestPath)
-	if err := manifest.Read(); err != nil {
-		return false, err
-	}
-	o, err := t.asK8sObject()
-	if err != nil {
-		return false, err
-	}
-	if dirty := manifest.Add(o); !dirty {
-		return false, nil
-	}
-	return true, manifest.Write()
-}
-
-func (t *Trigger) Delete(manifestPath string) error {
-	manifest := manifest.New(manifestPath)
-	if err := manifest.Read(); err != nil {
-		return err
-	}
-	manifest.Remove(t.Name, t.GetKind())
-	return manifest.Write()
 }
 
 func (t *Trigger) GetKind() string {
@@ -132,16 +107,27 @@ func (t *Trigger) GetSpec() map[string]interface{} {
 	}
 }
 
-func NewTrigger(name, broker, configBase string, filter *Filter) triggermesh.Component {
-	trigger := Trigger{
-		Name:            name,
-		Broker:          broker,
-		BrokerConfigDir: path.Join(configBase, broker),
+func NewTrigger(name, broker, configBase, targetURL, targetName string, filter Filter) (triggermesh.Component, error) {
+	if name == "" {
+		filterString, err := filter.String()
+		if err != nil {
+			return &Trigger{}, fmt.Errorf("filter: %w", err)
+		}
+		// in case of event types hash collision, replace with sha256
+		hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", targetName, filterString)))
+		name = fmt.Sprintf("%s-trigger-%s", broker, hex.EncodeToString(hash[:4]))
 	}
-	if filter != nil {
-		trigger.Filters = []Filter{*filter}
-	}
-	return &trigger
+
+	return &Trigger{
+		Name:       name,
+		Broker:     broker,
+		ConfigBase: configBase,
+		Target: Target{
+			Component: targetName,
+			URL:       targetURL,
+		},
+		Filters: []Filter{filter},
+	}, nil
 }
 
 func (t *Trigger) SetTarget(component, destination string) {
@@ -152,7 +138,7 @@ func (t *Trigger) SetTarget(component, destination string) {
 }
 
 func (t *Trigger) LookupTrigger() error {
-	configFile := path.Join(t.BrokerConfigDir, brokerConfigFile)
+	configFile := path.Join(t.ConfigBase, t.Broker, brokerConfigFile)
 	configuration, err := readBrokerConfig(configFile)
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -167,7 +153,7 @@ func (t *Trigger) LookupTrigger() error {
 }
 
 func (t *Trigger) RemoveTriggerFromConfig() error {
-	configFile := path.Join(t.BrokerConfigDir, brokerConfigFile)
+	configFile := path.Join(t.ConfigBase, t.Broker, brokerConfigFile)
 	configuration, err := readBrokerConfig(configFile)
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -177,7 +163,7 @@ func (t *Trigger) RemoveTriggerFromConfig() error {
 }
 
 func (t *Trigger) UpdateBrokerConfig() error {
-	configFile := path.Join(t.BrokerConfigDir, brokerConfigFile)
+	configFile := path.Join(t.ConfigBase, t.Broker, brokerConfigFile)
 	configuration, err := readBrokerConfig(configFile)
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -202,8 +188,8 @@ func (f *Filter) String() (string, error) {
 	return string(output), err
 }
 
-func FilterExactAttribute(attribute, value string) *Filter {
-	return &Filter{
+func FilterExactAttribute(attribute, value string) Filter {
+	return Filter{
 		Exact: map[string]string{attribute: value},
 	}
 }
@@ -223,23 +209,4 @@ func writeBrokerConfig(path string, configuration *Configuration) error {
 		return fmt.Errorf("marshal broker configuration: %w", err)
 	}
 	return os.WriteFile(path, out, os.ModePerm)
-}
-
-func CreateTrigger(name, targetName, port, broker, configBase string, filter *Filter) error {
-	if name == "" {
-		filterString, err := filter.String()
-		if err != nil {
-			return fmt.Errorf("filter: %w", err)
-		}
-		// in case of event types hash collision, replace with sha256
-		hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", targetName, filterString)))
-		name = fmt.Sprintf("%s-trigger-%s", broker, hex.EncodeToString(hash[:4]))
-	}
-	tr := NewTrigger(name, broker, configBase, filter)
-	tr.(*Trigger).SetTarget(targetName, fmt.Sprintf("http://host.docker.internal:%s", port))
-	if err := tr.(*Trigger).UpdateBrokerConfig(); err != nil {
-		return fmt.Errorf("broker config: %w", err)
-	}
-	_, err := tr.Add(path.Join(configBase, broker, manifestFile))
-	return err
 }

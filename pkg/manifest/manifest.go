@@ -17,16 +17,20 @@ limitations under the License.
 package manifest
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"reflect"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
 
 type Manifest struct {
+	sync.Mutex
 	Path    string
 	Objects []kubernetes.Object
 }
@@ -38,15 +42,20 @@ func New(path string) *Manifest {
 }
 
 func (m *Manifest) Read() error {
+	m.Lock()
+	defer m.Unlock()
 	o, err := parseYAML(m.Path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("manifest does not exist, please create the broker")
+		}
 		return err
 	}
 	m.Objects = o
 	return nil
 }
 
-func (m *Manifest) Write() error {
+func (m *Manifest) write() error {
 	var output []byte
 	for _, object := range m.Objects {
 		body, err := yaml.Marshal(object)
@@ -56,25 +65,38 @@ func (m *Manifest) Write() error {
 		body = append([]byte("---\n"), body...)
 		output = append(output, body...)
 	}
-	return os.WriteFile(m.Path, output, os.ModePerm)
+	if err := os.WriteFile(m.Path, output, os.ModePerm); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (m *Manifest) Add(object kubernetes.Object) bool {
-	object.Metadata.Namespace = "" // local manifest should not set namespace
+func (m *Manifest) Add(object triggermesh.Component) (bool, error) {
+	m.Lock()
+	defer m.Unlock()
+
+	k8sObject, err := object.AsK8sObject()
+	if err != nil {
+		return false, fmt.Errorf("creating k8s object: %w", err)
+	}
+
+	k8sObject.Metadata.Namespace = "" // local manifest should not set namespace
 	for i, o := range m.Objects {
-		if matchObjects(object, o) {
+		if matchObjects(k8sObject, o) {
 			if !reflect.DeepEqual(o, object) {
-				m.Objects[i] = object
-				return true
+				m.Objects[i] = k8sObject
+				return true, nil
 			}
-			return false
+			return false, nil
 		}
 	}
-	m.Objects = append(m.Objects, object)
-	return true
+	m.Objects = append(m.Objects, k8sObject)
+	return true, m.write()
 }
 
-func (m *Manifest) Remove(name, kind string) {
+func (m *Manifest) Remove(name, kind string) error {
+	m.Lock()
+	defer m.Unlock()
 	objects := []kubernetes.Object{}
 	for _, o := range m.Objects {
 		if o.Metadata.Name == name && o.Kind == kind {
@@ -83,44 +105,14 @@ func (m *Manifest) Remove(name, kind string) {
 		objects = append(objects, o)
 	}
 	m.Objects = objects
+	return m.write()
 }
 
 func parseYAML(path string) ([]kubernetes.Object, error) {
-	f, err := os.Open(path)
+	file, err := os.Open(path)
 	if err != nil {
-		return []kubernetes.Object{}, err
+		return nil, err
 	}
-
-	fstat, err := f.Stat()
-	if err != nil {
-		return []kubernetes.Object{}, err
-	}
-
-	if !fstat.IsDir() {
-		return readFile(f)
-	}
-
-	entries, err := f.ReadDir(-1)
-	if err != nil {
-		return []kubernetes.Object{}, err
-	}
-
-	var result []kubernetes.Object
-	for _, d := range entries {
-		if d.IsDir() {
-			// Skip directories
-			continue
-		}
-		objects, err := parseYAML(path + "/" + d.Name())
-		if err != nil {
-			return []kubernetes.Object{}, err
-		}
-		result = append(result, objects...)
-	}
-	return result, nil
-}
-
-func readFile(file io.Reader) ([]kubernetes.Object, error) {
 	var result []kubernetes.Object
 	decoder := yaml.NewDecoder(file)
 	for {

@@ -51,9 +51,10 @@ type components struct {
 }
 
 type DescribeOptions struct {
-	ConfigDir string
-	CRD       string
-	Version   string
+	ConfigBase string
+	CRD        string
+	Version    string
+	Manifest   *manifest.Manifest
 }
 
 func NewCmd() *cobra.Command {
@@ -65,31 +66,28 @@ func NewCmd() *cobra.Command {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
+			broker := viper.GetString("context")
+			if len(args) == 1 {
+				broker = args[0]
+			}
+			o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 			o.Version = viper.GetString("triggermesh.version")
-			crds, err := crd.Fetch(o.ConfigDir, o.Version)
+			o.Manifest = manifest.New(path.Join(o.ConfigBase, broker, manifestFile))
+			cobra.CheckErr(o.Manifest.Read())
+			crds, err := crd.Fetch(o.ConfigBase, o.Version)
 			if err != nil {
 				return err
 			}
 			o.CRD = crds
-			if len(args) == 1 {
-				return o.describe(args[0])
-			}
-			return o.describe(viper.GetString("context"))
+			return o.describe(broker)
 		},
 	}
 }
 
 func (o DescribeOptions) describe(broker string) error {
 	ctx := context.Background()
-	manifestFile := path.Join(o.ConfigDir, broker, manifestFile)
-	manifest := manifest.New(manifestFile)
-	if err := manifest.Read(); err != nil {
-		return nil
-	}
-
 	var intg integration
-	for _, object := range manifest.Objects {
+	for _, object := range o.Manifest.Objects {
 		switch {
 		case object.Kind == "Broker":
 			broker, err := tmbroker.New(object.Metadata.Name, manifestFile)
@@ -105,7 +103,10 @@ func (o DescribeOptions) describe(broker string) error {
 				container: []*docker.Container{container},
 			}
 		case object.Kind == "Trigger":
-			trigger := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigDir, nil)
+			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigBase, "", "", tmbroker.Filter{})
+			if err != nil {
+				return fmt.Errorf("trigger object: %w", err)
+			}
 			if err := trigger.(*tmbroker.Trigger).LookupTrigger(); err != nil {
 				return fmt.Errorf("trigger config: %w", err)
 			}

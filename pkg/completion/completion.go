@@ -25,12 +25,8 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-func ListSources(manifestFile string) []string {
+func ListSources(m *manifest.Manifest) []string {
 	var list []string
-	m := manifest.New(manifestFile)
-	if err := m.Read(); err != nil {
-		return []string{}
-	}
 	for _, object := range m.Objects {
 		if strings.HasPrefix(object.APIVersion, "sources.triggermesh.io") {
 			list = append(list, object.Metadata.Name)
@@ -39,25 +35,18 @@ func ListSources(manifestFile string) []string {
 	return list
 }
 
-func ListTargets(manifestFile string) []string {
+func ListTargets(m *manifest.Manifest) []string {
 	var list []string
-	m := manifest.New(manifestFile)
-	if err := m.Read(); err != nil {
-		return []string{}
-	}
 	for _, object := range m.Objects {
-		if strings.HasPrefix(object.APIVersion, "targets.triggermesh.io") {
+		if object.APIVersion == "targets.triggermesh.io/v1alpha1" ||
+			object.APIVersion == "flow.triggermesh.io/v1alpha1" {
 			list = append(list, object.Metadata.Name)
 		}
 	}
 	return list
 }
 
-func ListAll(manifestFile string) []string {
-	m := manifest.New(manifestFile)
-	if err := m.Read(); err != nil {
-		return []string{}
-	}
+func ListAll(m *manifest.Manifest) []string {
 	var list []string
 	for _, object := range m.Objects {
 		list = append(list, object.Metadata.Name)
@@ -65,12 +54,8 @@ func ListAll(manifestFile string) []string {
 	return list
 }
 
-func ListEventTypes(manifestFile, crdFile string) []string {
+func ListEventTypes(m *manifest.Manifest, crdFile string) []string {
 	var eventTypes []string
-	m := manifest.New(manifestFile)
-	if err := m.Read(); err != nil {
-		return []string{}
-	}
 	for _, object := range m.Objects {
 		if strings.HasPrefix(object.APIVersion, "sources.triggermesh.io") {
 			s := source.New(object.Metadata.Name, crdFile, object.Kind, "", "", object.Spec)
