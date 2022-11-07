@@ -142,7 +142,7 @@ func GetTargetTriggers(broker, configBase, target string) ([]triggermesh.Compone
 		if len(trigger.Filters) != 0 {
 			f = trigger.Filters[0]
 		}
-		t, err := NewTrigger(name, broker, configBase, trigger.Target.URL, trigger.Target.Component, f)
+		t, err := NewTrigger(name, broker, configBase, trigger.Target.URL, trigger.Target.Component, &f)
 		if err != nil {
 			return nil, fmt.Errorf("creating trigger object: %w", err)
 		}

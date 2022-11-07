@@ -103,7 +103,7 @@ func (o DescribeOptions) describe(broker string) error {
 				container: []*docker.Container{container},
 			}
 		case object.Kind == "Trigger":
-			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigBase, "", "", tmbroker.Filter{})
+			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigBase, "", "", nil)
 			if err != nil {
 				return fmt.Errorf("trigger object: %w", err)
 			}

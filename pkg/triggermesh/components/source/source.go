@@ -18,7 +18,6 @@ package source
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -29,7 +28,6 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 )
 
@@ -95,40 +93,27 @@ func (s *Source) GetEventTypes() ([]string, error) {
 	// try GetEventTypes method first
 	o, err := s.asUnstructured()
 	if err != nil {
-		return []string{}, err
+		return []string{}, fmt.Errorf("unstructured object: %w", err)
 	}
 	eventAttributes, err := adapter.EventAttributes(o)
 	if err != nil {
-		return []string{}, err
+		return []string{}, fmt.Errorf("source event attributes: %w", err)
 	}
-	if len(eventAttributes.ProducedEventTypes) != 0 {
-		return eventAttributes.ProducedEventTypes, nil
+	if len(eventAttributes.ProducedEventTypes) == 0 {
+		return []string{}, fmt.Errorf("%q does not expose event type attributes", s.Kind)
 	}
-	// if no luck, use CRD to get event types
-	sourceCRD, err := crd.GetResourceCRD(s.Kind, s.CRDFile)
-	if err != nil {
-		return []string{}, fmt.Errorf("source CRD: %w", err)
-	}
-	var et crd.EventTypes
-	if err := json.Unmarshal([]byte(sourceCRD.Metadata.Annotations.EventTypes), &et); err != nil {
-		return []string{}, fmt.Errorf("event producer CRD: %w", err)
-	}
-	var result []string
-	for _, v := range et {
-		result = append(result, v.Type)
-	}
-	return result, nil
+	return eventAttributes.ProducedEventTypes, nil
 }
 
 func (s *Source) GetEventSource() (string, error) {
 	// Second, get event attributes from the core object methods
 	o, err := s.asUnstructured()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("unstructured object: %w", err)
 	}
 	eventAttributes, err := adapter.EventAttributes(o)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("source event attributes: %w", err)
 	}
 	if eventAttributes.ProducedEventSource == "" {
 		return "", fmt.Errorf("%q does not expose event source attribute", s.Kind)

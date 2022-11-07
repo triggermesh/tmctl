@@ -107,18 +107,15 @@ func (t *Trigger) GetSpec() map[string]interface{} {
 	}
 }
 
-func NewTrigger(name, broker, configBase, targetURL, targetName string, filter Filter) (triggermesh.Component, error) {
+func NewTrigger(name, broker, configBase, targetURL, targetName string, filter *Filter) (triggermesh.Component, error) {
 	if name == "" {
-		filterString, err := filter.String()
-		if err != nil {
-			return &Trigger{}, fmt.Errorf("filter: %w", err)
-		}
+		filterStruct, _ := yaml.Marshal(filter)
 		// in case of event types hash collision, replace with sha256
-		hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", targetName, filterString)))
+		hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", targetName, string(filterStruct))))
 		name = fmt.Sprintf("%s-trigger-%s", broker, hex.EncodeToString(hash[:4]))
 	}
 
-	return &Trigger{
+	trigger := &Trigger{
 		Name:       name,
 		Broker:     broker,
 		ConfigBase: configBase,
@@ -126,8 +123,11 @@ func NewTrigger(name, broker, configBase, targetURL, targetName string, filter F
 			Component: targetName,
 			URL:       targetURL,
 		},
-		Filters: []Filter{filter},
-	}, nil
+	}
+	if filter != nil {
+		trigger.Filters = []Filter{*filter}
+	}
+	return trigger, nil
 }
 
 func (t *Trigger) SetTarget(component, destination string) {
@@ -183,13 +183,8 @@ func (t *Trigger) UpdateBrokerConfig() error {
 	return writeBrokerConfig(configFile, &configuration)
 }
 
-func (f *Filter) String() (string, error) {
-	output, err := yaml.Marshal(f)
-	return string(output), err
-}
-
-func FilterExactAttribute(attribute, value string) Filter {
-	return Filter{
+func FilterExactAttribute(attribute, value string) *Filter {
+	return &Filter{
 		Exact: map[string]string{attribute: value},
 	}
 }

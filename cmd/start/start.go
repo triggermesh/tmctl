@@ -99,7 +99,7 @@ func (o *StartOptions) start(broker string) error {
 			}
 			brokerPort = container.HostPort()
 		case "Trigger":
-			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigBase, "", "", tmbroker.Filter{})
+			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigBase, "", "", nil)
 			if err != nil {
 				return fmt.Errorf("trigger object: %w", err)
 			}

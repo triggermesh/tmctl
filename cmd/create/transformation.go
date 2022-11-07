@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -115,7 +116,7 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 	if file == "" {
 		input, err := fromStdIn()
 		if err != nil {
-			return fmt.Errorf("spec read: %w", err)
+			return fmt.Errorf("stdin read: %w", err)
 		}
 		data = []byte(input)
 	} else {
@@ -124,6 +125,9 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 			return fmt.Errorf("spec file read: %w", err)
 		}
 		data = specFile
+	}
+	if len(data) == 0 {
+		return fmt.Errorf("empty spec")
 	}
 	var spec map[string]interface{}
 	if err := yaml.Unmarshal(data, &spec); err != nil {
@@ -173,7 +177,7 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 		}
 		for _, component := range targetTriggers {
 			trigger := component.(*tmbroker.Trigger)
-			if len(trigger.Filters) != 1 || &trigger.Filters[0] != &filter {
+			if len(trigger.Filters) != 1 || !reflect.DeepEqual(trigger.Filters[0], *filter) {
 				continue
 			}
 			if err := trigger.RemoveTriggerFromConfig(); err != nil {
