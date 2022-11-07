@@ -95,7 +95,8 @@ func argsToMap(args []string) map[string]string {
 }
 
 func (o *CreateOptions) translateEventSource(eventSourcesFilter []string) ([]string, error) {
-	for i, source := range eventSourcesFilter {
+	var result []string
+	for _, source := range eventSourcesFilter {
 		s, err := components.GetObject(source, o.CRD, o.Version, o.Manifest)
 		if err != nil {
 			return nil, fmt.Errorf("%q event producer object: %w", source, err)
@@ -103,9 +104,11 @@ func (o *CreateOptions) translateEventSource(eventSourcesFilter []string) ([]str
 		if _, ok := s.(triggermesh.Producer); !ok {
 			return nil, fmt.Errorf("%q is not an event producer", source)
 		}
-		if eventSourcesFilter[i], err = s.(triggermesh.Producer).GetEventSource(); err != nil {
+		et, err := s.(triggermesh.Producer).GetEventTypes()
+		if err != nil {
 			return nil, fmt.Errorf("%q event source: %w", source, err)
 		}
+		result = append(result, et...)
 	}
-	return eventSourcesFilter, nil
+	return result, nil
 }

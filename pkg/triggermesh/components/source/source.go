@@ -92,11 +92,7 @@ func (s *Source) GetSpec() map[string]interface{} {
 }
 
 func (s *Source) GetEventTypes() ([]string, error) {
-	// First, check if component has explicit eventType in spec
-	if et, exists := s.spec["eventType"]; exists {
-		return []string{et.(string)}, nil
-	}
-	// Second, get event attributes from the core object methods
+	// try GetEventTypes method first
 	o, err := s.asUnstructured()
 	if err != nil {
 		return []string{}, err
@@ -108,7 +104,7 @@ func (s *Source) GetEventTypes() ([]string, error) {
 	if len(eventAttributes.ProducedEventTypes) != 0 {
 		return eventAttributes.ProducedEventTypes, nil
 	}
-	// Last, read attributes from CRD
+	// if no luck, use CRD to get event types
 	sourceCRD, err := crd.GetResourceCRD(s.Kind, s.CRDFile)
 	if err != nil {
 		return []string{}, fmt.Errorf("source CRD: %w", err)

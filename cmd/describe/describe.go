@@ -90,7 +90,7 @@ func (o DescribeOptions) describe(broker string) error {
 	for _, object := range o.Manifest.Objects {
 		switch {
 		case object.Kind == "Broker":
-			broker, err := tmbroker.New(object.Metadata.Name, manifestFile)
+			broker, err := tmbroker.New(object.Metadata.Name, o.Manifest.Path)
 			if err != nil {
 				return fmt.Errorf("creating broker object: %v", err)
 			}

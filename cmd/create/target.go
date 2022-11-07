@@ -82,10 +82,11 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 func (o *CreateOptions) target(name, kind string, args map[string]string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
 
-	eventSourcesFilter, err := o.translateEventSource(eventSourcesFilter)
+	et, err := o.translateEventSource(eventSourcesFilter)
 	if err != nil {
 		return err
 	}
+	eventTypesFilter = append(eventTypesFilter, et...)
 
 	t := target.New(name, o.CRD, kind, o.Context, o.Version, args)
 

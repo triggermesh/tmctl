@@ -63,10 +63,11 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 }
 
 func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilter []string, target string) error {
-	eventSourcesFilter, err := o.translateEventSource(eventSourcesFilter)
+	et, err := o.translateEventSource(eventSourcesFilter)
 	if err != nil {
 		return err
 	}
+	eventTypesFilter = append(eventTypesFilter, et...)
 
 	component, err := components.GetObject(target, o.CRD, o.Version, o.Manifest)
 	if err != nil {
@@ -91,11 +92,6 @@ func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 	}
 	for _, et := range eventTypesFilter {
 		if _, err = o.createTrigger(name, port, component.GetName(), tmbroker.FilterExactAttribute("type", et)); err != nil {
-			return err
-		}
-	}
-	for _, es := range eventSourcesFilter {
-		if _, err = o.createTrigger(name, port, component.GetName(), tmbroker.FilterExactAttribute("source", es)); err != nil {
 			return err
 		}
 	}
