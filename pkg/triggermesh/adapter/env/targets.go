@@ -40,6 +40,7 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/datadogtarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/elasticsearchtarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/googlecloudfirestoretarget"
+	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/googlecloudpubsubtarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/googlecloudstoragetarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/googlecloudworkflowstarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/googlesheettarget"
@@ -155,6 +156,12 @@ func targets(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return googlecloudfirestoretarget.MakeAppEnv(o), nil
+	case "GoogleCloudPubSubTarget":
+		var o *targetsv1alpha1.GoogleCloudPubSubTarget
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return nil, err
+		}
+		return googlecloudpubsubtarget.MakeAppEnv(o), nil
 	case "GoogleCloudStorageTarget":
 		var o *targetsv1alpha1.GoogleCloudStorageTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
