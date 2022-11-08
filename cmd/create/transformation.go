@@ -97,13 +97,13 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 
 func (o *CreateOptions) transformation(name, target, file string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
-	var targetPort string
+	var targetComponent triggermesh.Component
 	if target != "" {
-		port, err := o.lookupTarget(ctx, target)
+		t, err := o.lookupTarget(ctx, target)
 		if err != nil {
 			return err
 		}
-		targetPort = port
+		targetComponent = t
 	}
 
 	et, err := o.translateEventSource(eventSourcesFilter)
@@ -153,18 +153,17 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 	}
 
 	log.Println("Starting container")
-	container, err := t.(triggermesh.Runnable).Start(ctx, nil, restart)
-	if err != nil {
+	if _, err := t.(triggermesh.Runnable).Start(ctx, nil, restart); err != nil {
 		return err
 	}
 
 	var targetTriggers []triggermesh.Component
 	// creating new trigger from transformation to target
-	if target != "" {
-		if targetTriggers, err = tmbroker.GetTargetTriggers(o.Context, o.ConfigBase, target); err != nil {
+	if targetComponent != nil {
+		if targetTriggers, err = tmbroker.GetTargetTriggers(o.Context, o.ConfigBase, targetComponent); err != nil {
 			return fmt.Errorf("target triggers: %w", err)
 		}
-		if _, err := o.createTrigger("", targetPort, target, tmbroker.FilterExactAttribute("type", transformationEventType)); err != nil {
+		if _, err := o.createTrigger("", targetComponent, tmbroker.FilterExactAttribute("type", transformationEventType)); err != nil {
 			return fmt.Errorf("create trigger: %w", err)
 		}
 	}
@@ -172,7 +171,7 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 	// updating existing triggers from sources to target
 	for _, et := range eventTypesFilter {
 		filter := tmbroker.FilterExactAttribute("type", et)
-		if _, err := o.createTrigger("", container.HostPort(), container.Name, filter); err != nil {
+		if _, err := o.createTrigger("", t, filter); err != nil {
 			return err
 		}
 		for _, component := range targetTriggers {
@@ -191,7 +190,7 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 
 	if len(eventTypesFilter) == 0 {
 		for _, trigger := range targetTriggers {
-			trigger.(*tmbroker.Trigger).SetTarget(container.Name, fmt.Sprintf("http://host.docker.internal:%s", container.HostPort()))
+			trigger.(*tmbroker.Trigger).SetTarget(t)
 			if err := trigger.(*tmbroker.Trigger).UpdateBrokerConfig(); err != nil {
 				return err
 			}
@@ -229,14 +228,13 @@ func readInput() (string, error) {
 	return lines, scn.Err()
 }
 
-func (o *CreateOptions) lookupTarget(ctx context.Context, target string) (string, error) {
+func (o *CreateOptions) lookupTarget(ctx context.Context, target string) (triggermesh.Component, error) {
 	targetObject, err := components.GetObject(target, o.CRD, o.Version, o.Manifest)
 	if err != nil {
-		return "", fmt.Errorf("transformation target: %w", err)
+		return nil, fmt.Errorf("transformation target: %w", err)
 	}
-	consumer, ok := targetObject.(triggermesh.Consumer)
-	if !ok {
-		return "", fmt.Errorf("%q is not an event consumer", target)
+	if _, ok := targetObject.(triggermesh.Consumer); !ok {
+		return nil, fmt.Errorf("%q is not an event consumer", target)
 	}
-	return consumer.GetPort(ctx)
+	return targetObject, nil
 }

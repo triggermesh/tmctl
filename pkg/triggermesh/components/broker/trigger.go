@@ -25,42 +25,22 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	duckv1 "knative.dev/pkg/apis/duck/v1"
+
+	eventingbroker "github.com/triggermesh/brokers/pkg/config/broker"
+	eventingv1alpha1 "github.com/triggermesh/triggermesh-core/pkg/apis/eventing/v1alpha1"
+
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
 
-const manifestFile = "manifest.yaml"
-
 var _ triggermesh.Component = (*Trigger)(nil)
 
 type Trigger struct {
-	Broker     string `yaml:"-"`
-	ConfigBase string `yaml:"-"`
 	Name       string `yaml:"-"`
+	ConfigBase string `yaml:"-"`
 
-	Filters []Filter `yaml:"filters,omitempty"`
-	Target  Target   `yaml:"target"`
-}
-
-type Filter struct {
-	All    []Filter          `yaml:"all,omitempty"`
-	Any    []Filter          `yaml:"any,omitempty"`
-	Not    *Filter           `yaml:"not,omitempty"`
-	Exact  map[string]string `yaml:"exact,omitempty"`
-	Prefix map[string]string `yaml:"prefix,omitempty"`
-	Suffix map[string]string `yaml:"suffix,omitempty"`
-	CESQL  string            `yaml:"cesql,omitempty"`
-}
-
-type Target struct {
-	URL             string `yaml:"url"`
-	Component       string `yaml:"component,omitempty"` // for local version only
-	DeliveryOptions struct {
-		Retry         int32  `yaml:"retry,omitempty"`
-		BackoffDelay  string `yaml:"backoffDelay,omitempty"`
-		BackoffPolicy string `yaml:"backoffPolicy,omitempty"`
-		DeadLetterURL string `yaml:"deadLetterURL,omitempty"`
-	} `yaml:"deliveryOptions,omitempty"`
+	eventingv1alpha1.TriggerSpec `yaml:"spec,omitempty"`
 }
 
 func (t *Trigger) AsK8sObject() (kubernetes.Object, error) {
@@ -77,7 +57,7 @@ func (t *Trigger) AsK8sObject() (kubernetes.Object, error) {
 			Name:      t.Name,
 			Namespace: triggermesh.Namespace,
 			Labels: map[string]string{
-				"triggermesh.io/context": t.Broker,
+				"triggermesh.io/context": t.Broker.Name,
 			},
 		},
 		Spec: spec,
@@ -92,11 +72,15 @@ func (t *Trigger) GetName() string {
 	return t.Name
 }
 
-func (t *Trigger) GetTarget() Target {
+func (t *Trigger) GetAPIVersion() string {
+	return "v1alpha1"
+}
+
+func (t *Trigger) GetTarget() duckv1.Destination {
 	return t.Target
 }
 
-func (t *Trigger) GetFilters() []Filter {
+func (t *Trigger) GetFilters() []eventingbroker.Filter {
 	return t.Filters
 }
 
@@ -107,38 +91,48 @@ func (t *Trigger) GetSpec() map[string]interface{} {
 	}
 }
 
-func NewTrigger(name, broker, configBase, targetURL, targetName string, filter *Filter) (triggermesh.Component, error) {
+func NewTrigger(name, broker, configBase string, target triggermesh.Component, filter *eventingbroker.Filter) (triggermesh.Component, error) {
 	if name == "" {
 		filterStruct, _ := yaml.Marshal(filter)
 		// in case of event types hash collision, replace with sha256
-		hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", targetName, string(filterStruct))))
+		hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", target.GetName(), string(filterStruct))))
 		name = fmt.Sprintf("%s-trigger-%s", broker, hex.EncodeToString(hash[:4]))
 	}
 
 	trigger := &Trigger{
 		Name:       name,
-		Broker:     broker,
 		ConfigBase: configBase,
-		Target: Target{
-			Component: targetName,
-			URL:       targetURL,
+		TriggerSpec: eventingv1alpha1.TriggerSpec{
+			Broker: duckv1.KReference{
+				Name: broker,
+			},
+			Target: duckv1.Destination{
+				Ref: &duckv1.KReference{
+					Kind:       target.GetKind(),
+					Name:       target.GetName(),
+					APIVersion: target.GetAPIVersion(),
+				},
+			},
 		},
 	}
 	if filter != nil {
-		trigger.Filters = []Filter{*filter}
+		trigger.Filters = []eventingbroker.Filter{*filter}
 	}
 	return trigger, nil
 }
 
-func (t *Trigger) SetTarget(component, destination string) {
-	t.Target = Target{
-		Component: component,
-		URL:       destination,
+func (t *Trigger) SetTarget(target triggermesh.Component) {
+	t.Target = duckv1.Destination{
+		Ref: &duckv1.KReference{
+			Kind:       target.GetKind(),
+			Name:       target.GetName(),
+			APIVersion: target.GetAPIVersion(),
+		},
 	}
 }
 
 func (t *Trigger) LookupTrigger() error {
-	configFile := path.Join(t.ConfigBase, t.Broker, brokerConfigFile)
+	configFile := path.Join(t.ConfigBase, t.Broker.Name, brokerConfigFile)
 	configuration, err := readBrokerConfig(configFile)
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -153,7 +147,7 @@ func (t *Trigger) LookupTrigger() error {
 }
 
 func (t *Trigger) RemoveTriggerFromConfig() error {
-	configFile := path.Join(t.ConfigBase, t.Broker, brokerConfigFile)
+	configFile := path.Join(t.ConfigBase, t.Broker.Name, brokerConfigFile)
 	configuration, err := readBrokerConfig(configFile)
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -163,7 +157,7 @@ func (t *Trigger) RemoveTriggerFromConfig() error {
 }
 
 func (t *Trigger) UpdateBrokerConfig() error {
-	configFile := path.Join(t.ConfigBase, t.Broker, brokerConfigFile)
+	configFile := path.Join(t.ConfigBase, t.Broker.Name, brokerConfigFile)
 	configuration, err := readBrokerConfig(configFile)
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -183,8 +177,8 @@ func (t *Trigger) UpdateBrokerConfig() error {
 	return writeBrokerConfig(configFile, &configuration)
 }
 
-func FilterExactAttribute(attribute, value string) *Filter {
-	return &Filter{
+func FilterExactAttribute(attribute, value string) *eventingbroker.Filter {
+	return &eventingbroker.Filter{
 		Exact: map[string]string{attribute: value},
 	}
 }

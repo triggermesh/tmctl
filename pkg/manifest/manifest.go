@@ -74,20 +74,18 @@ func (m *Manifest) write() error {
 func (m *Manifest) Add(object triggermesh.Component) (bool, error) {
 	m.Lock()
 	defer m.Unlock()
-
 	k8sObject, err := object.AsK8sObject()
 	if err != nil {
 		return false, fmt.Errorf("creating k8s object: %w", err)
 	}
-
 	k8sObject.Metadata.Namespace = "" // local manifest should not set namespace
 	for i, o := range m.Objects {
 		if matchObjects(k8sObject, o) {
-			if !reflect.DeepEqual(o, object) {
-				m.Objects[i] = k8sObject
-				return true, nil
+			if reflect.DeepEqual(k8sObject, o) {
+				return false, nil
 			}
-			return false, nil
+			m.Objects[i] = k8sObject
+			return true, m.write()
 		}
 	}
 	m.Objects = append(m.Objects, k8sObject)
@@ -97,7 +95,7 @@ func (m *Manifest) Add(object triggermesh.Component) (bool, error) {
 func (m *Manifest) Remove(name, kind string) error {
 	m.Lock()
 	defer m.Unlock()
-	objects := []kubernetes.Object{}
+	objects := make([]kubernetes.Object, 0, len(m.Objects))
 	for _, o := range m.Objects {
 		if o.Metadata.Name == name && o.Kind == kind {
 			continue

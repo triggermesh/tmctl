@@ -22,6 +22,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	eventingbroker "github.com/triggermesh/brokers/pkg/config/broker"
+
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
@@ -159,12 +161,12 @@ func DescribeTrigger(triggers []triggermesh.Component) {
 		if len(filters) == 0 {
 			filters = []string{"*"}
 		}
-		fmt.Fprintf(w, "%s\t%v\t%v\n", trigger.GetName(), trigger.(*tmbroker.Trigger).GetTarget().Component, strings.Join(filters, ", "))
+		fmt.Fprintf(w, "%s\t%v\t%v\n", trigger.GetName(), trigger.(*tmbroker.Trigger).GetTarget().Ref.Name, strings.Join(filters, ", "))
 	}
 	fmt.Fprintln(w)
 }
 
-func triggerFilterToString(filter tmbroker.Filter) string {
+func triggerFilterToString(filter eventingbroker.Filter) string {
 	var result []string
 	for k, v := range filter.Exact {
 		result = append(result, fmt.Sprintf("%s is %s", k, v))

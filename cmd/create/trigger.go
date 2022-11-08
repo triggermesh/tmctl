@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"context"
 	"fmt"
 	"log"
 
@@ -74,24 +73,18 @@ func (o *CreateOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 		return fmt.Errorf("%q not found: %w", target, err)
 	}
 
-	consumer, ok := component.(triggermesh.Consumer)
-	if !ok {
+	if _, ok := component.(triggermesh.Consumer); !ok {
 		return fmt.Errorf("%q is not an event target", target)
-	}
-
-	port, err := consumer.GetPort(context.Background())
-	if err != nil {
-		return fmt.Errorf("target port: %w", err)
 	}
 
 	log.Println("Creating trigger")
 	if len(eventTypesFilter) == 0 && len(eventSourcesFilter) == 0 {
-		if _, err = o.createTrigger(name, port, component.GetName(), nil); err != nil {
+		if _, err = o.createTrigger(name, component, nil); err != nil {
 			return err
 		}
 	}
 	for _, et := range eventTypesFilter {
-		if _, err = o.createTrigger(name, port, component.GetName(), tmbroker.FilterExactAttribute("type", et)); err != nil {
+		if _, err = o.createTrigger(name, component, tmbroker.FilterExactAttribute("type", et)); err != nil {
 			return err
 		}
 	}

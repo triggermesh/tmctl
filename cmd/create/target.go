@@ -24,6 +24,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	eventingbroker "github.com/triggermesh/brokers/pkg/config/broker"
+
 	"github.com/triggermesh/tmctl/pkg/output"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
@@ -103,13 +105,12 @@ func (o *CreateOptions) target(name, kind string, args map[string]string, eventS
 	}
 
 	log.Println("Starting container")
-	container, err := t.(triggermesh.Runnable).Start(ctx, secrets, (restart || secretsChanged))
-	if err != nil {
+	if _, err := t.(triggermesh.Runnable).Start(ctx, secrets, (restart || secretsChanged)); err != nil {
 		return err
 	}
 
 	for _, et := range eventTypesFilter {
-		if _, err := o.createTrigger("", container.HostPort(), container.Name, tmbroker.FilterExactAttribute("type", et)); err != nil {
+		if _, err := o.createTrigger("", t, tmbroker.FilterExactAttribute("type", et)); err != nil {
 			return fmt.Errorf("creating trigger: %w", err)
 		}
 	}
@@ -118,9 +119,8 @@ func (o *CreateOptions) target(name, kind string, args map[string]string, eventS
 	return nil
 }
 
-func (o *CreateOptions) createTrigger(name, targetPort, targetName string, filter *tmbroker.Filter) (triggermesh.Component, error) {
-	trigger, err := tmbroker.NewTrigger(name, o.Context, o.ConfigBase,
-		fmt.Sprintf("http://host.docker.internal:%s", targetPort), targetName, filter)
+func (o *CreateOptions) createTrigger(name string, target triggermesh.Component, filter *eventingbroker.Filter) (triggermesh.Component, error) {
+	trigger, err := tmbroker.NewTrigger(name, o.Context, o.ConfigBase, target, filter)
 	if err != nil {
 		return nil, err
 	}

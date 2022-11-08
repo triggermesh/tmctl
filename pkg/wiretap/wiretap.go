@@ -22,7 +22,6 @@ import (
 	"io"
 
 	"github.com/triggermesh/tmctl/pkg/docker"
-	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
 type Wiretap struct {
@@ -76,16 +75,16 @@ func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
 }
 
 func (w *Wiretap) CreateTrigger(eventTypes []string) error {
-	for _, et := range eventTypes {
-		trigger, err := tmbroker.NewTrigger("wiretap-trigger", w.Broker, w.ConfigBase, w.Destination, "wiretap", tmbroker.FilterExactAttribute("type", et))
-		if err != nil {
-			return fmt.Errorf("creating trigger: %w", err)
-		}
-		trigger.(*tmbroker.Trigger).SetTarget("wiretap", w.Destination)
-		if err := trigger.(*tmbroker.Trigger).UpdateBrokerConfig(); err != nil {
-			return err
-		}
-	}
+	// for _, et := range eventTypes {
+	// trigger, err := tmbroker.NewTrigger("wiretap-trigger", w.Broker, w.ConfigBase, w.Destination, "wiretap", tmbroker.FilterExactAttribute("type", et))
+	// if err != nil {
+	// return fmt.Errorf("creating trigger: %w", err)
+	// }
+	// trigger.(*tmbroker.Trigger).SetTarget("wiretap", w.Destination)
+	// if err := trigger.(*tmbroker.Trigger).UpdateBrokerConfig(); err != nil {
+	// return err
+	// }
+	// }
 	return nil
 }
 
@@ -94,14 +93,14 @@ func (w *Wiretap) Cleanup(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
-	triggers, err := tmbroker.GetTargetTriggers(w.Broker, w.ConfigBase, "wiretap")
-	if err != nil {
-		return fmt.Errorf("wiretap triggers: %w", err)
-	}
-	for _, trigger := range triggers {
-		if err := trigger.(*tmbroker.Trigger).RemoveTriggerFromConfig(); err != nil {
-			return fmt.Errorf("removing trigger: %v", err)
-		}
-	}
+	// triggers, err := tmbroker.GetTargetTriggers(w.Broker, w.ConfigBase, "wiretap")
+	// if err != nil {
+	// return fmt.Errorf("wiretap triggers: %w", err)
+	// }
+	// for _, trigger := range triggers {
+	// 	if err := trigger.(*tmbroker.Trigger).RemoveTriggerFromConfig(); err != nil {
+	// 		return fmt.Errorf("removing trigger: %v", err)
+	// 	}
+	// }
 	return docker.ForceStop(ctx, fmt.Sprintf("%s-wiretap", w.Broker), client)
 }

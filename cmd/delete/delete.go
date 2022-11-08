@@ -155,7 +155,7 @@ func (o *DeleteOptions) deleteEverything(ctx context.Context, object kubernetes.
 	}
 	o.removeContainer(ctx, object.Metadata.Name, client)
 	o.removeObject(object.Metadata.Name)
-	o.cleanupTriggers(object.Metadata.Name)
+	// o.cleanupTriggers(object.Metadata.Name)
 	o.cleanupSecrets(object.Metadata.Name)
 }
 
@@ -165,7 +165,7 @@ func (o *DeleteOptions) removeObject(component string) {
 			continue
 		}
 		if object.Kind == "Trigger" {
-			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, o.Context, o.ConfigBase, "", "", nil)
+			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, o.Context, o.ConfigBase, nil, nil)
 			if err != nil {
 				log.Printf("Creating trigger object %q: %v", object.Metadata.Name, err)
 				continue
@@ -184,8 +184,8 @@ func (o *DeleteOptions) removeContainer(ctx context.Context, name string, client
 	return docker.ForceStop(ctx, name, client)
 }
 
-func (o *DeleteOptions) cleanupTriggers(component string) {
-	triggers, err := tmbroker.GetTargetTriggers(o.Context, o.ConfigBase, component)
+func (o *DeleteOptions) cleanupTriggers(target triggermesh.Component) {
+	triggers, err := tmbroker.GetTargetTriggers(o.Context, o.ConfigBase, target)
 	if err != nil {
 		return
 	}

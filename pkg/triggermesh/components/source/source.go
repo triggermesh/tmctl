@@ -85,6 +85,14 @@ func (s *Source) GetKind() string {
 	return s.Kind
 }
 
+func (s *Source) GetAPIVersion() string {
+	o, err := s.AsK8sObject()
+	if err != nil {
+		return ""
+	}
+	return o.APIVersion
+}
+
 func (s *Source) GetSpec() map[string]interface{} {
 	return s.spec
 }

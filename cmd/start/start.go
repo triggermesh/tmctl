@@ -99,17 +99,17 @@ func (o *StartOptions) start(broker string) error {
 			}
 			brokerPort = container.HostPort()
 		case "Trigger":
-			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigBase, "", "", nil)
+			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigBase, nil, nil)
 			if err != nil {
 				return fmt.Errorf("trigger object: %w", err)
 			}
 			if err := trigger.(*tmbroker.Trigger).LookupTrigger(); err != nil {
 				return fmt.Errorf("trigger configuration: %w", err)
 			}
-			if triggers, set := componentTriggers[trigger.(*tmbroker.Trigger).GetTarget().Component]; set {
-				componentTriggers[trigger.(*tmbroker.Trigger).GetTarget().Component] = append(triggers, trigger)
+			if triggers, set := componentTriggers[trigger.(*tmbroker.Trigger).GetTarget().Ref.Name]; set {
+				componentTriggers[trigger.(*tmbroker.Trigger).GetTarget().Ref.Name] = append(triggers, trigger)
 			} else {
-				componentTriggers[trigger.(*tmbroker.Trigger).GetTarget().Component] = []triggermesh.Component{trigger}
+				componentTriggers[trigger.(*tmbroker.Trigger).GetTarget().Ref.Name] = []triggermesh.Component{trigger}
 			}
 			if _, err := o.Manifest.Add(trigger); err != nil {
 				return fmt.Errorf("creating trigger: %w", err)
@@ -152,14 +152,10 @@ func (o *StartOptions) start(broker string) error {
 		if _, err := c.(triggermesh.Runnable).Start(ctx, secrets, o.Restart); err != nil {
 			return fmt.Errorf("starting container: %w", err)
 		}
-		if consumer, ok := c.(triggermesh.Consumer); ok {
-			port, err := consumer.GetPort(ctx)
-			if err != nil {
-				return fmt.Errorf("container port: %w", err)
-			}
+		if _, ok := c.(triggermesh.Consumer); ok {
 			if triggers, exists := componentTriggers[object.Metadata.Name]; exists {
 				for _, trigger := range triggers {
-					trigger.(*tmbroker.Trigger).SetTarget(object.Metadata.Name, fmt.Sprintf("http://host.docker.internal:%s", port))
+					trigger.(*tmbroker.Trigger).SetTarget(c)
 					if err := trigger.(*tmbroker.Trigger).UpdateBrokerConfig(); err != nil {
 						return fmt.Errorf("broker config: %w", err)
 					}

@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	eventingbroker "github.com/triggermesh/brokers/pkg/config/broker"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
@@ -112,6 +113,10 @@ func (b *Broker) GetName() string {
 	return b.Name
 }
 
+func (b *Broker) GetAPIVersion() string {
+	return "v1alpha1"
+}
+
 func (b *Broker) GetSpec() map[string]interface{} {
 	return b.spec
 }
@@ -128,21 +133,21 @@ func (b *Broker) ConsumedEventTypes() ([]string, error) {
 	return []string{}, nil
 }
 
-func GetTargetTriggers(broker, configBase, target string) ([]triggermesh.Component, error) {
+func GetTargetTriggers(broker, configBase string, target triggermesh.Component) ([]triggermesh.Component, error) {
 	config, err := readBrokerConfig(path.Join(configBase, broker, brokerConfigFile))
 	if err != nil {
 		return nil, fmt.Errorf("read broker config: %w", err)
 	}
 	var triggers []triggermesh.Component
 	for name, trigger := range config.Triggers {
-		if trigger.GetTarget().Component != target {
+		if trigger.GetTarget().Ref.Name != target.GetName() {
 			continue
 		}
-		f := Filter{}
+		f := eventingbroker.Filter{}
 		if len(trigger.Filters) != 0 {
 			f = trigger.Filters[0]
 		}
-		t, err := NewTrigger(name, broker, configBase, trigger.Target.URL, trigger.Target.Component, &f)
+		t, err := NewTrigger(name, broker, configBase, target, &f)
 		if err != nil {
 			return nil, fmt.Errorf("creating trigger object: %w", err)
 		}
