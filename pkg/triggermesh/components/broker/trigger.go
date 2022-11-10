@@ -17,14 +17,15 @@ limitations under the License.
 package broker
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"path"
 
 	"gopkg.in/yaml.v3"
 
+	"knative.dev/pkg/apis"
 	duckv1 "knative.dev/pkg/apis/duck/v1"
 
 	eventingbroker "github.com/triggermesh/brokers/pkg/config/broker"
@@ -34,27 +35,34 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
 
+const (
+	dockerHost = "http://host.docker.internal"
+)
+
 var _ triggermesh.Component = (*Trigger)(nil)
 
 type Trigger struct {
-	Name       string `yaml:"-"`
-	ConfigBase string `yaml:"-"`
+	name          string
+	configBase    string
+	componentName string
+	localURL      *apis.URL
 
 	eventingv1alpha1.TriggerSpec `yaml:"spec,omitempty"`
 }
 
 func (t *Trigger) AsK8sObject() (kubernetes.Object, error) {
 	spec := map[string]interface{}{
+		"broker": t.Broker,
 		"target": t.Target,
 	}
 	if len(t.Filters) != 0 {
 		spec["filters"] = t.Filters
 	}
 	return kubernetes.Object{
-		APIVersion: "eventing.triggermesh.io/v1alpha1",
-		Kind:       "Trigger",
+		APIVersion: APIVersion,
+		Kind:       TriggerKind,
 		Metadata: kubernetes.Metadata{
-			Name:      t.Name,
+			Name:      t.name,
 			Namespace: triggermesh.Namespace,
 			Labels: map[string]string{
 				"triggermesh.io/context": t.Broker.Name,
@@ -65,11 +73,11 @@ func (t *Trigger) AsK8sObject() (kubernetes.Object, error) {
 }
 
 func (t *Trigger) GetKind() string {
-	return "Trigger"
+	return TriggerKind
 }
 
 func (t *Trigger) GetName() string {
-	return t.Name
+	return t.name
 }
 
 func (t *Trigger) GetAPIVersion() string {
@@ -92,29 +100,44 @@ func (t *Trigger) GetSpec() map[string]interface{} {
 }
 
 func NewTrigger(name, broker, configBase string, target triggermesh.Component, filter *eventingbroker.Filter) (triggermesh.Component, error) {
+	trigger := &Trigger{
+		name:       name,
+		configBase: configBase,
+		TriggerSpec: eventingv1alpha1.TriggerSpec{
+			Broker: duckv1.KReference{
+				Name:  broker,
+				Kind:  "RedisBroker",
+				Group: "eventing.triggermesh.io",
+			},
+		},
+	}
+
 	if name == "" {
 		filterStruct, _ := yaml.Marshal(filter)
 		// in case of event types hash collision, replace with sha256
 		hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", target.GetName(), string(filterStruct))))
-		name = fmt.Sprintf("%s-trigger-%s", broker, hex.EncodeToString(hash[:4]))
+		trigger.name = fmt.Sprintf("%s-trigger-%s", broker, hex.EncodeToString(hash[:4]))
 	}
 
-	trigger := &Trigger{
-		Name:       name,
-		ConfigBase: configBase,
-		TriggerSpec: eventingv1alpha1.TriggerSpec{
-			Broker: duckv1.KReference{
-				Name: broker,
+	if target != nil {
+		trigger.componentName = target.GetName()
+		targetPort, err := target.(triggermesh.Consumer).GetPort(context.Background())
+		if err != nil {
+			return nil, fmt.Errorf("target local port: %w", err)
+		}
+		trigger.localURL, err = apis.ParseURL(fmt.Sprintf("%s:%s", dockerHost, targetPort))
+		if err != nil {
+			return nil, fmt.Errorf("target local URL: %w", err)
+		}
+		trigger.Target = duckv1.Destination{
+			Ref: &duckv1.KReference{
+				Kind:       target.GetKind(),
+				Name:       target.GetName(),
+				APIVersion: target.GetAPIVersion(),
 			},
-			Target: duckv1.Destination{
-				Ref: &duckv1.KReference{
-					Kind:       target.GetKind(),
-					Name:       target.GetName(),
-					APIVersion: target.GetAPIVersion(),
-				},
-			},
-		},
+		}
 	}
+
 	if filter != nil {
 		trigger.Filters = []eventingbroker.Filter{*filter}
 	}
@@ -122,6 +145,7 @@ func NewTrigger(name, broker, configBase string, target triggermesh.Component, f
 }
 
 func (t *Trigger) SetTarget(target triggermesh.Component) {
+	t.componentName = target.GetName()
 	t.Target = duckv1.Destination{
 		Ref: &duckv1.KReference{
 			Kind:       target.GetKind(),
@@ -129,73 +153,37 @@ func (t *Trigger) SetTarget(target triggermesh.Component) {
 			APIVersion: target.GetAPIVersion(),
 		},
 	}
-}
-
-func (t *Trigger) LookupTrigger() error {
-	configFile := path.Join(t.ConfigBase, t.Broker.Name, brokerConfigFile)
-	configuration, err := readBrokerConfig(configFile)
-	if err != nil {
-		return fmt.Errorf("broker config: %w", err)
-	}
-	trigger, exists := configuration.Triggers[t.Name]
-	if !exists {
-		return fmt.Errorf("trigger %q not found", t.Name)
-	}
-	t.Filters = trigger.Filters
-	t.Target = trigger.Target
-	return nil
-}
-
-func (t *Trigger) RemoveTriggerFromConfig() error {
-	configFile := path.Join(t.ConfigBase, t.Broker.Name, brokerConfigFile)
-	configuration, err := readBrokerConfig(configFile)
-	if err != nil {
-		return fmt.Errorf("broker config: %w", err)
-	}
-	delete(configuration.Triggers, t.Name)
-	return writeBrokerConfig(configFile, &configuration)
-}
-
-func (t *Trigger) UpdateBrokerConfig() error {
-	configFile := path.Join(t.ConfigBase, t.Broker.Name, brokerConfigFile)
-	configuration, err := readBrokerConfig(configFile)
-	if err != nil {
-		return fmt.Errorf("broker config: %w", err)
-	}
-
-	trigger, exists := configuration.Triggers[t.Name]
-	if exists {
-		trigger.Filters = t.Filters
-		trigger.Target = t.Target
-		configuration.Triggers[t.Name] = trigger
-	} else {
-		if configuration.Triggers == nil {
-			configuration.Triggers = make(map[string]Trigger, 1)
+	if consumer, ok := target.(triggermesh.Consumer); ok {
+		port, err := consumer.GetPort(context.Background())
+		if err != nil {
+			return
 		}
-		configuration.Triggers[t.Name] = *t
+		t.localURL, err = apis.ParseURL(fmt.Sprintf("%s:%s", dockerHost, port))
+		if err != nil {
+			return
+		}
 	}
-	return writeBrokerConfig(configFile, &configuration)
+}
+
+func (t *Trigger) LookupTarget() {
+	config, err := readBrokerConfig(path.Join(t.configBase, t.Broker.Name, brokerConfigFile))
+	if err != nil {
+		return
+	}
+	localTrigger, exists := config.Triggers[t.name]
+	if !exists {
+		return
+	}
+	t.Filters = localTrigger.Filters
+	t.Target = duckv1.Destination{
+		Ref: &duckv1.KReference{
+			Name: localTrigger.Target.Component,
+		},
+	}
 }
 
 func FilterExactAttribute(attribute, value string) *eventingbroker.Filter {
 	return &eventingbroker.Filter{
 		Exact: map[string]string{attribute: value},
 	}
-}
-
-func readBrokerConfig(path string) (Configuration, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return Configuration{}, fmt.Errorf("read file: %w", err)
-	}
-	var config Configuration
-	return config, yaml.Unmarshal(data, &config)
-}
-
-func writeBrokerConfig(path string, configuration *Configuration) error {
-	out, err := yaml.Marshal(configuration)
-	if err != nil {
-		return fmt.Errorf("marshal broker configuration: %w", err)
-	}
-	return os.WriteFile(path, out, os.ModePerm)
 }

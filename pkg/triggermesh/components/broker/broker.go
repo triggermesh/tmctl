@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	eventingbroker "github.com/triggermesh/brokers/pkg/config/broker"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
@@ -39,6 +38,10 @@ var (
 )
 
 const (
+	BrokerKind  = "RedisBroker"
+	TriggerKind = "Trigger"
+	APIVersion  = "eventing.triggermesh.io/v1alpha1"
+
 	brokerConfigFile = "broker.conf"
 	image            = "tzununbekov/memory-broker"
 )
@@ -50,14 +53,10 @@ type Broker struct {
 	spec map[string]interface{}
 }
 
-type Configuration struct {
-	Triggers map[string]Trigger `yaml:"triggers"`
-}
-
 func (b *Broker) asUnstructured() (unstructured.Unstructured, error) {
 	u := unstructured.Unstructured{}
-	u.SetAPIVersion("eventing.triggermesh.io/v1alpha1")
-	u.SetKind("Broker")
+	u.SetAPIVersion(APIVersion)
+	u.SetKind(BrokerKind)
 	u.SetName(b.Name)
 	u.SetNamespace(triggermesh.Namespace)
 	u.SetLabels(map[string]string{"context": b.Name})
@@ -66,8 +65,8 @@ func (b *Broker) asUnstructured() (unstructured.Unstructured, error) {
 
 func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
 	return kubernetes.Object{
-		APIVersion: "eventing.triggermesh.io/v1alpha1",
-		Kind:       "Broker",
+		APIVersion: APIVersion,
+		Kind:       BrokerKind,
 		Metadata: kubernetes.Metadata{
 			Name:      b.Name,
 			Namespace: triggermesh.Namespace,
@@ -75,7 +74,7 @@ func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
 				"triggermesh.io/context": b.Name,
 			},
 		},
-		Spec: map[string]interface{}{"storage": "inmemory"},
+		Spec: nil,
 	}, nil
 }
 
@@ -106,7 +105,7 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 }
 
 func (b *Broker) GetKind() string {
-	return "Broker"
+	return BrokerKind
 }
 
 func (b *Broker) GetName() string {
@@ -114,7 +113,7 @@ func (b *Broker) GetName() string {
 }
 
 func (b *Broker) GetAPIVersion() string {
-	return "v1alpha1"
+	return APIVersion
 }
 
 func (b *Broker) GetSpec() map[string]interface{} {
@@ -131,29 +130,6 @@ func (b *Broker) GetPort(ctx context.Context) (string, error) {
 
 func (b *Broker) ConsumedEventTypes() ([]string, error) {
 	return []string{}, nil
-}
-
-func GetTargetTriggers(broker, configBase string, target triggermesh.Component) ([]triggermesh.Component, error) {
-	config, err := readBrokerConfig(path.Join(configBase, broker, brokerConfigFile))
-	if err != nil {
-		return nil, fmt.Errorf("read broker config: %w", err)
-	}
-	var triggers []triggermesh.Component
-	for name, trigger := range config.Triggers {
-		if trigger.GetTarget().Ref.Name != target.GetName() {
-			continue
-		}
-		f := eventingbroker.Filter{}
-		if len(trigger.Filters) != 0 {
-			f = trigger.Filters[0]
-		}
-		t, err := NewTrigger(name, broker, configBase, target, &f)
-		if err != nil {
-			return nil, fmt.Errorf("creating trigger object: %w", err)
-		}
-		triggers = append(triggers, t)
-	}
-	return triggers, nil
 }
 
 func (b *Broker) Start(ctx context.Context, additionalEnvs map[string]string, restart bool) (*docker.Container, error) {

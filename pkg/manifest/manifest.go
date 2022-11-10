@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"gopkg.in/yaml.v3"
+	kyaml "sigs.k8s.io/yaml"
 
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
@@ -58,7 +59,7 @@ func (m *Manifest) Read() error {
 func (m *Manifest) write() error {
 	var output []byte
 	for _, object := range m.Objects {
-		body, err := yaml.Marshal(object)
+		body, err := kyaml.Marshal(object)
 		if err != nil {
 			return err
 		}

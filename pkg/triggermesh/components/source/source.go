@@ -27,6 +27,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 )
@@ -56,6 +57,13 @@ func (s *Source) asUnstructured() (unstructured.Unstructured, error) {
 }
 
 func (s *Source) AsK8sObject() (kubernetes.Object, error) {
+	s.spec["sink"] = map[string]interface{}{
+		"ref": map[string]interface{}{
+			"name":       s.Broker,
+			"kind":       tmbroker.BrokerKind,
+			"apiVersion": tmbroker.APIVersion,
+		},
+	}
 	return kubernetes.CreateObject(s.GetKind(), s.GetName(), triggermesh.Namespace, s.Broker, s.CRDFile, s.spec)
 }
 

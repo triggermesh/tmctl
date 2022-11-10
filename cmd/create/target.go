@@ -124,7 +124,7 @@ func (o *CreateOptions) createTrigger(name string, target triggermesh.Component,
 	if err != nil {
 		return nil, err
 	}
-	if err := trigger.(*tmbroker.Trigger).UpdateBrokerConfig(); err != nil {
+	if err := trigger.(*tmbroker.Trigger).WriteLocalConfig(); err != nil {
 		return nil, err
 	}
 	if _, err := o.Manifest.Add(trigger); err != nil {

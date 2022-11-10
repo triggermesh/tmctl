@@ -179,7 +179,7 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 			if len(trigger.Filters) != 1 || !reflect.DeepEqual(trigger.Filters[0], *filter) {
 				continue
 			}
-			if err := trigger.RemoveTriggerFromConfig(); err != nil {
+			if err := trigger.RemoveFromLocalConfig(); err != nil {
 				return err
 			}
 			if err := o.Manifest.Remove(trigger.GetName(), trigger.GetKind()); err != nil {
@@ -191,7 +191,7 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 	if len(eventTypesFilter) == 0 {
 		for _, trigger := range targetTriggers {
 			trigger.(*tmbroker.Trigger).SetTarget(t)
-			if err := trigger.(*tmbroker.Trigger).UpdateBrokerConfig(); err != nil {
+			if err := trigger.(*tmbroker.Trigger).WriteLocalConfig(); err != nil {
 				return err
 			}
 			if _, err := o.Manifest.Add(trigger); err != nil {

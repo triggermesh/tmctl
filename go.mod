@@ -13,16 +13,18 @@ require (
 	github.com/cloudevents/sdk-go/v2 v2.12.0
 	github.com/docker/docker v20.10.12+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/google/gnostic v0.6.8
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.12.0
-	github.com/triggermesh/triggermesh v1.21.2-0.20221108083533-6c16477b4901
+	github.com/triggermesh/brokers v0.0.0-20221102122724-2474a474b653
+	github.com/triggermesh/triggermesh v1.21.2-0.20221108094818-4aef4699eb85
+	github.com/triggermesh/triggermesh-core v0.0.0-20221031193346-a2f2c6b771bd
 	google.golang.org/api v0.101.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.25.3
 	k8s.io/apimachinery v0.25.3
-	k8s.io/client-go v11.0.1-0.20190805182717-6502b5e7b1b5+incompatible
 	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1
+	knative.dev/pkg v0.0.0-20221107171117-0243d641354d
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -57,6 +59,7 @@ require (
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/docker/distribution v2.8.0+incompatible // indirect
 	github.com/docker/go-units v0.4.0 // indirect
+	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-kit/log v0.1.0 // indirect
@@ -70,6 +73,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/cel-go v0.12.5 // indirect
+	github.com/google/gnostic v0.6.8 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/go-containerregistry v0.8.1-0.20220414143355-892d7a808387 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
@@ -94,6 +98,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.3-0.20220114050600-8b9d41f48198 // indirect
 	github.com/openzipkin/zipkin-go v0.3.0 // indirect
@@ -117,8 +122,6 @@ require (
 	github.com/tidwall/gjson v1.14.3 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
-	github.com/triggermesh/brokers v0.0.0-20221102122724-2474a474b653 // indirect
-	github.com/triggermesh/triggermesh-core v0.0.0-20221031193346-a2f2c6b771bd // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
@@ -140,13 +143,17 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	k8s.io/client-go v0.25.3 // indirect
 	k8s.io/klog/v2 v2.70.2-0.20220707122935-0990e81f1a8f // indirect
 	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed // indirect
 	knative.dev/eventing v0.35.0 // indirect
 	knative.dev/networking v0.0.0-20220412163509-1145ec58c8be // indirect
-	knative.dev/pkg v0.0.0-20221107171117-0243d641354d // indirect
 	knative.dev/serving v0.31.0 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
+<<<<<<< HEAD
 	sigs.k8s.io/yaml v1.3.0 // indirect
 `)
+=======
+)
+>>>>>>> 61ac594 (Appliable `dump` output)
