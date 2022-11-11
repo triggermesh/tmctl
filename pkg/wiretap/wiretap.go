@@ -21,14 +21,17 @@ import (
 	"fmt"
 	"io"
 
+	"knative.dev/pkg/apis"
+	v1 "knative.dev/pkg/apis/duck/v1"
+
 	"github.com/triggermesh/tmctl/pkg/docker"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/triggermesh-core/pkg/apis/eventing/v1alpha1"
 )
 
 type Wiretap struct {
-	Broker     string
-	ConfigBase string
-	// EventType string
+	Broker      string
+	ConfigBase  string
 	Destination string
 }
 
@@ -76,15 +79,22 @@ func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
 }
 
 func (w *Wiretap) CreateTrigger(eventTypes []string) error {
-	for _, et := range eventTypes {
-		trigger, err := tmbroker.NewTrigger("wiretap-trigger", w.Broker, w.ConfigBase, w.Destination, "wiretap", tmbroker.FilterExactAttribute("type", et))
-		if err != nil {
-			return fmt.Errorf("creating trigger: %w", err)
-		}
-		trigger.(*tmbroker.Trigger).SetTarget("wiretap", w.Destination)
-		if err := trigger.(*tmbroker.Trigger).UpdateBrokerConfig(); err != nil {
-			return err
-		}
+	url, err := apis.ParseURL(w.Destination)
+	if err != nil {
+		return fmt.Errorf("wiretap URL: %w", err)
+	}
+	trigger := &tmbroker.Trigger{
+		Name:       "wiretap",
+		ConfigBase: w.ConfigBase,
+		LocalURL:   url,
+		TriggerSpec: v1alpha1.TriggerSpec{
+			Broker: v1.KReference{
+				Name: w.Broker,
+			},
+		},
+	}
+	if err := trigger.WriteLocalConfig(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -94,14 +104,17 @@ func (w *Wiretap) Cleanup(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
-	triggers, err := tmbroker.GetTargetTriggers(w.Broker, w.ConfigBase, "wiretap")
-	if err != nil {
-		return fmt.Errorf("wiretap triggers: %w", err)
+	trigger := &tmbroker.Trigger{
+		Name:       "wiretap",
+		ConfigBase: w.ConfigBase,
+		TriggerSpec: v1alpha1.TriggerSpec{
+			Broker: v1.KReference{
+				Name: w.Broker,
+			},
+		},
 	}
-	for _, trigger := range triggers {
-		if err := trigger.(*tmbroker.Trigger).RemoveTriggerFromConfig(); err != nil {
-			return fmt.Errorf("removing trigger: %v", err)
-		}
+	if err := trigger.RemoveFromLocalConfig(); err != nil {
+		return fmt.Errorf("removing trigger: %v", err)
 	}
 	return docker.ForceStop(ctx, fmt.Sprintf("%s-wiretap", w.Broker), client)
 }

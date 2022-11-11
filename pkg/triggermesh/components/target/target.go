@@ -83,6 +83,14 @@ func (t *Target) GetKind() string {
 	return t.Kind
 }
 
+func (t *Target) GetAPIVersion() string {
+	o, err := t.AsK8sObject()
+	if err != nil {
+		return ""
+	}
+	return o.APIVersion
+}
+
 func (t *Target) GetSpec() map[string]interface{} {
 	return t.spec
 }

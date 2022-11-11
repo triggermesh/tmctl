@@ -27,6 +27,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 )
@@ -56,7 +57,18 @@ func (s *Source) asUnstructured() (unstructured.Unstructured, error) {
 }
 
 func (s *Source) AsK8sObject() (kubernetes.Object, error) {
-	return kubernetes.CreateObject(s.GetKind(), s.GetName(), triggermesh.Namespace, s.Broker, s.CRDFile, s.spec)
+	spec := make(map[string]interface{}, len(s.spec))
+	for k, v := range s.spec {
+		spec[k] = v
+	}
+	spec["sink"] = map[string]interface{}{
+		"ref": map[string]interface{}{
+			"name":       s.Broker,
+			"kind":       tmbroker.BrokerKind,
+			"apiVersion": tmbroker.APIVersion,
+		},
+	}
+	return kubernetes.CreateObject(s.GetKind(), s.GetName(), triggermesh.Namespace, s.Broker, s.CRDFile, spec)
 }
 
 func (s *Source) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {
@@ -83,6 +95,14 @@ func (s *Source) GetName() string {
 
 func (s *Source) GetKind() string {
 	return s.Kind
+}
+
+func (s *Source) GetAPIVersion() string {
+	o, err := s.AsK8sObject()
+	if err != nil {
+		return ""
+	}
+	return o.APIVersion
 }
 
 func (s *Source) GetSpec() map[string]interface{} {

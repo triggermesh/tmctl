@@ -27,6 +27,7 @@ import (
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/manifest"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
 const manifestFile = "manifest.yaml"
@@ -65,10 +66,10 @@ func (o *StopOptions) stop(broker string) error {
 	}
 
 	for _, object := range o.Manifest.Objects {
-		if object.Kind == "Trigger" || object.Kind == "Secret" {
+		if object.Kind == tmbroker.TriggerKind || object.Kind == "Secret" {
 			continue
 		}
-		if object.Kind == "Broker" {
+		if object.Kind == tmbroker.BrokerKind {
 			object.Metadata.Name += "-broker"
 		}
 		log.Printf("Stopping %s\n", object.Metadata.Name)

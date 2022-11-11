@@ -89,7 +89,7 @@ func (o DescribeOptions) describe(broker string) error {
 	var intg integration
 	for _, object := range o.Manifest.Objects {
 		switch {
-		case object.Kind == "Broker":
+		case object.Kind == tmbroker.BrokerKind:
 			broker, err := tmbroker.New(object.Metadata.Name, o.Manifest.Path)
 			if err != nil {
 				return fmt.Errorf("creating broker object: %v", err)
@@ -102,14 +102,12 @@ func (o DescribeOptions) describe(broker string) error {
 				object:    []triggermesh.Component{broker},
 				container: []*docker.Container{container},
 			}
-		case object.Kind == "Trigger":
-			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigBase, "", "", nil)
+		case object.Kind == tmbroker.TriggerKind:
+			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigBase, nil, nil)
 			if err != nil {
 				return fmt.Errorf("trigger object: %w", err)
 			}
-			if err := trigger.(*tmbroker.Trigger).LookupTrigger(); err != nil {
-				return fmt.Errorf("trigger config: %w", err)
-			}
+			trigger.(*tmbroker.Trigger).LookupTarget()
 			intg.Triggers.object = append(intg.Triggers.object, trigger)
 		case object.Kind == "Transformation":
 			trn := transformation.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)

@@ -25,18 +25,22 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
+	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/manifest"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
 const manifestFile = "manifest.yaml"
 
 type DumpOptions struct {
 	Format   string
+	Context  string
 	Manifest *manifest.Manifest
 }
 
 func NewCmd() *cobra.Command {
 	o := &DumpOptions{}
+	knativeEventing := false
 	dumpCmd := &cobra.Command{
 		Use:   "dump [broker]",
 		Short: "Generate Kubernetes manifest",
@@ -45,28 +49,35 @@ func NewCmd() *cobra.Command {
 			if len(args) == 1 {
 				broker = args[0]
 			}
+			o.Context = broker
 			o.Manifest = manifest.New(path.Join(path.Dir(viper.ConfigFileUsed()), broker, manifestFile))
 			cobra.CheckErr(o.Manifest.Read())
-			return o.dump(broker)
+			return o.dump(knativeEventing)
 		},
 	}
 	dumpCmd.Flags().StringVarP(&o.Format, "output", "o", "yaml", "Output format")
+	dumpCmd.Flags().BoolVar(&knativeEventing, "knative", false, "Use Knative Eventing components")
 	return dumpCmd
 }
 
-func (o *DumpOptions) dump(broker string) error {
+func (o *DumpOptions) dump(useKnativeEvenyting bool) error {
+	if useKnativeEvenyting {
+		for i, object := range o.Manifest.Objects {
+			o.Manifest.Objects[i] = o.knativeEventingTranformation(object)
+		}
+	}
 	switch o.Format {
 	case "json":
-		for _, v := range o.Manifest.Objects {
-			jsn, err := json.MarshalIndent(v, "", "  ")
+		for _, object := range o.Manifest.Objects {
+			jsn, err := json.MarshalIndent(object, "", "  ")
 			if err != nil {
 				return err
 			}
 			fmt.Println(string(jsn))
 		}
 	case "yaml":
-		for _, v := range o.Manifest.Objects {
-			yml, err := yaml.Marshal(v)
+		for _, object := range o.Manifest.Objects {
+			yml, err := yaml.Marshal(object)
 			if err != nil {
 				return err
 			}
@@ -76,6 +87,35 @@ func (o *DumpOptions) dump(broker string) error {
 	default:
 		return fmt.Errorf("format %q is not supported", o.Format)
 	}
-
 	return nil
+}
+
+func (o *DumpOptions) knativeEventingTranformation(object kubernetes.Object) kubernetes.Object {
+	switch object.APIVersion {
+	case tmbroker.APIVersion:
+		switch object.Kind {
+		case tmbroker.BrokerKind:
+			object.APIVersion = "eventing.knative.dev/v1"
+			object.Kind = "Broker"
+		case tmbroker.TriggerKind:
+			newSpec := map[string]interface{}{
+				"broker":     o.Context,
+				"subscriber": object.Spec["target"],
+			}
+			if filter, set := object.Spec["filters"]; set {
+				newSpec["filters"] = filter
+			}
+			object.APIVersion = "eventing.knative.dev/v1"
+			object.Spec = newSpec
+		}
+	case "sources.triggermesh.io/v1alpha1":
+		object.Spec["sink"] = map[string]interface{}{
+			"ref": map[string]interface{}{
+				"name":       o.Context,
+				"kind":       "Broker",
+				"apiVersion": "eventing.knative.dev/v1",
+			},
+		}
+	}
+	return object
 }

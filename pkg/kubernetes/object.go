@@ -29,27 +29,27 @@ const (
 )
 
 type Object struct {
-	APIVersion string                 `yaml:"apiVersion"`
-	Kind       string                 `yaml:"kind"`
-	Metadata   Metadata               `yaml:"metadata"`
-	Spec       map[string]interface{} `yaml:"spec,omitempty"`
+	APIVersion string                 `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string                 `json:"kind" yaml:"kind"`
+	Metadata   Metadata               `json:"metadata" yaml:"metadata"`
+	Spec       map[string]interface{} `json:"spec,omitempty" yaml:"spec,omitempty"`
 
 	// for Secrets
-	Data map[string]string `yaml:"data,omitempty"`
-	Type string            `yaml:"type,omitempty"`
+	Data map[string]string `json:"data,omitempty" yaml:"data,omitempty"`
+	Type string            `json:"type,omitempty" yaml:"type,omitempty"`
 }
 
 type Metadata struct {
-	Name            string            `yaml:"name"`
-	Namespace       string            `yaml:"namespace,omitempty"`
-	Labels          map[string]string `yaml:"labels"`
+	Name            string            `json:"name" yaml:"name"`
+	Namespace       string            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Labels          map[string]string `json:"labels" yaml:"labels"`
 	OwnerReferences []struct {
-		APIVersion         string `yaml:"apiVersion"`
-		BlockOwnerDeletion bool   `yaml:"blockOwnerDeletion"`
-		Kind               string `yaml:"kind"`
-		Name               string `yaml:"name"`
-		UID                string `yaml:"uid"`
-	} `yaml:"ownerReferences,omitempty"`
+		APIVersion         string `json:"apiVersion" yaml:"apiVersion"`
+		BlockOwnerDeletion bool   `json:"blockOwnerDeletion" yaml:"blockOwnerDeletion"`
+		Kind               string `json:"kind" yaml:"kind"`
+		Name               string `json:"name" yaml:"name"`
+		UID                string `json:"uid" yaml:"uid"`
+	} `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 }
 
 func CreateObject(resource, name, namespace, broker, crdFile string, spec map[string]interface{}) (Object, error) {

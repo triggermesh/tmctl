@@ -78,6 +78,14 @@ func (t *Transformation) GetKind() string {
 	return "transformation"
 }
 
+func (t *Transformation) GetAPIVersion() string {
+	o, err := t.AsK8sObject()
+	if err != nil {
+		return ""
+	}
+	return o.APIVersion
+}
+
 func (t *Transformation) GetSpec() map[string]interface{} {
 	return t.spec
 }

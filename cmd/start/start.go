@@ -82,12 +82,11 @@ func (o *StartOptions) initialize() {
 
 func (o *StartOptions) start(broker string) error {
 	ctx := context.Background()
-	componentTriggers := make(map[string][]triggermesh.Component)
+	// componentTriggers := make(map[string][]triggermesh.Component)
 	var brokerPort string
 	// start eventing first
 	for _, object := range o.Manifest.Objects {
-		switch object.Kind {
-		case "Broker":
+		if object.Kind == tmbroker.BrokerKind {
 			broker, err := tmbroker.New(object.Metadata.Name, o.Manifest.Path)
 			if err != nil {
 				return fmt.Errorf("creating broker object: %w", err)
@@ -98,22 +97,6 @@ func (o *StartOptions) start(broker string) error {
 				return fmt.Errorf("starting broker container: %w", err)
 			}
 			brokerPort = container.HostPort()
-		case "Trigger":
-			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigBase, "", "", nil)
-			if err != nil {
-				return fmt.Errorf("trigger object: %w", err)
-			}
-			if err := trigger.(*tmbroker.Trigger).LookupTrigger(); err != nil {
-				return fmt.Errorf("trigger configuration: %w", err)
-			}
-			if triggers, set := componentTriggers[trigger.(*tmbroker.Trigger).GetTarget().Component]; set {
-				componentTriggers[trigger.(*tmbroker.Trigger).GetTarget().Component] = append(triggers, trigger)
-			} else {
-				componentTriggers[trigger.(*tmbroker.Trigger).GetTarget().Component] = []triggermesh.Component{trigger}
-			}
-			if _, err := o.Manifest.Add(trigger); err != nil {
-				return fmt.Errorf("creating trigger: %w", err)
-			}
 		}
 	}
 
@@ -152,20 +135,15 @@ func (o *StartOptions) start(broker string) error {
 		if _, err := c.(triggermesh.Runnable).Start(ctx, secrets, o.Restart); err != nil {
 			return fmt.Errorf("starting container: %w", err)
 		}
-		if consumer, ok := c.(triggermesh.Consumer); ok {
-			port, err := consumer.GetPort(ctx)
+		if _, ok := c.(triggermesh.Consumer); ok {
+			triggers, err := tmbroker.GetTargetTriggers(c.GetName(), o.Context, o.ConfigBase)
 			if err != nil {
-				return fmt.Errorf("container port: %w", err)
+				return fmt.Errorf("%q target triggers: %w", c.GetName(), err)
 			}
-			if triggers, exists := componentTriggers[object.Metadata.Name]; exists {
-				for _, trigger := range triggers {
-					trigger.(*tmbroker.Trigger).SetTarget(object.Metadata.Name, fmt.Sprintf("http://host.docker.internal:%s", port))
-					if err := trigger.(*tmbroker.Trigger).UpdateBrokerConfig(); err != nil {
-						return fmt.Errorf("broker config: %w", err)
-					}
-					if _, err := o.Manifest.Add(trigger); err != nil {
-						return fmt.Errorf("unable to update manifest: %w", err)
-					}
+			for _, t := range triggers {
+				t.(*tmbroker.Trigger).SetTarget(c)
+				if err := t.(*tmbroker.Trigger).WriteLocalConfig(); err != nil {
+					return fmt.Errorf("updating broker config: %w", err)
 				}
 			}
 		}

@@ -54,6 +54,10 @@ func (s *Secret) GetKind() string {
 	return "Secret"
 }
 
+func (s *Secret) GetAPIVersion() string {
+	return "v1"
+}
+
 func (s *Secret) GetSpec() map[string]interface{} {
 	spec := make(map[string]interface{}, len(s.data))
 	for k, v := range s.data {

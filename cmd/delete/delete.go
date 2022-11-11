@@ -136,7 +136,7 @@ func (o *DeleteOptions) deleteComponents(names []string, deleteBroker bool) erro
 		if skip {
 			continue
 		}
-		if object.Kind == "Broker" {
+		if object.Kind == tmbroker.BrokerKind {
 			log.Printf("use \"tmctl delete --broker %s\" to delete the broker. Skipping", object.Metadata.Name)
 			continue
 		}
@@ -147,7 +147,7 @@ func (o *DeleteOptions) deleteComponents(names []string, deleteBroker bool) erro
 
 func (o *DeleteOptions) deleteEverything(ctx context.Context, object kubernetes.Object, client *client.Client) {
 	log.Printf("Deleting %q %s", object.Metadata.Name, strings.ToLower(object.Kind))
-	if object.Kind == "Broker" {
+	if object.Kind == tmbroker.BrokerKind {
 		object.Metadata.Name = object.Metadata.Name + "-broker"
 	}
 	if err := o.removeExternalServices(ctx, object); err != nil {
@@ -164,13 +164,13 @@ func (o *DeleteOptions) removeObject(component string) {
 		if component != object.Metadata.Name {
 			continue
 		}
-		if object.Kind == "Trigger" {
-			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, o.Context, o.ConfigBase, "", "", nil)
+		if object.Kind == tmbroker.TriggerKind {
+			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, o.Context, o.ConfigBase, nil, nil)
 			if err != nil {
 				log.Printf("Creating trigger object %q: %v", object.Metadata.Name, err)
 				continue
 			}
-			if err := trigger.(*tmbroker.Trigger).RemoveTriggerFromConfig(); err != nil {
+			if err := trigger.(*tmbroker.Trigger).RemoveFromLocalConfig(); err != nil {
 				log.Printf("Updating broker config %q: %v", object.Metadata.Name, err)
 			}
 		}
@@ -184,13 +184,13 @@ func (o *DeleteOptions) removeContainer(ctx context.Context, name string, client
 	return docker.ForceStop(ctx, name, client)
 }
 
-func (o *DeleteOptions) cleanupTriggers(component string) {
-	triggers, err := tmbroker.GetTargetTriggers(o.Context, o.ConfigBase, component)
+func (o *DeleteOptions) cleanupTriggers(target string) {
+	triggers, err := tmbroker.GetTargetTriggers(target, o.Context, o.ConfigBase)
 	if err != nil {
 		return
 	}
 	for _, trigger := range triggers {
-		if err := trigger.(*tmbroker.Trigger).RemoveTriggerFromConfig(); err != nil {
+		if err := trigger.(*tmbroker.Trigger).RemoveFromLocalConfig(); err != nil {
 			log.Printf("Updating broker config %q: %v", trigger.GetName(), err)
 			continue
 		}

@@ -29,6 +29,7 @@ type Component interface {
 
 	GetName() string
 	GetKind() string
+	GetAPIVersion() string
 	GetSpec() map[string]interface{}
 }
 
