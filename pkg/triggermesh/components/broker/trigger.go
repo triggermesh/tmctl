@@ -174,6 +174,10 @@ func (t *Trigger) LookupTarget() {
 	if !exists {
 		return
 	}
+	if url, _ := apis.ParseURL(localTrigger.Target.URL); url != nil {
+		t.LocalURL = url
+	}
+	t.ComponentName = localTrigger.Target.Component
 	t.Filters = localTrigger.Filters
 	t.Target = duckv1.Destination{
 		Ref: &duckv1.KReference{

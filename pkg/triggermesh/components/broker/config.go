@@ -67,24 +67,25 @@ func (t *Trigger) WriteLocalConfig() error {
 		return fmt.Errorf("broker config: %w", err)
 	}
 
-	triggerSpec := LocalTriggerSpec{
-		Filters: t.Filters,
-		Target: LocalTarget{
-			URL:       t.LocalURL.String(),
-			Component: t.ComponentName,
-		},
-	}
-
 	trigger, exists := configuration.Triggers[t.Name]
 	if exists {
-		trigger.Filters = triggerSpec.Filters
-		trigger.Target = triggerSpec.Target
+		trigger.Filters = t.Filters
+		trigger.Target = LocalTarget{
+			URL:       t.LocalURL.String(),
+			Component: t.ComponentName,
+		}
 		configuration.Triggers[t.Name] = trigger
 	} else {
 		if configuration.Triggers == nil {
 			configuration.Triggers = make(map[string]LocalTriggerSpec, 1)
 		}
-		configuration.Triggers[t.Name] = triggerSpec
+		configuration.Triggers[t.Name] = LocalTriggerSpec{
+			Filters: t.Filters,
+			Target: LocalTarget{
+				URL:       t.LocalURL.String(),
+				Component: t.ComponentName,
+			},
+		}
 	}
 	return writeBrokerConfig(configFile, &configuration)
 }

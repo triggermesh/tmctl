@@ -141,7 +141,7 @@ func (o *StartOptions) start(broker string) error {
 				return fmt.Errorf("%q target triggers: %w", c.GetName(), err)
 			}
 			for _, t := range triggers {
-				// t.(*tmbroker.Trigger).SetTarget(c)
+				t.(*tmbroker.Trigger).SetTarget(c)
 				if err := t.(*tmbroker.Trigger).WriteLocalConfig(); err != nil {
 					return fmt.Errorf("updating broker config: %w", err)
 				}
