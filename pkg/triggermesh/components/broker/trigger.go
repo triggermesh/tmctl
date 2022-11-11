@@ -42,10 +42,10 @@ const (
 var _ triggermesh.Component = (*Trigger)(nil)
 
 type Trigger struct {
-	name          string
-	configBase    string
-	componentName string
-	localURL      *apis.URL
+	Name          string
+	ConfigBase    string
+	ComponentName string
+	LocalURL      *apis.URL
 
 	eventingv1alpha1.TriggerSpec `yaml:"spec,omitempty"`
 }
@@ -62,7 +62,7 @@ func (t *Trigger) AsK8sObject() (kubernetes.Object, error) {
 		APIVersion: APIVersion,
 		Kind:       TriggerKind,
 		Metadata: kubernetes.Metadata{
-			Name:      t.name,
+			Name:      t.Name,
 			Namespace: triggermesh.Namespace,
 			Labels: map[string]string{
 				"triggermesh.io/context": t.Broker.Name,
@@ -77,7 +77,7 @@ func (t *Trigger) GetKind() string {
 }
 
 func (t *Trigger) GetName() string {
-	return t.name
+	return t.Name
 }
 
 func (t *Trigger) GetAPIVersion() string {
@@ -101,8 +101,8 @@ func (t *Trigger) GetSpec() map[string]interface{} {
 
 func NewTrigger(name, broker, configBase string, target triggermesh.Component, filter *eventingbroker.Filter) (triggermesh.Component, error) {
 	trigger := &Trigger{
-		name:       name,
-		configBase: configBase,
+		Name:       name,
+		ConfigBase: configBase,
 		TriggerSpec: eventingv1alpha1.TriggerSpec{
 			Broker: duckv1.KReference{
 				Name:  broker,
@@ -116,16 +116,16 @@ func NewTrigger(name, broker, configBase string, target triggermesh.Component, f
 		filterStruct, _ := yaml.Marshal(filter)
 		// in case of event types hash collision, replace with sha256
 		hash := md5.Sum([]byte(fmt.Sprintf("%s-%s", target.GetName(), string(filterStruct))))
-		trigger.name = fmt.Sprintf("%s-trigger-%s", broker, hex.EncodeToString(hash[:4]))
+		trigger.Name = fmt.Sprintf("%s-trigger-%s", broker, hex.EncodeToString(hash[:4]))
 	}
 
 	if target != nil {
-		trigger.componentName = target.GetName()
+		trigger.ComponentName = target.GetName()
 		targetPort, err := target.(triggermesh.Consumer).GetPort(context.Background())
 		if err != nil {
 			return nil, fmt.Errorf("target local port: %w", err)
 		}
-		trigger.localURL, err = apis.ParseURL(fmt.Sprintf("%s:%s", dockerHost, targetPort))
+		trigger.LocalURL, err = apis.ParseURL(fmt.Sprintf("%s:%s", dockerHost, targetPort))
 		if err != nil {
 			return nil, fmt.Errorf("target local URL: %w", err)
 		}
@@ -145,7 +145,7 @@ func NewTrigger(name, broker, configBase string, target triggermesh.Component, f
 }
 
 func (t *Trigger) SetTarget(target triggermesh.Component) {
-	t.componentName = target.GetName()
+	t.ComponentName = target.GetName()
 	t.Target = duckv1.Destination{
 		Ref: &duckv1.KReference{
 			Kind:       target.GetKind(),
@@ -158,7 +158,7 @@ func (t *Trigger) SetTarget(target triggermesh.Component) {
 		if err != nil {
 			return
 		}
-		t.localURL, err = apis.ParseURL(fmt.Sprintf("%s:%s", dockerHost, port))
+		t.LocalURL, err = apis.ParseURL(fmt.Sprintf("%s:%s", dockerHost, port))
 		if err != nil {
 			return
 		}
@@ -166,11 +166,11 @@ func (t *Trigger) SetTarget(target triggermesh.Component) {
 }
 
 func (t *Trigger) LookupTarget() {
-	config, err := readBrokerConfig(path.Join(t.configBase, t.Broker.Name, brokerConfigFile))
+	config, err := readBrokerConfig(path.Join(t.ConfigBase, t.Broker.Name, brokerConfigFile))
 	if err != nil {
 		return
 	}
-	localTrigger, exists := config.Triggers[t.name]
+	localTrigger, exists := config.Triggers[t.Name]
 	if !exists {
 		return
 	}

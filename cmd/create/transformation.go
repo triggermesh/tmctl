@@ -160,7 +160,7 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 	var targetTriggers []triggermesh.Component
 	// creating new trigger from transformation to target
 	if targetComponent != nil {
-		if targetTriggers, err = tmbroker.GetTargetTriggers(o.Context, o.ConfigBase, targetComponent); err != nil {
+		if targetTriggers, err = tmbroker.GetTargetTriggers(targetComponent.GetName(), o.Context, o.ConfigBase); err != nil {
 			return fmt.Errorf("target triggers: %w", err)
 		}
 		if _, err := o.createTrigger("", targetComponent, tmbroker.FilterExactAttribute("type", transformationEventType)); err != nil {

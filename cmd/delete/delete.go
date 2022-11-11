@@ -155,7 +155,7 @@ func (o *DeleteOptions) deleteEverything(ctx context.Context, object kubernetes.
 	}
 	o.removeContainer(ctx, object.Metadata.Name, client)
 	o.removeObject(object.Metadata.Name)
-	// o.cleanupTriggers(object.Metadata.Name)
+	o.cleanupTriggers(object.Metadata.Name)
 	o.cleanupSecrets(object.Metadata.Name)
 }
 
@@ -184,8 +184,8 @@ func (o *DeleteOptions) removeContainer(ctx context.Context, name string, client
 	return docker.ForceStop(ctx, name, client)
 }
 
-func (o *DeleteOptions) cleanupTriggers(target triggermesh.Component) {
-	triggers, err := tmbroker.GetTargetTriggers(o.Context, o.ConfigBase, target)
+func (o *DeleteOptions) cleanupTriggers(target string) {
+	triggers, err := tmbroker.GetTargetTriggers(target, o.Context, o.ConfigBase)
 	if err != nil {
 		return
 	}

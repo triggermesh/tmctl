@@ -136,7 +136,7 @@ func (o *StartOptions) start(broker string) error {
 			return fmt.Errorf("starting container: %w", err)
 		}
 		if _, ok := c.(triggermesh.Consumer); ok {
-			triggers, err := tmbroker.GetTargetTriggers(o.Context, o.ConfigBase, c)
+			triggers, err := tmbroker.GetTargetTriggers(c.GetName(), o.Context, o.ConfigBase)
 			if err != nil {
 				return fmt.Errorf("%q target triggers: %w", c.GetName(), err)
 			}
