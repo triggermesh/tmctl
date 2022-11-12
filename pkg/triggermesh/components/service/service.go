@@ -62,20 +62,16 @@ func (s *Service) asUnstructured() (unstructured.Unstructured, error) {
 	u.SetName(s.Name)
 	u.SetNamespace(triggermesh.Namespace)
 	u.SetLabels(map[string]string{"context": s.Broker})
-	spec := map[string]interface{}{
-		"containers": []interface{}{
-			map[string]interface{}{
-				"image": s.Image,
-				"name":  "user-container",
-				"env":   paramsToEnv(s.params),
-			},
-		},
-	}
-	return u, unstructured.SetNestedField(u.Object, spec, "spec", "template", "spec")
+	return u, unstructured.SetNestedField(u.Object, kserviceSpec(s.Image, s.params), "spec")
 }
 
 func (s *Service) AsK8sObject() (kubernetes.Object, error) {
-	object := kubernetes.Object{
+	manifestParams := make(map[string]string, len(s.params))
+	for k, v := range s.params {
+		manifestParams[k] = v
+	}
+	manifestParams["K_SINK"] = fmt.Sprintf("http://%s-rb-broker:8080", s.Broker)
+	return kubernetes.Object{
 		APIVersion: APIVersion,
 		Kind:       Kind,
 		Metadata: kubernetes.Metadata{
@@ -85,22 +81,8 @@ func (s *Service) AsK8sObject() (kubernetes.Object, error) {
 				"triggermesh.io/context": s.Broker,
 			},
 		},
-		Spec: map[string]interface{}{
-			"template": map[string]interface{}{
-				"spec": map[string]interface{}{
-					"containers": []interface{}{
-						map[string]interface{}{
-							"image": s.Image,
-							"name":  "user-container",
-							"env":   paramsToEnv(s.params),
-							// http://foo-rb-broker:8080/
-						},
-					},
-				},
-			},
-		},
-	}
-	return object, nil
+		Spec: kserviceSpec(s.Image, manifestParams),
+	}, nil
 }
 
 func (s *Service) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {
@@ -108,7 +90,10 @@ func (s *Service) asContainer(additionalEnvs map[string]string) (*docker.Contain
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
-	co, ho, err := adapter.RuntimeParams(u, s.Image, additionalEnvs)
+	for k, v := range additionalEnvs {
+		s.params[k] = v
+	}
+	co, ho, err := adapter.RuntimeParams(u, s.Image, s.params)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
@@ -210,4 +195,20 @@ func paramsToEnv(params map[string]string) []interface{} {
 		})
 	}
 	return env
+}
+
+func kserviceSpec(image string, params map[string]string) map[string]interface{} {
+	return map[string]interface{}{
+		"template": map[string]interface{}{
+			"spec": map[string]interface{}{
+				"containers": []interface{}{
+					map[string]interface{}{
+						"image": image,
+						"name":  "user-container",
+						"env":   paramsToEnv(params),
+					},
+				},
+			},
+		},
+	}
 }
