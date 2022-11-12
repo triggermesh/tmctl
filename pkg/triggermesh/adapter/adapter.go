@@ -65,7 +65,7 @@ func RuntimeParams(object unstructured.Unstructured, image string, additionalEnv
 		docker.WithExtraHost(),
 	}
 
-	if object.GetKind() == "RedisBroker" {
+	if object.GetKind() == "RedisBroker" || object.GetKind() == "Service" {
 		return co, ho, nil
 	}
 

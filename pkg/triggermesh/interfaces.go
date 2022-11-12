@@ -35,7 +35,7 @@ type Component interface {
 
 // Runnable is the interface for components that can run as Docker containers.
 type Runnable interface {
-	Start(context.Context, map[string]string, bool) (*docker.Container, error)
+	Start(ctx context.Context, additionalEnv map[string]string, restart bool) (*docker.Container, error)
 	Stop(context.Context) error
 	Info(context.Context) (*docker.Container, error)
 }

@@ -82,7 +82,6 @@ func (o *StartOptions) initialize() {
 
 func (o *StartOptions) start(broker string) error {
 	ctx := context.Background()
-	// componentTriggers := make(map[string][]triggermesh.Component)
 	var brokerPort string
 	// start eventing first
 	for _, object := range o.Manifest.Objects {
