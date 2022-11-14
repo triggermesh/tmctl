@@ -28,7 +28,7 @@ import (
 func ListSources(m *manifest.Manifest) []string {
 	var list []string
 	for _, object := range m.Objects {
-		if strings.HasPrefix(object.APIVersion, "sources.triggermesh.io") {
+		if object.APIVersion == "sources.triggermesh.io/v1alpha1" {
 			list = append(list, object.Metadata.Name)
 		}
 	}

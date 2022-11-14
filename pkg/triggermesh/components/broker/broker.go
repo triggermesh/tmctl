@@ -59,7 +59,6 @@ func (b *Broker) asUnstructured() (unstructured.Unstructured, error) {
 	u.SetKind(BrokerKind)
 	u.SetName(b.Name)
 	u.SetNamespace(triggermesh.Namespace)
-	u.SetLabels(map[string]string{"context": b.Name})
 	return u, unstructured.SetNestedField(u.Object, nil, "spec")
 }
 

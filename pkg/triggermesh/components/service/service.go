@@ -39,9 +39,9 @@ var (
 	Consumer Role = "consumer"
 
 	_ triggermesh.Component = (*Service)(nil)
-	// _ triggermesh.Consumer  = (*Service)(nil)
-	// _ triggermesh.Producer  = (*Service)(nil)
-	_ triggermesh.Runnable = (*Service)(nil)
+	_ triggermesh.Consumer  = (*Service)(nil)
+	_ triggermesh.Producer  = (*Service)(nil)
+	_ triggermesh.Runnable  = (*Service)(nil)
 )
 
 type Role string
@@ -61,7 +61,6 @@ func (s *Service) asUnstructured() (unstructured.Unstructured, error) {
 	u.SetKind(Kind)
 	u.SetName(s.Name)
 	u.SetNamespace(triggermesh.Namespace)
-	u.SetLabels(map[string]string{"context": s.Broker})
 	return u, unstructured.SetNestedField(u.Object, kserviceSpec(s.Image, s.params), "spec")
 }
 
@@ -70,7 +69,9 @@ func (s *Service) AsK8sObject() (kubernetes.Object, error) {
 	for k, v := range s.params {
 		manifestParams[k] = v
 	}
-	manifestParams["K_SINK"] = fmt.Sprintf("http://%s-rb-broker:8080", s.Broker)
+	if s.IsSource() {
+		manifestParams["K_SINK"] = fmt.Sprintf("http://%s-rb-broker:8080", s.Broker)
+	}
 	return kubernetes.Object{
 		APIVersion: APIVersion,
 		Kind:       Kind,
@@ -79,6 +80,7 @@ func (s *Service) AsK8sObject() (kubernetes.Object, error) {
 			Namespace: triggermesh.Namespace,
 			Labels: map[string]string{
 				"triggermesh.io/context": s.Broker,
+				"triggermesh.io/role":    string(s.role),
 			},
 		},
 		Spec: kserviceSpec(s.Image, manifestParams),
@@ -121,6 +123,14 @@ func (s *Service) GetSpec() map[string]interface{} {
 	return nil
 }
 
+func (s *Service) IsSource() bool {
+	return s.role == Producer
+}
+
+func (s *Service) IsTarget() bool {
+	return s.role == Consumer
+}
+
 func (s *Service) GetPort(ctx context.Context) (string, error) {
 	container, err := s.Info(ctx)
 	if err != nil {
@@ -135,6 +145,14 @@ func (s *Service) GetEventTypes() ([]string, error) {
 
 func (s *Service) GetEventSource() (string, error) {
 	return "", nil
+}
+
+func (s *Service) ConsumedEventTypes() ([]string, error) {
+	return []string{}, nil
+}
+
+func (s *Service) SetEventAttributes(map[string]string) error {
+	return fmt.Errorf("event source does not support context attributes override")
 }
 
 func (s *Service) Start(ctx context.Context, additionalEnvs map[string]string, restart bool) (*docker.Container, error) {
@@ -175,7 +193,7 @@ func (s *Service) Info(ctx context.Context) (*docker.Container, error) {
 
 func New(name, image, broker string, role Role, params map[string]string) triggermesh.Component {
 	if name == "" {
-		name = fmt.Sprintf("%s-service", broker)
+		name = fmt.Sprintf("%s-%s-kservice", broker, role)
 	}
 	return &Service{
 		Name:   name,

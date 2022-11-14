@@ -30,6 +30,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/target"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
@@ -52,7 +53,7 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 				return nil
 			}
 			cobra.CheckErr(o.Manifest.Read())
-			params := argsToMap(args[1:])
+			params := argsToMap(args[0:])
 			var name string
 			if n, exists := params["name"]; exists {
 				name = n
@@ -76,6 +77,10 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 					eventTypesFilter = strings.Split(tf, " ")
 				}
 				delete(params, "eventTypes")
+			}
+			if image, exists := params["fromImage"]; exists {
+				delete(params, "fromImage")
+				return o.targetFromImage(name, image, params, eventSourcesFilter, eventTypesFilter)
 			}
 			return o.target(name, args[0], params, eventSourcesFilter, eventTypesFilter)
 		},
@@ -131,4 +136,34 @@ func (o *CreateOptions) createTrigger(name string, target triggermesh.Component,
 		return nil, err
 	}
 	return trigger, nil
+}
+
+func (o *CreateOptions) targetFromImage(name, image string, params map[string]string, eventSourcesFilter, eventTypesFilter []string) error {
+	ctx := context.Background()
+
+	et, err := o.translateEventSource(eventSourcesFilter)
+	if err != nil {
+		return err
+	}
+	eventTypesFilter = append(eventTypesFilter, et...)
+
+	s := service.New(name, image, o.Context, service.Consumer, params)
+
+	log.Println("Updating manifest")
+	restart, err := o.Manifest.Add(s)
+	if err != nil {
+		return fmt.Errorf("unable to update manifest: %w", err)
+	}
+	log.Println("Starting container")
+	if _, err := s.(triggermesh.Runnable).Start(ctx, nil, restart); err != nil {
+		return err
+	}
+	for _, et := range eventTypesFilter {
+		if _, err := o.createTrigger("", s, tmbroker.FilterExactAttribute("type", et)); err != nil {
+			return fmt.Errorf("creating trigger: %w", err)
+		}
+	}
+	output.PrintStatus("consumer", s, eventSourcesFilter, eventTypesFilter)
+
+	return nil
 }

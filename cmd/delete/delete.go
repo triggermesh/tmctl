@@ -202,8 +202,8 @@ func (o *DeleteOptions) cleanupTriggers(target string) {
 
 func (o *DeleteOptions) cleanupSecrets(component string) {
 	for _, object := range o.Manifest.Objects {
-		if object.Metadata.Name == component && object.Kind == "Secret" {
-			if err := o.Manifest.Remove(component, object.Kind); err != nil {
+		if object.Metadata.Name == component+"-secret" && object.Kind == "Secret" {
+			if err := o.Manifest.Remove(object.Metadata.Name, object.Kind); err != nil {
 				log.Printf("Deleting secret %q: %v", object.Metadata.Name, err)
 			}
 		}

@@ -29,9 +29,6 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/components/target"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
@@ -86,12 +83,12 @@ func (o *StartOptions) start(broker string) error {
 	// start eventing first
 	for _, object := range o.Manifest.Objects {
 		if object.Kind == tmbroker.BrokerKind {
-			broker, err := tmbroker.New(object.Metadata.Name, o.Manifest.Path)
+			b, err := tmbroker.New(object.Metadata.Name, o.Manifest.Path)
 			if err != nil {
 				return fmt.Errorf("creating broker object: %w", err)
 			}
 			log.Println("Starting broker")
-			container, err := broker.(triggermesh.Runnable).Start(ctx, nil, o.Restart)
+			container, err := b.(triggermesh.Runnable).Start(ctx, nil, o.Restart)
 			if err != nil {
 				return fmt.Errorf("starting broker container: %w", err)
 			}
@@ -99,22 +96,21 @@ func (o *StartOptions) start(broker string) error {
 		}
 	}
 
-	for i, object := range o.Manifest.Objects {
-		var c triggermesh.Component
-		switch object.APIVersion {
-		case "sources.triggermesh.io/v1alpha1":
-			// TODO fix this
-			o.Manifest.Objects[i].Spec["sink"] = map[string]interface{}{"uri": fmt.Sprintf("http://host.docker.internal:%s", brokerPort)}
-			c = source.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-		case "targets.triggermesh.io/v1alpha1":
-			c = target.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-		case "flow.triggermesh.io/v1alpha1":
-			c = transformation.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
+	for _, object := range o.Manifest.Objects {
+		if object.APIVersion == tmbroker.APIVersion {
+			continue
 		}
+		c, _ := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest)
 		if c == nil {
 			continue
 		}
-
+		if _, ok := c.(triggermesh.Producer); ok {
+			spec := c.GetSpec()
+			if spec == nil {
+				spec = make(map[string]interface{})
+			}
+			spec["K_SINK"] = "http://host.docker.internal:" + brokerPort
+		}
 		secrets := make(map[string]string, 0)
 		if parent, ok := c.(triggermesh.Parent); ok {
 			s, _, err := components.ProcessSecrets(parent, o.Manifest)
@@ -146,7 +142,6 @@ func (o *StartOptions) start(broker string) error {
 				}
 			}
 		}
-
 		if _, err := o.Manifest.Add(c); err != nil {
 			return fmt.Errorf("updating manifest: %w", err)
 		}

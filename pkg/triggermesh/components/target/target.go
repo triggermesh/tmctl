@@ -111,7 +111,7 @@ func (t *Target) GetChildren() ([]triggermesh.Component, error) {
 	if len(secrets) == 0 {
 		return nil, nil
 	}
-	return []triggermesh.Component{secret.New(strings.ToLower(t.Name), t.Broker, secrets)}, nil
+	return []triggermesh.Component{secret.New(strings.ToLower(t.Name)+"-secret", t.Broker, secrets)}, nil
 }
 
 func (t *Target) ConsumedEventTypes() ([]string, error) {

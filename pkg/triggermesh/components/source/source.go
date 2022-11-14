@@ -149,7 +149,7 @@ func (s *Source) GetChildren() ([]triggermesh.Component, error) {
 	if len(secrets) == 0 {
 		return nil, nil
 	}
-	return []triggermesh.Component{secret.New(strings.ToLower(s.Name), s.Broker, secrets)}, nil
+	return []triggermesh.Component{secret.New(strings.ToLower(s.Name)+"-secret", s.Broker, secrets)}, nil
 }
 
 func (s *Source) SetEventAttributes(map[string]string) error {

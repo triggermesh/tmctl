@@ -66,9 +66,6 @@ func RuntimeParams(object unstructured.Unstructured, image string, additionalEnv
 	}
 
 	finalEnv := []corev1.EnvVar{}
-	for k, v := range additionalEnvs {
-		finalEnv = append(finalEnv, corev1.EnvVar{Name: k, Value: v})
-	}
 
 	if object.GetKind() != "RedisBroker" &&
 		object.GetKind() != "Service" {
@@ -76,14 +73,19 @@ func RuntimeParams(object unstructured.Unstructured, image string, additionalEnv
 		if err != nil {
 			return nil, nil, fmt.Errorf("adapter environment: %w", err)
 		}
-		for i, v := range adapterEnv {
+		for _, v := range adapterEnv {
 			if v.ValueFrom != nil && additionalEnvs != nil {
 				if secret, ok := additionalEnvs[v.ValueFrom.SecretKeyRef.Key]; ok {
-					finalEnv[i] = corev1.EnvVar{Name: v.Name, Value: string(secret)}
-					// delete(additionalEnvs, v.ValueFrom.SecretKeyRef.Key)
+					finalEnv = append(finalEnv, corev1.EnvVar{Name: v.Name, Value: string(secret)})
+					delete(additionalEnvs, v.ValueFrom.SecretKeyRef.Key)
 				}
+			} else {
+				finalEnv = append(finalEnv, v)
 			}
 		}
+	}
+	for k, v := range additionalEnvs {
+		finalEnv = append(finalEnv, corev1.EnvVar{Name: k, Value: v})
 	}
 
 	sinkURI, set, err := unstructured.NestedString(object.Object, "spec", "sink", "uri")
@@ -94,7 +96,6 @@ func RuntimeParams(object unstructured.Unstructured, image string, additionalEnv
 		finalEnv = append(finalEnv, corev1.EnvVar{Name: "K_SINK", Value: sinkURI})
 	}
 	co = append(co, docker.WithEnv(envsToString(finalEnv)))
-
 	return co, ho, nil
 }
 

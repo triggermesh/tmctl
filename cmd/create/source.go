@@ -125,6 +125,7 @@ func (o *CreateOptions) sourceFromImage(name, image string, params map[string]st
 
 	s := service.New(name, image, o.Context, service.Producer, params)
 
+	log.Println("Updating manifest")
 	restart, err := o.Manifest.Add(s)
 	if err != nil {
 		return fmt.Errorf("unable to update manifest: %w", err)
@@ -133,5 +134,6 @@ func (o *CreateOptions) sourceFromImage(name, image string, params map[string]st
 	if _, err := s.(triggermesh.Runnable).Start(ctx, nil, restart); err != nil {
 		return err
 	}
+	output.PrintStatus("producer", s, []string{}, []string{})
 	return nil
 }
