@@ -129,14 +129,6 @@ func (o *CreateOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 	if strings.HasPrefix(args[len(args)-1], "--") {
 		return []string{}, cobra.ShellCompDirectiveNoFileComp
 	}
-	for _, arg := range args {
-		if arg == "--fromImage" {
-			return []string{
-				"--name\tOptional component name.",
-				"--broker\tOptional broker name.",
-			}, cobra.ShellCompDirectiveNoFileComp
-		}
-	}
 
 	prefix := ""
 	toComplete = strings.TrimLeft(toComplete, "-")
