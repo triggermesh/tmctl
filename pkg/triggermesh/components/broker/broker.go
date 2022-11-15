@@ -59,7 +59,6 @@ func (b *Broker) asUnstructured() (unstructured.Unstructured, error) {
 	u.SetKind(BrokerKind)
 	u.SetName(b.Name)
 	u.SetNamespace(triggermesh.Namespace)
-	u.SetLabels(map[string]string{"context": b.Name})
 	return u, unstructured.SetNestedField(u.Object, nil, "spec")
 }
 
@@ -74,7 +73,6 @@ func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
 				"triggermesh.io/context": b.Name,
 			},
 		},
-		Spec: nil,
 	}, nil
 }
 
@@ -83,7 +81,6 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
-	image := image
 	co, ho, err := adapter.RuntimeParams(o, image, additionalEnvs)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)

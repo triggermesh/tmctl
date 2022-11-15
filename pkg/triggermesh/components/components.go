@@ -19,10 +19,13 @@ package components
 import (
 	"encoding/base64"
 	"fmt"
+	"path"
 
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/target"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
@@ -31,36 +34,60 @@ import (
 func GetObject(name, crdFile, version string, manifest *manifest.Manifest) (triggermesh.Component, error) {
 	for _, object := range manifest.Objects {
 		if object.Metadata.Name == name {
+			broker, set := object.Metadata.Labels["triggermesh.io/context"]
+			if !set {
+				return nil, fmt.Errorf("context label not set")
+			}
 			switch object.APIVersion {
 			case "sources.triggermesh.io/v1alpha1":
-				return source.New(object.Metadata.Name, crdFile, object.Kind, "", version, object.Spec), nil
+				return source.New(object.Metadata.Name, crdFile, object.Kind, broker, version, object.Spec), nil
 			case "targets.triggermesh.io/v1alpha1":
-				return target.New(object.Metadata.Name, crdFile, object.Kind, "", version, object.Spec), nil
+				return target.New(object.Metadata.Name, crdFile, object.Kind, broker, version, object.Spec), nil
 			case "flow.triggermesh.io/v1alpha1":
-				return transformation.New(object.Metadata.Name, crdFile, object.Kind, "", version, object.Spec), nil
+				return transformation.New(object.Metadata.Name, crdFile, object.Kind, broker, version, object.Spec), nil
+			case "eventing.triggermesh.io/v1alpha1":
+				switch object.Kind {
+				case "RedisBroker":
+					return tmbroker.New(object.Metadata.Name, manifest.Path)
+				case "Trigger":
+					brokerConfigPath := path.Dir(manifest.Path)
+					baseConfigPath := path.Dir(brokerConfigPath)
+					trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, baseConfigPath, nil, nil)
+					if err != nil {
+						return nil, fmt.Errorf("creating trigger object: %w", err)
+					}
+					trigger.(*tmbroker.Trigger).LookupTarget()
+					return trigger, nil
+				}
+			case "serving.knative.dev/v1":
+				role, set := object.Metadata.Labels["triggermesh.io/role"]
+				if !set {
+					break
+				}
+				// TODO: Fix this
+				params := make(map[string]string)
+				container := object.Spec["template"].(map[string]interface{})["spec"].(map[string]interface{})["containers"].([]interface{})[0]
+				image := container.(map[string]interface{})["image"].(string)
+				env := container.(map[string]interface{})["env"]
+				if env != nil {
+					for _, v := range env.([]interface{}) {
+						params[v.(map[string]interface{})["name"].(string)] = v.(map[string]interface{})["value"].(string)
+					}
+				}
+				return service.New(name, image, broker, service.Role(role), params), nil
 			}
 		}
 	}
 	return nil, nil
 }
 
-func ProcessSecrets(p triggermesh.Parent, manifest *manifest.Manifest) (map[string]string, bool, error) {
+func ProcessSecrets(p triggermesh.Parent, manifest *manifest.Manifest) ([]triggermesh.Component, map[string]string, error) {
 	secrets := readSecrets(p, manifest)
-	secretsChanged := false
-	for _, secret := range secrets {
-		dirty, err := manifest.Add(secret)
-		if err != nil {
-			return nil, false, fmt.Errorf("unable to update manifest: %w", err)
-		}
-		if dirty {
-			secretsChanged = true
-		}
-	}
-	secretEnv, err := decodeSecrets(secrets)
+	plainSecretsEnv, err := decodeSecrets(secrets)
 	if err != nil {
-		return nil, false, fmt.Errorf("decoding secret: %w", err)
+		return nil, nil, fmt.Errorf("decoding secret: %w", err)
 	}
-	return secretEnv, secretsChanged, nil
+	return secrets, plainSecretsEnv, nil
 }
 
 func readSecrets(p triggermesh.Parent, manifest *manifest.Manifest) []triggermesh.Component {
@@ -68,7 +95,7 @@ func readSecrets(p triggermesh.Parent, manifest *manifest.Manifest) []triggermes
 	if err != nil {
 		// Secrets are already extracted, read manifest
 		for _, object := range manifest.Objects {
-			if object.Kind == "Secret" && object.Metadata.Name == p.(triggermesh.Component).GetName() {
+			if object.Kind == "Secret" && object.Metadata.Name == p.(triggermesh.Component).GetName()+"-secret" {
 				for key, value := range object.Data {
 					secret := secret.New(object.Metadata.Name, "", map[string]string{
 						key: string(value),

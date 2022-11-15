@@ -18,6 +18,7 @@ package source
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 )
 
@@ -119,10 +121,23 @@ func (s *Source) GetEventTypes() ([]string, error) {
 	if err != nil {
 		return []string{}, fmt.Errorf("source event attributes: %w", err)
 	}
-	if len(eventAttributes.ProducedEventTypes) == 0 {
-		return []string{}, fmt.Errorf("%q does not expose event type attributes", s.Kind)
+	if len(eventAttributes.ProducedEventTypes) != 0 {
+		return eventAttributes.ProducedEventTypes, nil
 	}
-	return eventAttributes.ProducedEventTypes, nil
+	// then read CRD annotations
+	sourceCRD, err := crd.GetResourceCRD(s.Kind, s.CRDFile)
+	if err != nil {
+		return []string{}, fmt.Errorf("source CRD: %w", err)
+	}
+	var et crd.EventTypes
+	if err := json.Unmarshal([]byte(sourceCRD.Metadata.Annotations.EventTypes), &et); err != nil {
+		return []string{}, fmt.Errorf("event types CRD: %w", err)
+	}
+	var result []string
+	for _, v := range et {
+		result = append(result, v.Type)
+	}
+	return result, nil
 }
 
 func (s *Source) GetEventSource() (string, error) {
@@ -149,7 +164,7 @@ func (s *Source) GetChildren() ([]triggermesh.Component, error) {
 	if len(secrets) == 0 {
 		return nil, nil
 	}
-	return []triggermesh.Component{secret.New(strings.ToLower(s.Name), s.Broker, secrets)}, nil
+	return []triggermesh.Component{secret.New(strings.ToLower(s.Name)+"-secret", s.Broker, secrets)}, nil
 }
 
 func (s *Source) SetEventAttributes(map[string]string) error {

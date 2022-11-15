@@ -81,15 +81,7 @@ func (t *Trigger) GetName() string {
 }
 
 func (t *Trigger) GetAPIVersion() string {
-	return "v1alpha1"
-}
-
-func (t *Trigger) GetTarget() duckv1.Destination {
-	return t.Target
-}
-
-func (t *Trigger) GetFilters() []eventingbroker.Filter {
-	return t.Filters
+	return APIVersion
 }
 
 func (t *Trigger) GetSpec() map[string]interface{} {
@@ -106,7 +98,7 @@ func NewTrigger(name, broker, configBase string, target triggermesh.Component, f
 		TriggerSpec: eventingv1alpha1.TriggerSpec{
 			Broker: duckv1.KReference{
 				Name:  broker,
-				Kind:  "RedisBroker",
+				Kind:  BrokerKind,
 				Group: "eventing.triggermesh.io",
 			},
 		},

@@ -17,19 +17,24 @@ limitations under the License.
 package completion
 
 import (
-	"strings"
-
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 func ListSources(m *manifest.Manifest) []string {
 	var list []string
 	for _, object := range m.Objects {
-		if strings.HasPrefix(object.APIVersion, "sources.triggermesh.io") {
+		if object.APIVersion == "sources.triggermesh.io/v1alpha1" ||
+			object.APIVersion == "flow.triggermesh.io/v1alpha1" {
 			list = append(list, object.Metadata.Name)
+		}
+		if object.APIVersion == service.APIVersion {
+			if role, set := object.Metadata.Labels[service.RoleLabel]; set && role == string(service.Producer) {
+				list = append(list, object.Metadata.Name)
+			}
 		}
 	}
 	return list
@@ -41,6 +46,11 @@ func ListTargets(m *manifest.Manifest) []string {
 		if object.APIVersion == "targets.triggermesh.io/v1alpha1" ||
 			object.APIVersion == "flow.triggermesh.io/v1alpha1" {
 			list = append(list, object.Metadata.Name)
+		}
+		if object.APIVersion == service.APIVersion {
+			if role, set := object.Metadata.Labels[service.RoleLabel]; set && role == string(service.Consumer) {
+				list = append(list, object.Metadata.Name)
+			}
 		}
 	}
 	return list
@@ -54,16 +64,15 @@ func ListAll(m *manifest.Manifest) []string {
 	return list
 }
 
-func ListEventTypes(m *manifest.Manifest, crdFile string) []string {
+func ListEventTypes(m *manifest.Manifest, crdFile, version string) []string {
 	var eventTypes []string
 	for _, object := range m.Objects {
-		if strings.HasPrefix(object.APIVersion, "sources.triggermesh.io") {
-			s := source.New(object.Metadata.Name, crdFile, object.Kind, "", "", object.Spec)
-			et, err := s.(triggermesh.Producer).GetEventTypes()
-			if err != nil {
-				continue
+		c, err := components.GetObject(object.Metadata.Name, crdFile, version, m)
+		if err == nil {
+			if producer, ok := c.(triggermesh.Producer); ok {
+				et, _ := producer.GetEventTypes()
+				eventTypes = append(eventTypes, et...)
 			}
-			eventTypes = append(eventTypes, et...)
 		}
 	}
 	return eventTypes

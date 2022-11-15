@@ -28,13 +28,14 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 	return &cobra.Command{
-		Use: "source <kind> [--name <name>]",
+		Use: "source [kind]/[--fromImage <image>] [--name <name>]",
 		// Short:              "TriggerMesh source",
 		DisableFlagParsing: true,
 		SilenceErrors:      true,
@@ -53,7 +54,7 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 			if err := o.Manifest.Read(); err != nil {
 				return err
 			}
-			params := argsToMap(args[1:])
+			params := argsToMap(args)
 			var name string
 			if n, exists := params["name"]; exists {
 				name = n
@@ -62,6 +63,10 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 			if v, exists := params["version"]; exists {
 				o.Version = v
 				delete(params, "version")
+			}
+			if image, exists := params["fromImage"]; exists {
+				delete(params, "fromImage")
+				return o.sourceFromImage(name, image, params)
 			}
 			return o.source(name, args[0], params)
 		},
@@ -82,24 +87,61 @@ func (o *CreateOptions) source(name, kind string, params map[string]string) erro
 
 	s := source.New(name, o.CRD, kind, o.Context, o.Version, params)
 
-	secrets, secretsChanged, err := components.ProcessSecrets(s.(triggermesh.Parent), o.Manifest)
+	secrets, secretsEnv, err := components.ProcessSecrets(s.(triggermesh.Parent), o.Manifest)
 	if err != nil {
 		return fmt.Errorf("processing secrets: %v", err)
 	}
+	secretsChanged := false
+
+	log.Println("Updating manifest")
+	for _, secret := range secrets {
+		dirty, err := o.Manifest.Add(secret)
+		if err != nil {
+			return fmt.Errorf("unable to write secret: %w", err)
+		}
+		if dirty {
+			secretsChanged = true
+		}
+	}
+	restart, err := o.Manifest.Add(s)
+	if err != nil {
+		return fmt.Errorf("unable to update manifest: %w", err)
+	}
+
+	status, err := s.(triggermesh.Reconcilable).Initialize(ctx, secretsEnv)
+	if err != nil {
+		return fmt.Errorf("source initialization: %w", err)
+	}
+	s.(triggermesh.Reconcilable).UpdateStatus(status)
+	log.Println("Starting container")
+	if _, err := s.(triggermesh.Runnable).Start(ctx, secretsEnv, (restart || secretsChanged)); err != nil {
+		return err
+	}
+	output.PrintStatus("producer", s, []string{}, []string{})
+	return nil
+}
+
+func (o *CreateOptions) sourceFromImage(name, image string, params map[string]string) error {
+	ctx := context.Background()
+	broker, err := tmbroker.New(o.Context, o.Manifest.Path)
+	if err != nil {
+		return fmt.Errorf("broker object: %v", err)
+	}
+	port, err := broker.(triggermesh.Consumer).GetPort(ctx)
+	if err != nil {
+		return fmt.Errorf("broker offline: %v", err)
+	}
+	params["K_SINK"] = "http://host.docker.internal:" + port
+
+	s := service.New(name, image, o.Context, service.Producer, params)
 
 	log.Println("Updating manifest")
 	restart, err := o.Manifest.Add(s)
 	if err != nil {
 		return fmt.Errorf("unable to update manifest: %w", err)
 	}
-
-	status, err := s.(triggermesh.Reconcilable).Initialize(ctx, secrets)
-	if err != nil {
-		return fmt.Errorf("source initialization: %w", err)
-	}
-	s.(triggermesh.Reconcilable).UpdateStatus(status)
 	log.Println("Starting container")
-	if _, err := s.(triggermesh.Runnable).Start(ctx, secrets, (restart || secretsChanged)); err != nil {
+	if _, err := s.(triggermesh.Runnable).Start(ctx, nil, restart); err != nil {
 		return err
 	}
 	output.PrintStatus("producer", s, []string{}, []string{})

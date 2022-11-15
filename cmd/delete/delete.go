@@ -117,13 +117,13 @@ func (o *DeleteOptions) deleteComponents(names []string, deleteBroker bool) erro
 		return fmt.Errorf("docker client: %w", err)
 	}
 	for _, object := range o.Manifest.Objects {
-		if deleteBroker {
-			o.deleteEverything(ctx, object, client)
+		if object.Kind == "Secret" {
+			// do not remove secrets ,
+			// we may need them to finalize external services
 			continue
 		}
-		if object.Kind == "Secret" {
-			// do not remove secrets implicitly,
-			/// we may need them to finalize external services
+		if deleteBroker {
+			o.deleteEverything(ctx, object, client)
 			continue
 		}
 		skip := true
@@ -202,8 +202,8 @@ func (o *DeleteOptions) cleanupTriggers(target string) {
 
 func (o *DeleteOptions) cleanupSecrets(component string) {
 	for _, object := range o.Manifest.Objects {
-		if object.Metadata.Name == component && object.Kind == "Secret" {
-			if err := o.Manifest.Remove(component, object.Kind); err != nil {
+		if object.Metadata.Name == component+"-secret" && object.Kind == "Secret" {
+			if err := o.Manifest.Remove(object.Metadata.Name, object.Kind); err != nil {
 				log.Printf("Deleting secret %q: %v", object.Metadata.Name, err)
 			}
 		}
@@ -223,11 +223,11 @@ func (o *DeleteOptions) removeExternalServices(ctx context.Context, object kuber
 	if !ok {
 		return nil
 	}
-	secrets, _, err := components.ProcessSecrets(p, o.Manifest)
+	_, secretsEnv, err := components.ProcessSecrets(p, o.Manifest)
 	if err != nil {
 		return fmt.Errorf("secrets extraction: %w", err)
 	}
-	return r.Finalize(ctx, secrets)
+	return r.Finalize(ctx, secretsEnv)
 }
 
 func (o *DeleteOptions) switchContext() error {

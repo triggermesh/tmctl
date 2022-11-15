@@ -19,36 +19,32 @@ package describe
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
+	"strings"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/triggermesh/tmctl/pkg/docker"
+	eventingbroker "github.com/triggermesh/brokers/pkg/config/broker"
+
 	"github.com/triggermesh/tmctl/pkg/manifest"
-	"github.com/triggermesh/tmctl/pkg/output"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/components/target"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-const manifestFile = "manifest.yaml"
+const (
+	manifestFile = "manifest.yaml"
 
-type integration struct {
-	Broker          components
-	Sources         components
-	Transformations components
-	Targets         components
-	Triggers        components
-}
-
-type components struct {
-	object    []triggermesh.Component
-	container []*docker.Container
-}
+	successColorCode = "\033[92m"
+	defaultColorCode = "\033[39m"
+	offlineColorCode = "\u001b[31m"
+)
 
 type DescribeOptions struct {
 	ConfigBase string
@@ -84,65 +80,131 @@ func NewCmd() *cobra.Command {
 	}
 }
 
-func (o DescribeOptions) describe(broker string) error {
-	ctx := context.Background()
-	var intg integration
+func (o DescribeOptions) describe(b string) error {
+	broker := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
+	triggers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
+	producers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
+	consumers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
+	transformations := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
+	fmt.Fprintln(broker, "Broker\tStatus")
+	fmt.Fprintln(triggers, "Trigger\tTarget\tFilter")
+	fmt.Fprintln(transformations, "Transformation\tEventTypes\tStatus")
+	fmt.Fprintln(producers, "Producer\tKind\tEventTypes\tStatus")
+	fmt.Fprintln(consumers, "Consumer\tKind\tExpected Events\tStatus")
+	brokersPrint := false
+	triggersPrint := false
+	transformationsPrint := false
+	producersPrint := false
+	consumersPrint := false
+
 	for _, object := range o.Manifest.Objects {
-		switch {
-		case object.Kind == tmbroker.BrokerKind:
-			broker, err := tmbroker.New(object.Metadata.Name, o.Manifest.Path)
-			if err != nil {
-				return fmt.Errorf("creating broker object: %v", err)
-			}
-			container, err := broker.(triggermesh.Runnable).Info(ctx)
-			if err != nil {
-				container = nil
-			}
-			intg.Broker = components{
-				object:    []triggermesh.Component{broker},
-				container: []*docker.Container{container},
-			}
-		case object.Kind == tmbroker.TriggerKind:
-			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, o.ConfigBase, nil, nil)
-			if err != nil {
-				return fmt.Errorf("trigger object: %w", err)
-			}
-			trigger.(*tmbroker.Trigger).LookupTarget()
-			intg.Triggers.object = append(intg.Triggers.object, trigger)
-		case object.Kind == "Transformation":
-			trn := transformation.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-			container, err := trn.(triggermesh.Runnable).Info(ctx)
-			if err != nil {
-				container = nil
-			}
-			intg.Transformations.object = append(intg.Transformations.object, trn)
-			intg.Transformations.container = append(intg.Transformations.container, container)
-		case object.APIVersion == "sources.triggermesh.io/v1alpha1":
-			source := source.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-			container, err := source.(triggermesh.Runnable).Info(ctx)
-			if err != nil {
-				container = nil
-			}
-			intg.Sources.object = append(intg.Sources.object, source)
-			intg.Sources.container = append(intg.Sources.container, container)
-		case object.APIVersion == "targets.triggermesh.io/v1alpha1":
-			target := target.New(object.Metadata.Name, o.CRD, object.Kind, broker, o.Version, object.Spec)
-			container, err := target.(triggermesh.Runnable).Info(ctx)
-			if err != nil {
-				container = nil
-			}
-			intg.Targets.object = append(intg.Targets.object, target)
-			intg.Targets.container = append(intg.Targets.container, container)
-		default:
+		c, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest)
+		if err != nil {
+			return fmt.Errorf("creating component interface: %w", err)
+		}
+		if c == nil {
 			continue
 		}
+		if c.GetAPIVersion() == tmbroker.APIVersion {
+			switch c.GetKind() {
+			case tmbroker.BrokerKind:
+				brokersPrint = true
+				fmt.Fprintf(broker, "%s\t%s\n", c.GetName(), status(c))
+			case tmbroker.TriggerKind:
+				filterString := "*"
+				if len(c.(*tmbroker.Trigger).Filters) != 0 {
+					filterString = triggerFilterToString(c.(*tmbroker.Trigger).Filters[0])
+				}
+				triggersPrint = true
+				fmt.Fprintf(triggers, "%s\t%s\t%s\n", c.GetName(), c.(*tmbroker.Trigger).Target.Ref.Name, filterString)
+			}
+			continue
+		}
+
+		producer, pOk := c.(triggermesh.Producer)
+		consumer, cOk := c.(triggermesh.Consumer)
+		switch {
+		case pOk && cOk:
+			// service
+			if service, ok := c.(*service.Service); ok {
+				if service.IsSource() {
+					et, _ := c.(triggermesh.Producer).GetEventTypes()
+					if len(et) == 0 {
+						et = []string{"*"}
+					}
+					producersPrint = true
+					fmt.Fprintf(producers, "%s\tkn-service (%s)\t%s\t%s\n", c.GetName(), service.Image, strings.Join(et, ", "), status(c))
+				}
+				if service.IsTarget() {
+					et, _ := c.(triggermesh.Consumer).ConsumedEventTypes()
+					if len(et) == 0 {
+						et = []string{"*"}
+					}
+					consumersPrint = true
+					fmt.Fprintf(consumers, "%s\tkn-service (%s)\t%s\t%s\n", c.GetName(), service.Image, strings.Join(et, ", "), status(c))
+				}
+			}
+			// transformation
+			if _, ok := c.(*transformation.Transformation); ok {
+				et, _ := producer.GetEventTypes()
+				if len(et) == 0 {
+					et = []string{"*"}
+				}
+				transformationsPrint = true
+				fmt.Fprintf(transformations, "%s\t%s\t%s\n", c.GetName(), strings.Join(et, ", "), status(c))
+			}
+		case pOk:
+			// source
+			et, _ := producer.GetEventTypes()
+			if len(et) == 0 {
+				et = []string{"*"}
+			}
+			producersPrint = true
+			fmt.Fprintf(producers, "%s\t%s\t%s\t%s\n", c.GetName(), c.GetKind(), strings.Join(et, ", "), status(c))
+		case cOk:
+			// target
+			et, _ := consumer.ConsumedEventTypes()
+			if len(et) == 0 {
+				et = []string{"*"}
+			}
+			consumersPrint = true
+			fmt.Fprintf(consumers, "%s\t%s\t%s\t%s\n", c.GetName(), c.GetKind(), strings.Join(et, ", "), status(c))
+		}
 	}
-
-	output.DescribeBroker(intg.Broker.object, intg.Broker.container)
-	output.DescribeTrigger(intg.Triggers.object)
-	output.DescribeSource(intg.Sources.object, intg.Sources.container)
-	output.DescribeTransformation(intg.Transformations.object, intg.Transformations.container)
-	output.DescribeTarget(intg.Targets.object, intg.Targets.container)
-
+	if brokersPrint {
+		fmt.Fprintln(broker)
+	}
+	if triggersPrint {
+		fmt.Fprintln(triggers)
+	}
+	if transformationsPrint {
+		fmt.Fprintln(transformations)
+	}
+	if producersPrint {
+		fmt.Fprintln(producers)
+	}
+	if consumersPrint {
+		fmt.Fprintln(consumers)
+	}
 	return nil
+}
+
+func status(component triggermesh.Component) string {
+	offlineStatus := fmt.Sprintf("%soffline%s", offlineColorCode, defaultColorCode)
+	if container, ok := component.(triggermesh.Runnable); ok {
+		c, err := container.Info(context.Background())
+		if err != nil {
+			return offlineStatus
+		}
+		return fmt.Sprintf("%sonline(http://localhost:%s)%s", successColorCode, c.HostPort(), defaultColorCode)
+	}
+	return offlineStatus
+}
+
+func triggerFilterToString(filter eventingbroker.Filter) string {
+	var result []string
+	for k, v := range filter.Exact {
+		result = append(result, fmt.Sprintf("%s is %s", k, v))
+	}
+	return strings.Join(result, ", ")
 }

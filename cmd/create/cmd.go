@@ -78,11 +78,13 @@ func argsToMap(args []string) map[string]string {
 	result := make(map[string]string)
 	for k := 0; k < len(args); k++ {
 		if strings.HasPrefix(args[k], "--") {
-			key := strings.TrimLeft(args[k], "-")
+			key := args[k]
 			var value string
 			if kv := strings.Split(args[k], "="); len(kv) == 2 {
+				key = kv[0]
 				value = kv[1]
 			}
+			key = strings.TrimLeft(key, "-")
 			for j := k + 1; j < len(args) && !strings.HasPrefix(args[j], "--"); j++ {
 				value = fmt.Sprintf("%s %s", value, args[j])
 				k = j
