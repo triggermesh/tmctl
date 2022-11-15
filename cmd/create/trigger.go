@@ -53,7 +53,7 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	})
 	triggerCmd.RegisterFlagCompletionFunc("eventTypes", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return completion.ListEventTypes(o.Manifest, o.CRD), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version), cobra.ShellCompDirectiveNoFileComp
 	})
 	triggerCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListTargets(o.Manifest), cobra.ShellCompDirectiveNoFileComp

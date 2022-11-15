@@ -81,23 +81,13 @@ func GetObject(name, crdFile, version string, manifest *manifest.Manifest) (trig
 	return nil, nil
 }
 
-func ProcessSecrets(p triggermesh.Parent, manifest *manifest.Manifest) (map[string]string, bool, error) {
+func ProcessSecrets(p triggermesh.Parent, manifest *manifest.Manifest) ([]triggermesh.Component, map[string]string, error) {
 	secrets := readSecrets(p, manifest)
-	secretsChanged := false
-	for _, secret := range secrets {
-		dirty, err := manifest.Add(secret)
-		if err != nil {
-			return nil, false, fmt.Errorf("unable to update manifest: %w", err)
-		}
-		if dirty {
-			secretsChanged = true
-		}
-	}
-	secretEnv, err := decodeSecrets(secrets)
+	plainSecretsEnv, err := decodeSecrets(secrets)
 	if err != nil {
-		return nil, false, fmt.Errorf("decoding secret: %w", err)
+		return nil, nil, fmt.Errorf("decoding secret: %w", err)
 	}
-	return secretEnv, secretsChanged, nil
+	return secrets, plainSecretsEnv, nil
 }
 
 func readSecrets(p triggermesh.Parent, manifest *manifest.Manifest) []triggermesh.Component {

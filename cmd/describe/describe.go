@@ -34,6 +34,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
@@ -84,11 +85,17 @@ func (o DescribeOptions) describe(b string) error {
 	triggers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
 	producers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
 	consumers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
-
+	transformations := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
 	fmt.Fprintln(broker, "Broker\tStatus")
 	fmt.Fprintln(triggers, "Trigger\tTarget\tFilter")
+	fmt.Fprintln(transformations, "Transformation\tEventTypes\tStatus")
 	fmt.Fprintln(producers, "Producer\tKind\tEventTypes\tStatus")
 	fmt.Fprintln(consumers, "Consumer\tKind\tExpected Events\tStatus")
+	brokersPrint := false
+	triggersPrint := false
+	transformationsPrint := false
+	producersPrint := false
+	consumersPrint := false
 
 	for _, object := range o.Manifest.Objects {
 		c, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest)
@@ -98,52 +105,87 @@ func (o DescribeOptions) describe(b string) error {
 		if c == nil {
 			continue
 		}
-		switch c.GetAPIVersion() {
-		case tmbroker.APIVersion:
+		if c.GetAPIVersion() == tmbroker.APIVersion {
 			switch c.GetKind() {
 			case tmbroker.BrokerKind:
+				brokersPrint = true
 				fmt.Fprintf(broker, "%s\t%s\n", c.GetName(), status(c))
 			case tmbroker.TriggerKind:
 				filterString := "*"
 				if len(c.(*tmbroker.Trigger).Filters) != 0 {
 					filterString = triggerFilterToString(c.(*tmbroker.Trigger).Filters[0])
 				}
+				triggersPrint = true
 				fmt.Fprintf(triggers, "%s\t%s\t%s\n", c.GetName(), c.(*tmbroker.Trigger).Target.Ref.Name, filterString)
 			}
-		case "sources.triggermesh.io/v1alpha1", "flow.triggermesh.io/v1alpha1":
-			et, _ := c.(triggermesh.Producer).GetEventTypes()
+			continue
+		}
+
+		producer, pOk := c.(triggermesh.Producer)
+		consumer, cOk := c.(triggermesh.Consumer)
+		switch {
+		case pOk && cOk:
+			// service
+			if service, ok := c.(*service.Service); ok {
+				if service.IsSource() {
+					et, _ := c.(triggermesh.Producer).GetEventTypes()
+					if len(et) == 0 {
+						et = []string{"*"}
+					}
+					producersPrint = true
+					fmt.Fprintf(producers, "%s\tkn-service (%s)\t%s\t%s\n", c.GetName(), service.Image, strings.Join(et, ", "), status(c))
+				}
+				if service.IsTarget() {
+					et, _ := c.(triggermesh.Consumer).ConsumedEventTypes()
+					if len(et) == 0 {
+						et = []string{"*"}
+					}
+					consumersPrint = true
+					fmt.Fprintf(consumers, "%s\tkn-service (%s)\t%s\t%s\n", c.GetName(), service.Image, strings.Join(et, ", "), status(c))
+				}
+			}
+			// transformation
+			if _, ok := c.(*transformation.Transformation); ok {
+				et, _ := producer.GetEventTypes()
+				if len(et) == 0 {
+					et = []string{"*"}
+				}
+				transformationsPrint = true
+				fmt.Fprintf(transformations, "%s\t%s\t%s\n", c.GetName(), strings.Join(et, ", "), status(c))
+			}
+		case pOk:
+			// source
+			et, _ := producer.GetEventTypes()
 			if len(et) == 0 {
 				et = []string{"*"}
 			}
+			producersPrint = true
 			fmt.Fprintf(producers, "%s\t%s\t%s\t%s\n", c.GetName(), c.GetKind(), strings.Join(et, ", "), status(c))
-		case "targets.triggermesh.io/v1alpha1":
-			et, _ := c.(triggermesh.Consumer).ConsumedEventTypes()
+		case cOk:
+			// target
+			et, _ := consumer.ConsumedEventTypes()
 			if len(et) == 0 {
 				et = []string{"*"}
 			}
+			consumersPrint = true
 			fmt.Fprintf(consumers, "%s\t%s\t%s\t%s\n", c.GetName(), c.GetKind(), strings.Join(et, ", "), status(c))
-		case service.APIVersion:
-			if c.(*service.Service).IsSource() {
-				et, _ := c.(triggermesh.Producer).GetEventTypes()
-				if len(et) == 0 {
-					et = []string{"*"}
-				}
-				fmt.Fprintf(producers, "%s\t%s\t%s\t%s\n", c.GetName(), "kn-service", strings.Join(et, ", "), status(c))
-			}
-			if c.(*service.Service).IsTarget() {
-				et, _ := c.(triggermesh.Consumer).ConsumedEventTypes()
-				if len(et) == 0 {
-					et = []string{"*"}
-				}
-				fmt.Fprintf(consumers, "%s\t%s\t%s\t%s\n", c.GetName(), "kn-service", strings.Join(et, ", "), status(c))
-			}
-		case "v1":
 		}
 	}
-	fmt.Fprintln(broker)
-	fmt.Fprintln(triggers)
-	fmt.Fprintln(producers)
-	fmt.Fprintln(consumers)
+	if brokersPrint {
+		fmt.Fprintln(broker)
+	}
+	if triggersPrint {
+		fmt.Fprintln(triggers)
+	}
+	if transformationsPrint {
+		fmt.Fprintln(transformations)
+	}
+	if producersPrint {
+		fmt.Fprintln(producers)
+	}
+	if consumersPrint {
+		fmt.Fprintln(consumers)
+	}
 	return nil
 }
 

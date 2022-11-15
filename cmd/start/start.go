@@ -29,6 +29,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
@@ -105,19 +106,24 @@ func (o *StartOptions) start(broker string) error {
 			continue
 		}
 		if _, ok := c.(triggermesh.Producer); ok {
+			sink := "http://host.docker.internal:" + brokerPort
 			spec := c.GetSpec()
 			if spec == nil {
 				spec = make(map[string]interface{})
 			}
-			spec["K_SINK"] = "http://host.docker.internal:" + brokerPort
+			if service, ok := c.(*service.Service); ok && service.IsSource() {
+				spec["K_SINK"] = sink
+			} else {
+				spec["sink"] = map[string]interface{}{"uri": sink}
+			}
 		}
 		secrets := make(map[string]string, 0)
 		if parent, ok := c.(triggermesh.Parent); ok {
-			s, _, err := components.ProcessSecrets(parent, o.Manifest)
+			_, secretsEnv, err := components.ProcessSecrets(parent, o.Manifest)
 			if err != nil {
 				return fmt.Errorf("processing secrets: %w", err)
 			}
-			secrets = s
+			secrets = secretsEnv
 		}
 		if reconcilable, ok := c.(triggermesh.Reconcilable); ok {
 			status, err := reconcilable.Initialize(ctx, secrets)
@@ -141,9 +147,6 @@ func (o *StartOptions) start(broker string) error {
 					return fmt.Errorf("updating broker config: %w", err)
 				}
 			}
-		}
-		if _, err := o.Manifest.Add(c); err != nil {
-			return fmt.Errorf("updating manifest: %w", err)
 		}
 	}
 	return nil

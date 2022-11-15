@@ -87,24 +87,34 @@ func (o *CreateOptions) source(name, kind string, params map[string]string) erro
 
 	s := source.New(name, o.CRD, kind, o.Context, o.Version, params)
 
-	secrets, secretsChanged, err := components.ProcessSecrets(s.(triggermesh.Parent), o.Manifest)
+	secrets, secretsEnv, err := components.ProcessSecrets(s.(triggermesh.Parent), o.Manifest)
 	if err != nil {
 		return fmt.Errorf("processing secrets: %v", err)
 	}
+	secretsChanged := false
 
 	log.Println("Updating manifest")
+	for _, secret := range secrets {
+		dirty, err := o.Manifest.Add(secret)
+		if err != nil {
+			return fmt.Errorf("unable to write secret: %w", err)
+		}
+		if dirty {
+			secretsChanged = true
+		}
+	}
 	restart, err := o.Manifest.Add(s)
 	if err != nil {
 		return fmt.Errorf("unable to update manifest: %w", err)
 	}
 
-	status, err := s.(triggermesh.Reconcilable).Initialize(ctx, secrets)
+	status, err := s.(triggermesh.Reconcilable).Initialize(ctx, secretsEnv)
 	if err != nil {
 		return fmt.Errorf("source initialization: %w", err)
 	}
 	s.(triggermesh.Reconcilable).UpdateStatus(status)
 	log.Println("Starting container")
-	if _, err := s.(triggermesh.Runnable).Start(ctx, secrets, (restart || secretsChanged)); err != nil {
+	if _, err := s.(triggermesh.Runnable).Start(ctx, secretsEnv, (restart || secretsChanged)); err != nil {
 		return err
 	}
 	output.PrintStatus("producer", s, []string{}, []string{})

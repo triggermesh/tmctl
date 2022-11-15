@@ -32,6 +32,9 @@ import (
 const (
 	APIVersion = "serving.knative.dev/v1"
 	Kind       = "Service"
+
+	RoleLabel    = "triggermesh.io/role"
+	ContextLabel = "triggermesh.io/context"
 )
 
 var (
@@ -79,8 +82,8 @@ func (s *Service) AsK8sObject() (kubernetes.Object, error) {
 			Name:      s.Name,
 			Namespace: triggermesh.Namespace,
 			Labels: map[string]string{
-				"triggermesh.io/context": s.Broker,
-				"triggermesh.io/role":    string(s.role),
+				ContextLabel: s.Broker,
+				RoleLabel:    string(s.role),
 			},
 		},
 		Spec: kserviceSpec(s.Image, manifestParams),
@@ -120,7 +123,11 @@ func (s *Service) GetAPIVersion() string {
 }
 
 func (s *Service) GetSpec() map[string]interface{} {
-	return nil
+	spec := make(map[string]interface{}, len(s.params))
+	for k, v := range s.params {
+		spec[k] = v
+	}
+	return spec
 }
 
 func (s *Service) IsSource() bool {
@@ -140,10 +147,16 @@ func (s *Service) GetPort(ctx context.Context) (string, error) {
 }
 
 func (s *Service) GetEventTypes() ([]string, error) {
+	if et, set := s.params["CE_TYPE"]; set {
+		return strings.Split(et, ","), nil
+	}
 	return []string{}, nil
 }
 
 func (s *Service) GetEventSource() (string, error) {
+	if es, set := s.params["CE_SOURCE"]; set {
+		return es, nil
+	}
 	return "", nil
 }
 
@@ -151,7 +164,7 @@ func (s *Service) ConsumedEventTypes() ([]string, error) {
 	return []string{}, nil
 }
 
-func (s *Service) SetEventAttributes(map[string]string) error {
+func (s *Service) SetEventAttributes(attributes map[string]string) error {
 	return fmt.Errorf("event source does not support context attributes override")
 }
 
@@ -193,7 +206,7 @@ func (s *Service) Info(ctx context.Context) (*docker.Container, error) {
 
 func New(name, image, broker string, role Role, params map[string]string) triggermesh.Component {
 	if name == "" {
-		name = fmt.Sprintf("%s-%s-kservice", broker, role)
+		name = fmt.Sprintf("%s-%s-service", broker, role)
 	}
 	return &Service{
 		Name:   name,

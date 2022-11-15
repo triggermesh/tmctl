@@ -98,19 +98,29 @@ func (o *CreateOptions) target(name, kind string, args map[string]string, eventS
 
 	t := target.New(name, o.CRD, kind, o.Context, o.Version, args)
 
-	secrets, secretsChanged, err := components.ProcessSecrets(t.(triggermesh.Parent), o.Manifest)
+	secrets, secretsEnv, err := components.ProcessSecrets(t.(triggermesh.Parent), o.Manifest)
 	if err != nil {
 		return fmt.Errorf("processing secrets: %v", err)
 	}
+	secretsChanged := false
 
 	log.Println("Updating manifest")
+	for _, secret := range secrets {
+		dirty, err := o.Manifest.Add(secret)
+		if err != nil {
+			return fmt.Errorf("unable to write secret: %w", err)
+		}
+		if dirty {
+			secretsChanged = true
+		}
+	}
 	restart, err := o.Manifest.Add(t)
 	if err != nil {
 		return fmt.Errorf("unable to update manifest: %w", err)
 	}
 
 	log.Println("Starting container")
-	if _, err := t.(triggermesh.Runnable).Start(ctx, secrets, (restart || secretsChanged)); err != nil {
+	if _, err := t.(triggermesh.Runnable).Start(ctx, secretsEnv, (restart || secretsChanged)); err != nil {
 		return err
 	}
 
