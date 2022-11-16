@@ -35,7 +35,7 @@ import (
 
 func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 	return &cobra.Command{
-		Use: "source [kind]/[--fromImage <image>] [--name <name>]",
+		Use: "source [kind]/[--from-image <image>] [--name <name>]",
 		// Short:              "TriggerMesh source",
 		DisableFlagParsing: true,
 		SilenceErrors:      true,
