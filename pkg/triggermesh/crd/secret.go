@@ -48,7 +48,7 @@ func ExtractSecrets(componentName string, schema Schema, spec map[string]interfa
 				}
 				spec[k] = map[string]interface{}{
 					key: map[string]interface{}{
-						"name": strings.ToLower(componentName),
+						"name": strings.ToLower(componentName) + "-secret",
 						"key":  k,
 					},
 				}
