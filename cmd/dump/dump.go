@@ -60,8 +60,8 @@ func NewCmd() *cobra.Command {
 	return dumpCmd
 }
 
-func (o *DumpOptions) dump(useKnativeEvenyting bool) error {
-	if useKnativeEvenyting {
+func (o *DumpOptions) dump(useKnativeEventing bool) error {
+	if useKnativeEventing {
 		for i, object := range o.Manifest.Objects {
 			o.Manifest.Objects[i] = o.knativeEventingTranformation(object)
 		}
