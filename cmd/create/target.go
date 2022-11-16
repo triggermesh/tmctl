@@ -37,7 +37,7 @@ import (
 
 func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use: "target <kind> [--name <name>][--source <name>,<name>...][--eventTypes <type>,<type>...]",
+		Use: "target [kind]/[--from-image <image>] [--name <name>][--source <name>,<name>...][--event-types <type>,<type>...]",
 		// Short:              "TriggerMesh target",
 		DisableFlagParsing: true,
 		SilenceErrors:      true,
@@ -71,15 +71,15 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 				}
 				delete(params, "source")
 			}
-			if tf, exists := params["eventTypes"]; exists {
+			if tf, exists := params["event-types"]; exists {
 				eventTypesFilter = strings.Split(tf, ",")
 				if len(eventTypesFilter) == 1 {
 					eventTypesFilter = strings.Split(tf, " ")
 				}
-				delete(params, "eventTypes")
+				delete(params, "event-types")
 			}
-			if image, exists := params["fromImage"]; exists {
-				delete(params, "fromImage")
+			if image, exists := params["from-image"]; exists {
+				delete(params, "from-image")
 				return o.targetFromImage(name, image, params, eventSourcesFilter, eventTypesFilter)
 			}
 			return o.target(name, args[0], params, eventSourcesFilter, eventTypesFilter)
