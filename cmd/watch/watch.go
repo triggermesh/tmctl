@@ -57,7 +57,7 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
-	watchCmd.Flags().StringVarP(&o.EventTypes, "eventTypes", "e", "", "Filter events based on type attribute")
+	watchCmd.Flags().StringVarP(&o.EventTypes, "event-types", "e", "", "Filter events based on type attribute")
 
 	return watchCmd
 }

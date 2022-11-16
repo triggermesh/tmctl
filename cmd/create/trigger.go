@@ -34,7 +34,7 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 	triggerCmd := &cobra.Command{
 		Use: "trigger --target <name> [--source <name>][--eventType <event type>]",
 		// Short:     "TriggerMesh trigger",
-		ValidArgs: []string{"--target", "--name", "--source", "--eventTypes"},
+		ValidArgs: []string{"--target", "--name", "--source", "--event-types"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cobra.CheckErr(o.Manifest.Read())
 			return o.trigger(name, eventSourcesFilter, eventTypesFilter, target)
@@ -43,7 +43,7 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 	triggerCmd.Flags().StringVar(&name, "name", "", "Trigger name")
 	triggerCmd.Flags().StringVar(&target, "target", "", "Target name")
 	triggerCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Event sources filter")
-	triggerCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
+	triggerCmd.Flags().StringSliceVar(&eventTypesFilter, "event-types", []string{}, "Event types filter")
 	triggerCmd.MarkFlagRequired("target")
 
 	triggerCmd.RegisterFlagCompletionFunc("name", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
@@ -52,7 +52,7 @@ func (o *CreateOptions) NewTriggerCmd() *cobra.Command {
 	triggerCmd.RegisterFlagCompletionFunc("source", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	})
-	triggerCmd.RegisterFlagCompletionFunc("eventTypes", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+	triggerCmd.RegisterFlagCompletionFunc("event-types", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version), cobra.ShellCompDirectiveNoFileComp
 	})
 	triggerCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {

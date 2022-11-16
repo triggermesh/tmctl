@@ -32,7 +32,7 @@ func (o *CreateOptions) sourcesCompletion(cmd *cobra.Command, args []string, toC
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return append(sources, "--fromImage"), cobra.ShellCompDirectiveNoFileComp
+		return append(sources, "--from-image"), cobra.ShellCompDirectiveNoFileComp
 	}
 	if args[len(args)-1] == "--broker" {
 		list, err := brokers.List(o.ConfigBase, "")
@@ -42,14 +42,14 @@ func (o *CreateOptions) sourcesCompletion(cmd *cobra.Command, args []string, toC
 		return list, cobra.ShellCompDirectiveNoFileComp
 	}
 	if toComplete == "--name" ||
-		toComplete == "--fromImage" {
+		toComplete == "--from-image" {
 		return []string{toComplete}, cobra.ShellCompDirectiveNoFileComp
 	}
 	if strings.HasPrefix(args[len(args)-1], "--") {
 		return []string{}, cobra.ShellCompDirectiveNoFileComp
 	}
 	for _, arg := range args {
-		if arg == "--fromImage" {
+		if arg == "--from-image" {
 			return []string{
 				"--ce_type\tCE Type attribute override.",
 				"--name\tOptional component name.",
@@ -105,20 +105,30 @@ func (o *CreateOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return append(targets, "--fromImage"), cobra.ShellCompDirectiveNoFileComp
+		return append(targets, "--from-image"), cobra.ShellCompDirectiveNoFileComp
+	}
+
+	if lastParam(args) == "--source" && strings.HasSuffix(args[len(args)-1], ",") {
+		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+	}
+
+	if lastParam(args) == "--event-types" && strings.HasSuffix(args[len(args)-1], ",") {
+		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version),
+			cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 	}
 
 	if toComplete == "--source" ||
-		toComplete == "--eventTypes" ||
+		toComplete == "--event-types" ||
 		toComplete == "--name" ||
-		toComplete == "--fromImage" {
+		toComplete == "--from-image" {
 		return []string{toComplete}, cobra.ShellCompDirectiveNoFileComp
 	}
 	switch args[len(args)-1] {
 	case "--source":
-		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoFileComp
-	case "--eventTypes":
-		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+	case "--event-types":
+		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version),
+			cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 	case "--broker":
 		list, err := brokers.List(o.ConfigBase, "")
 		if err != nil {
@@ -170,7 +180,16 @@ func (o *CreateOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 	}
 	return append(spec,
 		"--source\tEvent source name.",
-		"--eventTypes\tEvent types filter.",
+		"--event-types\tEvent types filter.",
 		"--name\tOptional component name.",
 	), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+}
+
+func lastParam(args []string) string {
+	for i := len(args) - 1; i >= 0; i-- {
+		if strings.HasPrefix(args[i], "--") {
+			return args[i]
+		}
+	}
+	return ""
 }

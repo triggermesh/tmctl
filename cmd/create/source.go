@@ -64,8 +64,8 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 				o.Version = v
 				delete(params, "version")
 			}
-			if image, exists := params["fromImage"]; exists {
-				delete(params, "fromImage")
+			if image, exists := params["from-image"]; exists {
+				delete(params, "from-image")
 				return o.sourceFromImage(name, image, params)
 			}
 			return o.source(name, args[0], params)
