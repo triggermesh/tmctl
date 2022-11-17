@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -35,7 +36,7 @@ import (
 
 func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 	return &cobra.Command{
-		Use: "source [kind]/[--from-image <image>] [--name <name>]",
+		Use: "source [kind]/[--from-image <image>][--name <name>]",
 		// Short:              "TriggerMesh source",
 		DisableFlagParsing: true,
 		SilenceErrors:      true,
@@ -63,6 +64,17 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 			if v, exists := params["version"]; exists {
 				o.Version = v
 				delete(params, "version")
+			}
+			if _, readDisabled := params["disable-file-args"]; !readDisabled {
+				for key, value := range params {
+					data, err := os.ReadFile(value)
+					if err != nil {
+						continue
+					}
+					params[key] = string(data)
+				}
+			} else {
+				delete(params, "disable-file-args")
 			}
 			if image, exists := params["from-image"]; exists {
 				delete(params, "from-image")

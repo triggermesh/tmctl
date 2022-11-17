@@ -22,6 +22,8 @@ import (
 	"strconv"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
@@ -74,6 +76,26 @@ func (s *Schema) Process(spec map[string]interface{}) (map[string]interface{}, e
 			}
 			switch schemaKey.Type[0] {
 			case "array":
+				if schemaKey.Items != nil && schemaKey.Items.Schema != nil {
+					if len(schemaKey.Items.Schema.Type) == 1 && schemaKey.Items.Schema.Type[0] == "object" {
+						// try to unmarshal input into array of objects
+						var items []map[string]interface{}
+						if err := yaml.Unmarshal([]byte(value), &items); err == nil {
+							nestedArraySchema := Schema{
+								schema: *schemaKey.Items.Schema,
+							}
+							var array []interface{}
+							for _, nestedObject := range items {
+								nestedArrayItem, err := nestedArraySchema.Process(nestedObject)
+								if err == nil {
+									array = append(array, nestedArrayItem)
+								}
+							}
+							spec[k] = array
+							continue
+						}
+					}
+				}
 				values := strings.Split(value, " ")
 				if len(values) == 1 {
 					values = strings.Split(value, ",")
@@ -81,13 +103,20 @@ func (s *Schema) Process(spec map[string]interface{}) (map[string]interface{}, e
 				spec[k] = values
 			case "integer":
 				integer, _ := strconv.Atoi(value) // let the CRD validation complain about the type
-				spec[k] = integer
+				spec[k] = int64(integer)
 			case "boolean":
 				spec[k] = (value == "true")
 			case "object":
+				var object map[string]interface{}
+				if err := yaml.Unmarshal([]byte(value), &object); err == nil {
+					spec[k] = object
+					continue
+				}
 				return nil, fmt.Errorf("%q is expected to be an object with properties: %s",
 					k, propertyKeysAsString(schemaKey.Properties))
 			}
+		case int:
+			spec[k] = int64(value)
 		case map[string]interface{}:
 			nestedSchema := Schema{
 				schema: schemaKey,
@@ -97,6 +126,21 @@ func (s *Schema) Process(spec map[string]interface{}) (map[string]interface{}, e
 				return nil, err
 			}
 			spec[k] = nestedValue
+		case []interface{}:
+			nestedSchema := Schema{
+				schema: *schemaKey.Items.Schema,
+			}
+			var array []interface{}
+			for _, v := range value {
+				if nestedObject, ok := v.(map[string]interface{}); ok {
+					nestedArrayItem, err := nestedSchema.Process(nestedObject)
+					if err == nil {
+						array = append(array, nestedArrayItem)
+					}
+				}
+			}
+			spec[k] = array
+		default:
 		}
 	}
 	return spec, nil

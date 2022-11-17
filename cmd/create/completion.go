@@ -91,7 +91,7 @@ func (o *CreateOptions) sourcesCompletion(cmd *cobra.Command, args []string, toC
 	for name, property := range properties {
 		attr := property.Typ
 		if property.Required {
-			attr = fmt.Sprintf("required,%s", attr)
+			attr = fmt.Sprintf("*required,%s", attr)
 		}
 		name = prefix + name
 		spec = append(spec, fmt.Sprintf("--%s\t(%s) %s", name, attr, property.Description))
@@ -173,7 +173,7 @@ func (o *CreateOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 	for name, property := range properties {
 		attr := property.Typ
 		if property.Required {
-			attr = fmt.Sprintf("required,%s", attr)
+			attr = fmt.Sprintf("*required,%s", attr)
 		}
 		name = prefix + name
 		spec = append(spec, fmt.Sprintf("--%s\t(%s) %s", name, attr, property.Description))
