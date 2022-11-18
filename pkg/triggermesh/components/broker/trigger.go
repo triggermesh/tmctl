@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"path"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -180,6 +181,6 @@ func (t *Trigger) LookupTarget() {
 
 func FilterExactAttribute(attribute, value string) *eventingbroker.Filter {
 	return &eventingbroker.Filter{
-		Exact: map[string]string{attribute: value},
+		Exact: map[string]string{attribute: strings.TrimSpace(value)},
 	}
 }

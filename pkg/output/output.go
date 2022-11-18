@@ -64,7 +64,8 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 		}
 		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
 		result = fmt.Sprintf("%s\nNext steps:", result)
-		result = fmt.Sprintf("%s\n\ttmctl watch\t - show events flowing through the broker in the real time", result)
+		result = fmt.Sprintf("%s\n\ttmctl create transformation --target %s\t - create event transformation component", result, object.GetName())
+		result = fmt.Sprintf("%s\n\ttmctl create trigger --target %s\t - create trigger to send events from source to target", result, object.GetName())
 		result = fmt.Sprintf("%s\n\ttmctl dump\t - dump Kubernetes manifest", result)
 	}
 	fmt.Println(result)

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -37,7 +38,7 @@ import (
 
 func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use: "target [kind]/[--from-image <image>] [--name <name>][--source <name>,<name>...][--event-types <type>,<type>...]",
+		Use: "target [kind]/[--from-image <image>][--name <name>][--source <name>,<name>...][--event-types <type>,<type>...]",
 		// Short:              "TriggerMesh target",
 		DisableFlagParsing: true,
 		SilenceErrors:      true,
@@ -77,6 +78,17 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 					eventTypesFilter = strings.Split(tf, " ")
 				}
 				delete(params, "event-types")
+			}
+			if _, readDisabled := params["disable-file-args"]; !readDisabled {
+				for key, value := range params {
+					data, err := os.ReadFile(value)
+					if err != nil {
+						continue
+					}
+					params[key] = string(data)
+				}
+			} else {
+				delete(params, "disable-file-args")
 			}
 			if image, exists := params["from-image"]; exists {
 				delete(params, "from-image")

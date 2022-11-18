@@ -89,8 +89,8 @@ func (o DescribeOptions) describe(b string) error {
 	fmt.Fprintln(broker, "Broker\tStatus")
 	fmt.Fprintln(triggers, "Trigger\tTarget\tFilter")
 	fmt.Fprintln(transformations, "Transformation\tEventTypes\tStatus")
-	fmt.Fprintln(producers, "Producer\tKind\tEventTypes\tStatus")
-	fmt.Fprintln(consumers, "Consumer\tKind\tExpected Events\tStatus")
+	fmt.Fprintln(producers, "Source\tKind\tEventTypes\tStatus")
+	fmt.Fprintln(consumers, "Target\tKind\tExpected Events\tStatus")
 	brokersPrint := false
 	triggersPrint := false
 	transformationsPrint := false
