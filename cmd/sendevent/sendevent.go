@@ -61,9 +61,8 @@ func NewCmd() *cobra.Command {
 	cobra.OnInitialize(o.initialize)
 	sendCmd.Flags().StringVar(&eventType, "eventType", defaultEventType, "CloudEvent Type attribute")
 	sendCmd.RegisterFlagCompletionFunc("eventType", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListFilteredEventTypes(o.Context, o.ConfigDir, o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	})
-	sendCmd.MarkFlagRequired("eventType")
 	return sendCmd
 }
 
@@ -100,7 +99,7 @@ func (o *SendOptions) send(eventType, data string) error {
 	event := cloudevents.NewEvent()
 	event.SetSource(defaultEventSource)
 	event.SetType(eventType)
-	event.SetData(cloudevents.ApplicationJSON, data)
+	event.SetData(cloudevents.ApplicationJSON, []byte(data))
 
 	brokerEndpoint := fmt.Sprintf("http://localhost:%s", port)
 	fmt.Printf("%s -> %s\n", data, brokerEndpoint)

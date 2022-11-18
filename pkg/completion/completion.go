@@ -20,6 +20,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
+	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
@@ -72,6 +73,26 @@ func ListEventTypes(m *manifest.Manifest, crdFile, version string) []string {
 			if producer, ok := c.(triggermesh.Producer); ok {
 				et, _ := producer.GetEventTypes()
 				eventTypes = append(eventTypes, et...)
+			}
+		}
+	}
+	return eventTypes
+}
+
+func ListFilteredEventTypes(broker, configBase string, m *manifest.Manifest) []string {
+	var eventTypes []string
+	for _, object := range m.Objects {
+		if object.Kind != tmbroker.TriggerKind {
+			continue
+		}
+		trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, configBase, nil, nil)
+		if err != nil {
+			continue
+		}
+		trigger.(*tmbroker.Trigger).LookupTarget()
+		for _, filter := range trigger.(*tmbroker.Trigger).Filters {
+			if eventType, set := filter.Exact["type"]; set {
+				eventTypes = append(eventTypes, eventType)
 			}
 		}
 	}
