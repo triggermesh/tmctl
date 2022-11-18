@@ -127,20 +127,21 @@ func (s *Schema) Process(spec map[string]interface{}) (map[string]interface{}, e
 			}
 			spec[k] = nestedValue
 		case []interface{}:
-			nestedSchema := Schema{
-				schema: *schemaKey.Items.Schema,
-			}
 			var array []interface{}
 			for _, v := range value {
 				if nestedObject, ok := v.(map[string]interface{}); ok {
+					nestedSchema := Schema{
+						schema: *schemaKey.Items.Schema,
+					}
 					nestedArrayItem, err := nestedSchema.Process(nestedObject)
 					if err == nil {
 						array = append(array, nestedArrayItem)
 					}
+				} else {
+					array = append(array, v)
 				}
 			}
 			spec[k] = array
-		default:
 		}
 	}
 	return spec, nil

@@ -26,11 +26,16 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmctl/pkg/completion"
+	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const (
+	manifestFile = "manifest.yaml"
+
 	defaultEventType   = "triggermesh-local-event"
 	defaultEventSource = "triggermesh-cli"
 )
@@ -38,30 +43,47 @@ const (
 type SendOptions struct {
 	Context   string
 	ConfigDir string
-	EventType string
+	Version   string
+	CRD       string
+	Manifest  *manifest.Manifest
 }
 
 func NewCmd() *cobra.Command {
 	o := &SendOptions{}
+	var eventType string
 	sendCmd := &cobra.Command{
-		Use:   "send-event <data> [--eventType <type>]",
+		Use:   "send-event <data> --eventType <type>",
 		Short: "Send CloudEvent to the broker",
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-			return []string{"--eventType"}, cobra.ShellCompDirectiveNoFileComp
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.Context = viper.GetString("context")
-			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
-			return o.send(strings.Join(args, " "))
+			return o.send(eventType, strings.Join(args, " "))
 		},
 	}
-	sendCmd.Flags().StringVar(&o.EventType, "eventType", defaultEventType, "CloudEvent Type attribute")
+	cobra.OnInitialize(o.initialize)
+	sendCmd.Flags().StringVar(&eventType, "eventType", defaultEventType, "CloudEvent Type attribute")
+	sendCmd.RegisterFlagCompletionFunc("eventType", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version), cobra.ShellCompDirectiveNoFileComp
+	})
+	sendCmd.MarkFlagRequired("eventType")
 	return sendCmd
 }
 
-func (o *SendOptions) send(data string) error {
+func (o *SendOptions) initialize() {
+	o.ConfigDir = path.Dir(viper.ConfigFileUsed())
+	o.Context = viper.GetString("context")
+	o.Version = viper.GetString("triggermesh.version")
+	o.Manifest = manifest.New(path.Join(o.ConfigDir, o.Context, manifestFile))
+	crds, err := crd.Fetch(o.ConfigDir, o.Version)
+	cobra.CheckErr(err)
+	o.CRD = crds
+
+	// try to read manifest even if it does not exists.
+	// required for autocompletion.
+	o.Manifest.Read()
+}
+
+func (o *SendOptions) send(eventType, data string) error {
 	ctx := context.Background()
-	broker, err := tmbroker.New(o.Context, path.Join(o.ConfigDir, o.Context, "manifest.yaml"))
+	broker, err := tmbroker.New(o.Context, path.Join(o.ConfigDir, o.Context, manifestFile))
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}
@@ -77,7 +99,7 @@ func (o *SendOptions) send(data string) error {
 
 	event := cloudevents.NewEvent()
 	event.SetSource(defaultEventSource)
-	event.SetType(o.EventType)
+	event.SetType(eventType)
 	event.SetData(cloudevents.ApplicationJSON, data)
 
 	brokerEndpoint := fmt.Sprintf("http://localhost:%s", port)
