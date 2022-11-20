@@ -18,6 +18,7 @@ package sendevent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path"
 	"strings"
@@ -29,7 +30,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
-	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
@@ -50,18 +51,27 @@ type SendOptions struct {
 
 func NewCmd() *cobra.Command {
 	o := &SendOptions{}
-	var eventType string
+	var eventType, target string
 	sendCmd := &cobra.Command{
-		Use:   "send-event <data> --eventType <type>",
+		Use:   "send-event [--eventType <type>][--destination <name>] <data> ",
 		Short: "Send CloudEvent to the broker",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return o.send(eventType, strings.Join(args, " "))
+			if target == "" {
+				target = o.Context
+			}
+			return o.send(eventType, target, strings.Join(args, " "))
 		},
 	}
 	cobra.OnInitialize(o.initialize)
+
+	sendCmd.Flags().StringVar(&target, "target", "", "Component to send event to")
 	sendCmd.Flags().StringVar(&eventType, "eventType", defaultEventType, "CloudEvent Type attribute")
+
 	sendCmd.RegisterFlagCompletionFunc("eventType", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListFilteredEventTypes(o.Context, o.ConfigDir, o.Manifest), cobra.ShellCompDirectiveNoFileComp
+	})
+	sendCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return completion.ListTargets(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	})
 	return sendCmd
 }
@@ -80,29 +90,36 @@ func (o *SendOptions) initialize() {
 	o.Manifest.Read()
 }
 
-func (o *SendOptions) send(eventType, data string) error {
+func (o *SendOptions) send(eventType, target, data string) error {
 	ctx := context.Background()
-	broker, err := tmbroker.New(o.Context, path.Join(o.ConfigDir, o.Context, manifestFile))
+	component, err := components.GetObject(target, o.CRD, o.Version, o.Manifest)
 	if err != nil {
-		return fmt.Errorf("broker object: %v", err)
+		return fmt.Errorf("destination target: %w", err)
 	}
-	port, err := broker.(triggermesh.Consumer).GetPort(ctx)
+	consumer, ok := component.(triggermesh.Consumer)
+	if !ok {
+		return fmt.Errorf("%q is not an event consumer", target)
+	}
+	port, err := consumer.GetPort(ctx)
 	if err != nil {
-		return fmt.Errorf("broker socket: %v", err)
+		return fmt.Errorf("target port: %w", err)
 	}
 
 	c, err := cloudevents.NewClientHTTP()
 	if err != nil {
 		return fmt.Errorf("cloudevents client, %w", err)
 	}
-
 	event := cloudevents.NewEvent()
 	event.SetSource(defaultEventSource)
 	event.SetType(eventType)
-	event.SetData(cloudevents.ApplicationJSON, []byte(data))
+	contentType := cloudevents.TextPlain
+	if json.Valid([]byte(data)) {
+		contentType = cloudevents.ApplicationJSON
+	}
+	event.SetData(contentType, []byte(data))
 
 	brokerEndpoint := fmt.Sprintf("http://localhost:%s", port)
-	fmt.Printf("Request:\n%s\nDestination: %s-broker(%s)\n", event.String(), o.Context, brokerEndpoint)
+	fmt.Printf("Request:\n%s\nDestination: %s(%s)\n", event.String(), target, brokerEndpoint)
 	result := c.Send(cloudevents.ContextWithTarget(ctx, brokerEndpoint), event)
 	if cloudevents.IsUndelivered(result) {
 		return fmt.Errorf("send event: %w", result)
