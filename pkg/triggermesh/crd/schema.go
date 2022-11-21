@@ -230,6 +230,9 @@ func (s *Schema) GetAttributesCompletion(path ...string) (bool, map[string]Prope
 		if _, secret := isSecretRef(prop); secret {
 			prop.Type = []string{"string/secret"}
 		}
+		if _, secret := schema["valueFromSecret"]; secret && name == "value" {
+			continue
+		}
 		if name == "sink" ||
 			name == "valueFromSecret" ||
 			name == "secretKeyRef" {
