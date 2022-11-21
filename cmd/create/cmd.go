@@ -71,7 +71,7 @@ func (o *CreateOptions) initialize() {
 
 	// try to read manifest even if it does not exists.
 	// required for autocompletion.
-	o.Manifest.Read()
+	_ = o.Manifest.Read()
 }
 
 func argsToMap(args []string) map[string]string {

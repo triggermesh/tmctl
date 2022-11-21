@@ -67,12 +67,12 @@ func NewCmd() *cobra.Command {
 	sendCmd.Flags().StringVar(&target, "target", "", "Component to send event to")
 	sendCmd.Flags().StringVar(&eventType, "eventType", defaultEventType, "CloudEvent Type attribute")
 
-	sendCmd.RegisterFlagCompletionFunc("eventType", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+	cobra.CheckErr(sendCmd.RegisterFlagCompletionFunc("eventType", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListFilteredEventTypes(o.Context, o.ConfigDir, o.Manifest), cobra.ShellCompDirectiveNoFileComp
-	})
-	sendCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+	}))
+	cobra.CheckErr(sendCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListTargets(o.Manifest), cobra.ShellCompDirectiveNoFileComp
-	})
+	}))
 	return sendCmd
 }
 
@@ -87,7 +87,7 @@ func (o *SendOptions) initialize() {
 
 	// try to read manifest even if it does not exists.
 	// required for autocompletion.
-	o.Manifest.Read()
+	_ = o.Manifest.Read()
 }
 
 func (o *SendOptions) send(eventType, target, data string) error {
@@ -116,7 +116,9 @@ func (o *SendOptions) send(eventType, target, data string) error {
 	if json.Valid([]byte(data)) {
 		contentType = cloudevents.ApplicationJSON
 	}
-	event.SetData(contentType, []byte(data))
+	if err := event.SetData(contentType, []byte(data)); err != nil {
+		return fmt.Errorf("event data: %w", err)
+	}
 
 	brokerEndpoint := fmt.Sprintf("http://localhost:%s", port)
 	fmt.Printf("Request:\n%s\nDestination: %s(%s)\n", event.String(), target, brokerEndpoint)

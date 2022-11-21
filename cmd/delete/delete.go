@@ -68,13 +68,13 @@ func NewCmd() *cobra.Command {
 	}
 	cobra.OnInitialize(o.initialize)
 	deleteCmd.Flags().StringVar(&broker, "broker", "", "Delete the broker")
-	deleteCmd.RegisterFlagCompletionFunc("broker", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+	cobra.CheckErr(deleteCmd.RegisterFlagCompletionFunc("broker", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		list, err := brokers.List(path.Dir(viper.ConfigFileUsed()), "")
 		if err != nil {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		}
 		return list, cobra.ShellCompDirectiveNoFileComp
-	})
+	}))
 	return deleteCmd
 }
 
@@ -89,7 +89,7 @@ func (o *DeleteOptions) initialize() {
 
 	// try to read manifest even if it does not exists.
 	// required for autocompletion.
-	o.Manifest.Read()
+	_ = o.Manifest.Read()
 }
 
 func (o *DeleteOptions) deleteBroker(broker string) error {
@@ -153,7 +153,9 @@ func (o *DeleteOptions) deleteEverything(ctx context.Context, object kubernetes.
 	if err := o.removeExternalServices(ctx, object); err != nil {
 		log.Printf("WARN: external services are not deleted: %v", err)
 	}
-	o.removeContainer(ctx, object.Metadata.Name, client)
+	if err := o.removeContainer(ctx, object.Metadata.Name, client); err != nil {
+		log.Printf("WARN: unable to remove %q container: %v", object.Metadata.Name, err)
+	}
 	o.removeObject(object.Metadata.Name)
 	o.cleanupTriggers(object.Metadata.Name)
 	o.cleanupSecrets(object.Metadata.Name)

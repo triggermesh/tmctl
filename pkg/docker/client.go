@@ -135,7 +135,9 @@ func (c *Container) Start(ctx context.Context, client *client.Client, restart bo
 		}
 	}
 	if restart {
-		c.Remove(ctx, client)
+		// remove errors usually means that container doesn't exist
+		// ignore it and try to create a new one.
+		_ = c.Remove(ctx, client)
 	} else if containerIsRunning {
 		return existingContainer, nil
 	}
