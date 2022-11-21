@@ -45,11 +45,6 @@ jobs:
           -filter-mode=diff_context \
           -reporter=github-check \
           -fail-on-error=true
-        reviewdog -conf=.github/workflows/config/reviewdog.yaml \
-          -runners=license-yaml \
-          -filter-mode=diff_context \
-          -reporter=github-check \
-          -fail-on-error=true
 
   vendor:
     name: Third-Party Licenses
