@@ -38,18 +38,18 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 	case "broker":
 		result = fmt.Sprintf("%s\nCurrent broker is set to %q", result, object.GetName())
 		result = fmt.Sprintf("%s\nTo change the current broker use \"tmctl brokers --set <broker name>\"", result)
-		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
-		result = fmt.Sprintf("%s\nNext steps:", result)
-		result = fmt.Sprintf("%s\n\ttmctl create source\t - create source that will produce events", result)
+		result = fmt.Sprintf("%s%s\n%s", successColorCode, result, defaultColorCode)
+		// result = fmt.Sprintf("%s\nNext steps:", result)
+		// result = fmt.Sprintf("%s\n\ttmctl create source\t - create source that will produce events", result)
 	case "producer":
 		et, _ := object.(triggermesh.Producer).GetEventTypes()
 		if len(et) != 0 {
 			result = fmt.Sprintf("%s\nComponent produces:\t%s", result, strings.Join(et, ", "))
 		}
-		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
-		result = fmt.Sprintf("%s\nNext steps:", result)
-		result = fmt.Sprintf("%s\n\ttmctl create target <kind> --source %s [--event-types <types>]\t - create target that will consume events from this source", result, object.GetName())
-		result = fmt.Sprintf("%s\n\ttmctl watch\t\t\t\t\t\t\t\t\t - show events flowing through the broker in the real time", result)
+		result = fmt.Sprintf("%s%s\n%s", successColorCode, result, defaultColorCode)
+		// result = fmt.Sprintf("%s\nNext steps:", result)
+		// result = fmt.Sprintf("%s\n\ttmctl create target <kind> --source %s [--event-types <types>]\t - create target that will consume events from this source", result, object.GetName())
+		// result = fmt.Sprintf("%s\n\ttmctl watch\t\t\t\t\t\t\t\t\t - show events flowing through the broker in the real time", result)
 	case "consumer":
 		et, _ := object.(triggermesh.Consumer).ConsumedEventTypes()
 		if len(et) != 0 {
@@ -62,13 +62,13 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 		if filter != "" {
 			result = fmt.Sprintf("%s\nSubscribed to:\t\t%s", result, filter)
 		}
-		result = fmt.Sprintf("%s%s\n%s%s", successColorCode, result, delimeter, defaultColorCode)
-		result = fmt.Sprintf("%s\nNext steps:", result)
-		result = fmt.Sprintf("%s\n\ttmctl create transformation --target %s\t - create event transformation component", result, object.GetName())
-		result = fmt.Sprintf("%s\n\ttmctl create trigger --target %s\t - create trigger to send events from source to target", result, object.GetName())
-		result = fmt.Sprintf("%s\n\ttmctl dump\t - dump Kubernetes manifest", result)
+		result = fmt.Sprintf("%s%s\n%s", successColorCode, result, defaultColorCode)
+		// result = fmt.Sprintf("%s\nNext steps:", result)
+		// result = fmt.Sprintf("%s\n\ttmctl create transformation --target %s\t - create event transformation component", result, object.GetName())
+		// result = fmt.Sprintf("%s\n\ttmctl create trigger --target %s\t - create trigger to send events from source to target", result, object.GetName())
+		// result = fmt.Sprintf("%s\n\ttmctl dump\t - dump Kubernetes manifest", result)
 	}
-	fmt.Println(result)
+	fmt.Print(result)
 }
 
 // func Draw() {}

@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -178,6 +179,7 @@ func ListSources(crdFile string) ([]string, error) {
 			result = append(result, strings.TrimSuffix(k, "source"))
 		}
 	}
+	sort.Strings(result)
 	return result, nil
 }
 
@@ -192,5 +194,6 @@ func ListTargets(crdFile string) ([]string, error) {
 			result = append(result, strings.TrimSuffix(k, "target"))
 		}
 	}
+	sort.Strings(result)
 	return result, nil
 }

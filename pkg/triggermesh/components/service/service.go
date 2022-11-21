@@ -38,8 +38,8 @@ const (
 )
 
 var (
-	Producer Role = "producer"
-	Consumer Role = "consumer"
+	Producer Role = "source"
+	Consumer Role = "target"
 
 	_ triggermesh.Component = (*Service)(nil)
 	_ triggermesh.Consumer  = (*Service)(nil)
