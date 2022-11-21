@@ -39,8 +39,6 @@ import (
 )
 
 const (
-	manifestFile = "manifest.yaml"
-
 	successColorCode = "\033[92m"
 	defaultColorCode = "\033[39m"
 	offlineColorCode = "\u001b[31m"
@@ -68,7 +66,7 @@ func NewCmd() *cobra.Command {
 			}
 			o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 			o.Version = viper.GetString("triggermesh.version")
-			o.Manifest = manifest.New(path.Join(o.ConfigBase, broker, manifestFile))
+			o.Manifest = manifest.New(path.Join(o.ConfigBase, broker, triggermesh.ManifestFile))
 			cobra.CheckErr(o.Manifest.Read())
 			crds, err := crd.Fetch(o.ConfigBase, o.Version)
 			if err != nil {

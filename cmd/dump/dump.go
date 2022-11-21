@@ -27,10 +27,9 @@ import (
 
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
-
-const manifestFile = "manifest.yaml"
 
 type DumpOptions struct {
 	Format   string
@@ -50,7 +49,7 @@ func NewCmd() *cobra.Command {
 				broker = args[0]
 			}
 			o.Context = broker
-			o.Manifest = manifest.New(path.Join(path.Dir(viper.ConfigFileUsed()), broker, manifestFile))
+			o.Manifest = manifest.New(path.Join(path.Dir(viper.ConfigFileUsed()), broker, triggermesh.ManifestFile))
 			cobra.CheckErr(o.Manifest.Read())
 			return o.dump(knativeEventing)
 		},

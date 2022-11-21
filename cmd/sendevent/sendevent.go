@@ -35,8 +35,6 @@ import (
 )
 
 const (
-	manifestFile = "manifest.yaml"
-
 	defaultEventType   = "triggermesh-local-event"
 	defaultEventSource = "triggermesh-cli"
 )
@@ -80,7 +78,7 @@ func (o *SendOptions) initialize() {
 	o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
-	o.Manifest = manifest.New(path.Join(o.ConfigDir, o.Context, manifestFile))
+	o.Manifest = manifest.New(path.Join(o.ConfigDir, o.Context, triggermesh.ManifestFile))
 	crds, err := crd.Fetch(o.ConfigDir, o.Version)
 	cobra.CheckErr(err)
 	o.CRD = crds

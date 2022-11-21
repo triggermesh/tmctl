@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
 	"github.com/triggermesh/tmctl/cmd/brokers"
 	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"

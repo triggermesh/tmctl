@@ -39,8 +39,6 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-const manifestFile = "manifest.yaml"
-
 type DeleteOptions struct {
 	ConfigBase string
 	Context    string
@@ -82,7 +80,7 @@ func (o *DeleteOptions) initialize() {
 	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
-	o.Manifest = manifest.New(path.Join(o.ConfigBase, o.Context, manifestFile))
+	o.Manifest = manifest.New(path.Join(o.ConfigBase, o.Context, triggermesh.ManifestFile))
 	crds, err := crd.Fetch(o.ConfigBase, o.Version)
 	cobra.CheckErr(err)
 	o.CRD = crds
@@ -95,7 +93,7 @@ func (o *DeleteOptions) initialize() {
 func (o *DeleteOptions) deleteBroker(broker string) error {
 	oo := *o
 	oo.Context = broker
-	oo.Manifest = manifest.New(path.Join(oo.ConfigBase, broker, manifestFile))
+	oo.Manifest = manifest.New(path.Join(oo.ConfigBase, broker, triggermesh.ManifestFile))
 	cobra.CheckErr(oo.Manifest.Read())
 
 	if err := oo.deleteComponents([]string{}, true); err != nil {
@@ -153,9 +151,8 @@ func (o *DeleteOptions) deleteEverything(ctx context.Context, object kubernetes.
 	if err := o.removeExternalServices(ctx, object); err != nil {
 		log.Printf("WARN: external services are not deleted: %v", err)
 	}
-	if err := o.removeContainer(ctx, object.Metadata.Name, client); err != nil {
-		log.Printf("WARN: unable to remove %q container: %v", object.Metadata.Name, err)
-	}
+	// not all components are runnable, but removeContainer should try to stop it anyway
+	_ = o.removeContainer(ctx, object.Metadata.Name, client)
 	o.removeObject(object.Metadata.Name)
 	o.cleanupTriggers(object.Metadata.Name)
 	o.cleanupSecrets(object.Metadata.Name)

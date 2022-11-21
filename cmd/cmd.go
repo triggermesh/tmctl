@@ -34,14 +34,10 @@ import (
 	"github.com/triggermesh/tmctl/cmd/stop"
 	"github.com/triggermesh/tmctl/cmd/version"
 	"github.com/triggermesh/tmctl/cmd/watch"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
 
-const (
-	defaultTriggermeshVersion = "v1.21.1"
-	defaultBroker             = ""
-
-	configDir = ".triggermesh/cli"
-)
+const defaultBroker = ""
 
 func NewRootCommand(ver, commit string) *cobra.Command {
 	rootCmd := &cobra.Command{
@@ -55,7 +51,7 @@ Find more information at: https://docs.triggermesh.io`,
 
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().String("version", defaultTriggermeshVersion, "TriggerMesh components version.")
+	rootCmd.PersistentFlags().String("version", triggermesh.DefaultVersion, "TriggerMesh components version.")
 	rootCmd.PersistentFlags().String("broker", defaultBroker, "Optional broker name.")
 	// rootCmd.PersistentFlags().MarkHidden("broker")
 
@@ -90,17 +86,14 @@ Find more information at: https://docs.triggermesh.io`,
 func initConfig() {
 	home, err := os.UserHomeDir()
 	cobra.CheckErr(err)
-	configHome := path.Join(home, configDir)
+	configHome := path.Join(home, triggermesh.ConfigDir)
 
-	// Search config in home directory with name ".cobra" (without extension).
-	viper.SetConfigType("yaml")
-	viper.SetConfigName("config")
-	viper.AddConfigPath(configHome)
+	viper.SetConfigFile(path.Join(configHome, triggermesh.ConfigFile))
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			cobra.CheckErr(os.MkdirAll(configHome, os.ModePerm))
 			viper.SetDefault("context", defaultBroker)
-			viper.SetDefault("triggermesh.version", defaultTriggermeshVersion)
+			viper.SetDefault("triggermesh.version", triggermesh.DefaultVersion)
 			cobra.CheckErr(viper.SafeWriteConfig())
 			cobra.CheckErr(viper.ReadInConfig())
 		} else {

@@ -33,8 +33,6 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-const manifestFile = "manifest.yaml"
-
 type StartOptions struct {
 	ConfigBase string
 	Context    string
@@ -72,7 +70,7 @@ func (o *StartOptions) initialize() {
 	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
-	o.Manifest = manifest.New(path.Join(o.ConfigBase, o.Context, manifestFile))
+	o.Manifest = manifest.New(path.Join(o.ConfigBase, o.Context, triggermesh.ManifestFile))
 	crds, err := crd.Fetch(o.ConfigBase, o.Version)
 	cobra.CheckErr(err)
 	o.CRD = crds

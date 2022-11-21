@@ -16,4 +16,13 @@ limitations under the License.
 
 package triggermesh
 
-const Namespace = "local"
+// TriggerMesh constant values used as default paths, config names, etc.
+const (
+	Namespace    = "local"
+	ManifestFile = "manifest.yaml"
+
+	ConfigFile = "config.yaml"
+	ConfigDir  = ".triggermesh/cli"
+
+	DefaultVersion = "v1.21.1"
+)

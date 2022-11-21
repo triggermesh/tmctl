@@ -17,6 +17,7 @@ limitations under the License.
 package output
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -62,6 +63,10 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 		if filter != "" {
 			result = fmt.Sprintf("%s\nSubscribed to:\t\t%s", result, filter)
 		}
+		if port, err := object.(triggermesh.Consumer).GetPort(context.Background()); err == nil {
+			result = fmt.Sprintf("%s\nListening on:\t\thttp://localhost:%s", result, port)
+		}
+
 		result = fmt.Sprintf("%s%s\n%s", successColorCode, result, defaultColorCode)
 		// result = fmt.Sprintf("%s\nNext steps:", result)
 		// result = fmt.Sprintf("%s\n\ttmctl create transformation --target %s\t - create event transformation component", result, object.GetName())
