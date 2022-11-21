@@ -48,7 +48,8 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("list sources: %w", err)
 				}
-				cmd.Help()
+				// help can never return an error
+				_ = cmd.Help()
 				fmt.Printf("\nAvailable source kinds:\n---\n%s\n", strings.Join(sources, "\n"))
 				return nil
 			}

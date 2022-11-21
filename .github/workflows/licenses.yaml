@@ -74,11 +74,11 @@ jobs:
           ${{ github.job }}-${{ runner.os }}-go-
 
     - name: Install go-licenses
-      run: go install github.com/google/go-licenses@v1.2.1
+      run: go install github.com/google/go-licenses@v1.5.0
 
     - name: Check third-party licenses
       run: |
-        go-licenses save ./... --save_path LICENSES/vendor/ --force
+        go-licenses save ./... --save_path LICENSES/vendor/ --force --ignore github.com/triggermesh
 
         git_status="$(git status --porcelain)"
         if [[ ${git_status} ]]; then

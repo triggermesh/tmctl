@@ -59,8 +59,8 @@ Find more information at: https://docs.triggermesh.io`,
 	rootCmd.PersistentFlags().String("broker", defaultBroker, "Optional broker name.")
 	// rootCmd.PersistentFlags().MarkHidden("broker")
 
-	viper.BindPFlag("context", rootCmd.PersistentFlags().Lookup("broker"))
-	viper.BindPFlag("triggermesh.version", rootCmd.PersistentFlags().Lookup("version"))
+	cobra.CheckErr(viper.BindPFlag("context", rootCmd.PersistentFlags().Lookup("broker")))
+	cobra.CheckErr(viper.BindPFlag("triggermesh.version", rootCmd.PersistentFlags().Lookup("version")))
 
 	rootCmd.AddCommand(brokers.NewCmd())
 	rootCmd.AddCommand(create.NewCmd())
@@ -74,17 +74,16 @@ Find more information at: https://docs.triggermesh.io`,
 	rootCmd.AddCommand(watch.NewCmd())
 	rootCmd.AddCommand(version.NewCmd(ver, commit))
 
-	rootCmd.RegisterFlagCompletionFunc("broker", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("broker", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		list, err := brokers.List(path.Dir(viper.ConfigFileUsed()), "")
 		if err != nil {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		}
 		return list, cobra.ShellCompDirectiveNoFileComp
-	})
-	rootCmd.RegisterFlagCompletionFunc("version", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+	}))
+	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("version", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return []string{}, cobra.ShellCompDirectiveNoFileComp
-	})
-
+	}))
 	return rootCmd
 }
 

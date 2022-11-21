@@ -49,7 +49,8 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("list sources: %w", err)
 				}
-				cmd.Help()
+				// help can never return an error
+				_ = cmd.Help()
 				fmt.Printf("\nAvailable target kinds:\n---\n%s\n", strings.Join(targets, "\n"))
 				return nil
 			}
