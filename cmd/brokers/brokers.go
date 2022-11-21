@@ -24,9 +24,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-)
 
-const manifestFile = "manifest.yaml"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
+)
 
 func NewCmd() *cobra.Command {
 	var broker string
@@ -78,7 +78,7 @@ func List(configDir, currentContext string) ([]string, error) {
 			return nil, fmt.Errorf("listing files: %w", err)
 		}
 		for _, file := range files {
-			if file.Name() == manifestFile {
+			if file.Name() == triggermesh.ManifestFile {
 				if dir.Name() == currentContext {
 					output = append(output, fmt.Sprintf("*%s", dir.Name()))
 					continue

@@ -27,10 +27,9 @@ import (
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
-
-const manifestFile = "manifest.yaml"
 
 type StopOptions struct {
 	ConfigBase string
@@ -49,7 +48,7 @@ func NewCmd() *cobra.Command {
 				broker = args[0]
 			}
 			o.ConfigBase = path.Dir(viper.ConfigFileUsed())
-			o.Manifest = manifest.New(path.Join(o.ConfigBase, broker, manifestFile))
+			o.Manifest = manifest.New(path.Join(o.ConfigBase, broker, triggermesh.ManifestFile))
 			cobra.CheckErr(o.Manifest.Read())
 			return o.stop(broker)
 		},

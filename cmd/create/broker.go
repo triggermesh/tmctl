@@ -47,7 +47,7 @@ func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 func (o *CreateOptions) broker(name string) error {
 	ctx := context.Background()
 
-	o.Manifest.Path = path.Join(o.ConfigBase, name, manifestFile)
+	o.Manifest.Path = path.Join(o.ConfigBase, name, triggermesh.ManifestFile)
 	broker, err := tmbroker.New(name, o.Manifest.Path)
 	if err != nil {
 		return fmt.Errorf("broker: %w", err)
