@@ -12,12 +12,3 @@ runner:
     errorformat:
       - '%A%f:%l: %m'
       - '%C%.%#'
-  license-yaml:
-    cmd: >-
-      boilerplate-check check
-      --boilerplate=hack/boilerplate/boilerplate.yaml.txt
-      --file-extension=yaml
-      --exclude='(^\.|vendor)'
-    errorformat:
-      - '%A%f:%l: %m'
-      - '%C%.%#'
