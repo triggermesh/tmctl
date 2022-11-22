@@ -24,13 +24,17 @@ brew install tmctl
 For MacOS on Apple Silicon chips:
 
 ```
-curl -L https://github.com/triggermesh/tmctl/releases/download/v0.0.1/tmctl_0.0.1_darwin_arm64 -o /usr/local/bin/tmctl && chmod +x /usr/local/bin/tmctl
+curl -L https://github.com/triggermesh/tmctl/releases/download/v0.0.1/tmctl_0.0.1_darwin_arm64 -o tmctl \
+    && chmod +x tmctl \
+    && sudo mv tmctl /usr/local/bin
 ```
 
 Linux, AMD64:
 
 ```
-curl -L https://github.com/triggermesh/tmctl/releases/download/v0.0.1/tmctl_0.0.1_linux_amd64 -o /usr/local/bin/tmctl && chmod +x /usr/local/bin/tmctl
+curl -L https://github.com/triggermesh/tmctl/releases/download/v0.0.1/tmctl_0.0.1_linux_amd64 -o tmctl \
+    && chmod +x tmctl \
+    && sudo mv tmctl /usr/local/bin
 ```
 
 To view more versions and architectures of pre-built binaries please visit our GitHub [release page](https://github.com/triggermesh/tmctl/releases/latest). 
