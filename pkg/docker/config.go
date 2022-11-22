@@ -48,9 +48,9 @@ func WithPort(port nat.Port) ContainerOption {
 	}
 }
 
-func WithEntrypoint(entrypoint string) ContainerOption {
+func WithEntrypoint(entrypoint []string) ContainerOption {
 	return func(cc *container.Config) {
-		cc.Entrypoint = []string{entrypoint}
+		cc.Entrypoint = entrypoint
 	}
 }
 
