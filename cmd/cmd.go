@@ -88,7 +88,9 @@ func initConfig() {
 	cobra.CheckErr(err)
 	configHome := path.Join(home, triggermesh.ConfigDir)
 
-	viper.SetConfigFile(path.Join(configHome, triggermesh.ConfigFile))
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("config")
+	viper.AddConfigPath(configHome)
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			cobra.CheckErr(os.MkdirAll(configHome, os.ModePerm))
