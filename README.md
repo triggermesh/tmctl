@@ -1,155 +1,90 @@
 # TriggerMesh CLI
-Local environment edition.
 
-Project status: Work in progress, initial testing stage.
+`tmctl` is the TriggerMesh CLI (part of the Shaker project) to create, manage and debug event-driven integration apps. This CLI provides a simple user experience in your local environment and supports further deployment to a  Kubernetes cluster.
 
-Working name is `tmctl`.
 
-## Available commands and scenarios
+For the full documentation of TriggerMesh and its tooling, please visit [docs.triggermesh.io](https://docs.triggermesh.io).
 
-Commands without the context:
+## Requirements
 
-```
-tmctl config *
-tmctl list
-tmctl create broker <broker>
-```
+The CLI runs TriggerMesh components locally as containers, therefore Docker engine must be running on the machine where `tmctl` is installed.
 
-Commands with optional context:
+## Installation
+
+TriggerMesh CLI can be installed from different sources: brew repository, pre-built binary, or compiled from the source.
+
+### Brew
 
 ```
-tmctl dump [broker]
-tmctl describe [broker]
-tmctl delete [--broker <broker>] <component>
-tmctl start [broker]
-tmctl stop [broker]
-tmctl watch [broker]
+brew install tmctl
 ```
 
-Commands with context from config:
+### Pre-built binary
+
+For MacOS on Apple Silicon chips:
 
 ```
-tmctl create source *
-tmctl create target *
-tmctl create trigger *
-tmctl create transformation *
+curl -L https://github.com/triggermesh/tmctl/releases/download/v0.0.1/tmctl_0.0.1_darwin_arm64 -o /usr/local/bin/tmctl && chmod +x /usr/local/bin/tmctl
 ```
 
-### Installation
+Linux, AMD64:
 
-Checkout the code:
+```
+curl -L https://github.com/triggermesh/tmctl/releases/download/v0.0.1/tmctl_0.0.1_linux_amd64 -o /usr/local/bin/tmctl && chmod +x /usr/local/bin/tmctl
+```
+
+To view more versions and architectures of pre-built binaries please visit our GitHub [release page](https://github.com/triggermesh/tmctl/releases/latest). 
+
+### Source
+
+`go` compiler of the latest version is recommended to build `tmctl` binary from the source:
 
 ```
 git clone git@github.com:triggermesh/tmctl.git
-```
-
-Install binary:
-
-```
 cd tmctl
 go install
 ```
 
 ### Autocompletion
 
-The CLI can generate completion scripts that can be loaded into the shell
-to help use the CLI more easily:
-
-for Bash:
-```
-source <(tmctl completion bash)
-```
-or for ZSH:
+After `tmctl` is installed and available in system's `$PATH`, command-line [completion](https://en.wikipedia.org/wiki/Command-line_completion) should be configured as it improves the CLI user experience. To configure command-line completion, please use the "help" command output for the shell of your choice, for example:
 
 ```
-source <(tmctl completion zsh)
-```
-
-To make autocompletion load automatically, put this command in one of the
-shell profile configuration, e.g.:
+tmctl completion bash --help
+``` 
+or
 
 ```
-echo 'source <(tmctl completion bash)' >>~/.bash_profile
+tmctl completion zsh --help
 ```
 
-`tmctl` binary must be available in the `$PATH` to generate and use completion.
+_NOTE: for the Bash shell, `bash-completion` of version *2* is recommended._
 
+## Usage
 
-### Local event flow
-
-Create broker:
-
-```
-tmctl create broker foo
-```
-
-Create source:
+The CLI commands provide a way to manage TriggerMesh components locally and deploy them on a Kubernetes cluster without the need to write YAML files. All commands support `--help` argument to get the description and usage:
 
 ```
-tmctl create source awssqs --arn <arn> --auth.credentials.accessKeyID=<access key> --auth.credentials.secretAccessKey=<secret key>
+$ tmctl help
+tmctl is a CLI to help you create event brokers, sources, targets and transformations.
+
+Available Commands:
+  brokers     Show the list of brokers
+  completion  Generate the autocompletion script for the specified shell
+  config      Read and write config values
+  create      Create TriggerMesh objects
+  delete      Delete components by names
+  describe    Show broker status
+  dump        Generate Kubernetes manifest
+  help        Help about any command
+  send-event  Send CloudEvent to the broker
+  start       Starts TriggerMesh components
+  stop        Stops TriggerMesh components
+  version     CLI version information
+  watch       Watch events flowing through the broker
 ```
 
-Watch incoming events:
-
-```
-tmctl watch
-```
-
-Create transformation:
-```
-tmctl create transformation --sources foo-awssqssource
-```
-
-Create target and trigger:
-
-```
-tmctl create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io
-tmctl create trigger --sources foo-transformation --target foo-cloudeventstarget
-```
-
-Or, in one command:
-
-```
-tmctl create target cloudevents --endpoint https://sockeye-tzununbekov.dev.triggermesh.io --sources foo-transformation
-```
-
-Open sockeye [web-interface](https://sockeye-tzununbekov.dev.triggermesh.io), send the message to SQS queue specified in the source creation step and observe the received CloudEvent in the sockeye tab.
-
-Or send test event manually:
-
-```
-tmctl send-event --eventType com.amazon.sqs.message '{"hello":"world"}'
-```
-
-Stop event flow:
-
-```
-tmctl stop
-```
-
-Start event flow:
-
-```
-tmctl start
-```
-
-Print Kubernetes manifest (not applicable at the moment):
-
-```
-tmctl dump
-```
-
-Describe the integration:
-
-```
-tmctl describe
-```
-
-List existing brokers:
-
-```
-tmctl list
-```
+For the quickstart guide, please visit [docs.triggermesh.io](https://docs.triggermesh.io).
 
 ## Contributing
 

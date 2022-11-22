@@ -43,7 +43,7 @@ const (
 	APIVersion  = "eventing.triggermesh.io/v1alpha1"
 
 	brokerConfigFile = "broker.conf"
-	image            = "tzununbekov/memory-broker"
+	image            = "gcr.io/triggermesh/memory-broker:dev"
 )
 
 type Broker struct {
@@ -85,6 +85,16 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
+	co = append(co, docker.WithEntrypoint([]string{
+		"/memory-broker",
+		"start",
+		"--memory.buffer-size",
+		"100",
+		"--memory.produce-timeout",
+		"1s",
+		"--broker-config-path",
+		"/etc/triggermesh/broker.conf",
+	}))
 
 	bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", b.ConfigFile)
 	ho = append(ho, docker.WithVolumeBind(bind))
