@@ -1,17 +1,17 @@
 # TriggerMesh CLI
 
-`tmctl` is the TriggerMesh CLI tool to create, manage and debug event-driven integration apps. The key idea of this CLI is to provide a simple user experience in the local environment and support further migration to Kubernetes.
+`tmctl` is the TriggerMesh CLI (part of the Shaker project) to create, manage and debug event-driven integration apps. This CLI provides a simple user experience in your local environment and supports further deployment to a  Kubernetes cluster.
 
 
-For the full documentation of the TriggerMesh and its tooling, please visit [docs.triggermesh.io](https://docs.triggermesh.io).
+For the full documentation of TriggerMesh and its tooling, please visit [docs.triggermesh.io](https://docs.triggermesh.io).
 
 ## Requirements
 
-The CLI runs TriggerMesh components locally as containers, therefore Docker engine must be running on the machine where CLI is installed.
+The CLI runs TriggerMesh components locally as containers, therefore Docker engine must be running on the machine where `tmctl` is installed.
 
 ## Installation
 
-TriggerMesh CLI can be installed from different sources: brew repository, pre-built binary, or compiled from the sources.
+TriggerMesh CLI can be installed from different sources: brew repository, pre-built binary, or compiled from the source.
 
 ### Brew
 
@@ -33,7 +33,7 @@ Linux, AMD64:
 curl -L https://github.com/triggermesh/tmctl/releases/download/v0.0.1/tmctl_0.0.1_linux_amd64 -o /usr/local/bin/tmctl && chmod +x /usr/local/bin/tmctl
 ```
 
-To view more versions and architectures of pre-built binaries please visit our Github [release page](https://github.com/triggermesh/tmctl/releases/latest). 
+To view more versions and architectures of pre-built binaries please visit our GitHub [release page](https://github.com/triggermesh/tmctl/releases/latest). 
 
 ### Source
 
@@ -62,7 +62,7 @@ _NOTE: for the Bash shell, `bash-completion` of version *2* is recommended._
 
 ## Usage
 
-The CLI commands provide a way to manage TriggerMesh resources locally and deploy them on Kubernetes cluster without the need to write YAML files. All commands support `--help` argument to get the description and usage:
+The CLI commands provide a way to manage TriggerMesh components locally and deploy them on a Kubernetes cluster without the need to write YAML files. All commands support `--help` argument to get the description and usage:
 
 ```
 $ tmctl help
