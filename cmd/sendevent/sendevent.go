@@ -119,11 +119,13 @@ func (o *SendOptions) send(eventType, target, data string) error {
 	}
 
 	brokerEndpoint := fmt.Sprintf("http://localhost:%s", port)
-	fmt.Printf("Request:\n%s\nDestination: %s(%s)\n", event.String(), target, brokerEndpoint)
+	fmt.Printf("Destination: %s(%s)\n", target, brokerEndpoint)
+	fmt.Printf("Request:\n------\n%s------", event.String())
 	result := c.Send(cloudevents.ContextWithTarget(ctx, brokerEndpoint), event)
-	if cloudevents.IsUndelivered(result) {
-		return fmt.Errorf("send event: %w", result)
+	response := "\033[92mOK\033[39m"
+	if !cloudevents.IsACK(result) {
+		response = fmt.Sprintf("\u001b[31mError\033[39m(%s)", result.Error())
 	}
-	fmt.Printf("Response: %s \033[92mOK\033[39m\n", result)
+	fmt.Printf("\nResponse: %s\n", response)
 	return nil
 }

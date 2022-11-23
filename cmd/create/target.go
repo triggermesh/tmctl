@@ -19,7 +19,6 @@ package create
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -27,6 +26,7 @@ import (
 
 	eventingbroker "github.com/triggermesh/brokers/pkg/config/broker"
 
+	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/output"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
@@ -137,6 +137,13 @@ func (o *CreateOptions) target(name, kind string, args map[string]string, eventS
 		return err
 	}
 
+	// update our triggers in case of target container restart
+	if restart || secretsChanged {
+		if err := o.updateTriggers(t); err != nil {
+			return err
+		}
+	}
+
 	for _, et := range eventTypesFilter {
 		if _, err := o.createTrigger("", t, tmbroker.FilterExactAttribute("type", et)); err != nil {
 			return fmt.Errorf("creating trigger: %w", err)
@@ -161,6 +168,20 @@ func (o *CreateOptions) createTrigger(name string, target triggermesh.Component,
 	return trigger, nil
 }
 
+func (o *CreateOptions) updateTriggers(target triggermesh.Component) error {
+	triggers, err := tmbroker.GetTargetTriggers(target.GetName(), o.Context, o.ConfigBase)
+	if err != nil {
+		return fmt.Errorf("target triggers: %w", err)
+	}
+	for _, trigger := range triggers {
+		trigger.(*tmbroker.Trigger).SetTarget(target)
+		if err := trigger.(*tmbroker.Trigger).WriteLocalConfig(); err != nil {
+			return fmt.Errorf("broker config update: %w", err)
+		}
+	}
+	return nil
+}
+
 func (o *CreateOptions) targetFromImage(name, image string, params map[string]string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
 
@@ -180,6 +201,12 @@ func (o *CreateOptions) targetFromImage(name, image string, params map[string]st
 	log.Println("Starting container")
 	if _, err := s.(triggermesh.Runnable).Start(ctx, nil, restart); err != nil {
 		return err
+	}
+	// update our triggers in case of target container restart
+	if restart {
+		if err := o.updateTriggers(s); err != nil {
+			return err
+		}
 	}
 	for _, et := range eventTypesFilter {
 		if _, err := o.createTrigger("", s, tmbroker.FilterExactAttribute("type", et)); err != nil {

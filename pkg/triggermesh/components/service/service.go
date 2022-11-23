@@ -218,7 +218,7 @@ func New(name, image, broker string, role Role, params map[string]string) trigge
 }
 
 func paramsToEnv(params map[string]string) []interface{} {
-	var env []interface{}
+	env := make([]interface{}, 0, len(params))
 	for k, v := range params {
 		env = append(env, map[string]interface{}{
 			"name":  strings.ToUpper(k),

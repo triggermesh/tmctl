@@ -71,7 +71,19 @@ func GetObject(name, crdFile, version string, manifest *manifest.Manifest) (trig
 				env := container.(map[string]interface{})["env"]
 				if env != nil {
 					for _, v := range env.([]interface{}) {
-						params[v.(map[string]interface{})["name"].(string)] = v.(map[string]interface{})["value"].(string)
+						val, ok := v.(map[string]interface{})
+						if !ok {
+							continue
+						}
+						name, ok := val["name"]
+						if !ok {
+							continue
+						}
+						value, ok := val["value"]
+						if !ok {
+							continue
+						}
+						params[name.(string)] = value.(string)
 					}
 				}
 				return service.New(name, image, broker, service.Role(role), params), nil

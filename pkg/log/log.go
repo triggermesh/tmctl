@@ -14,20 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package log
 
 import (
-	"github.com/triggermesh/tmctl/cmd"
-	"github.com/triggermesh/tmctl/pkg/log"
+	glog "log"
+
+	"github.com/spf13/viper"
 )
 
-var (
-	Version string = "dev"
-	Commit  string = "unknown"
-)
-
-func main() {
-	if err := cmd.NewRootCommand(Version, Commit).Execute(); err != nil {
-		log.Fatal(err)
+var broker = func() string {
+	if broker := viper.GetString("context"); broker != "" {
+		return broker
 	}
+	return "-"
+}
+
+// Println is standard's log output supplied with the broker name.
+func Println(message string) {
+	glog.Printf("%s | %s", broker(), message)
+}
+
+// Printf is standard's log formattable output supplied with the broker name.
+func Printf(format string, v ...any) {
+	glog.Printf(broker()+" | "+format, v...)
+}
+
+// Fatal is the local fatal function.
+func Fatal(v ...any) {
+	glog.Fatal(v...)
 }
