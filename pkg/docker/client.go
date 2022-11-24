@@ -63,7 +63,12 @@ func NewClient() (*client.Client, error) {
 }
 
 func (c *Container) Logs(ctx context.Context, client *client.Client) (io.ReadCloser, error) {
-	options := types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true, Follow: true}
+	options := types.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     true,
+		// start tailing new logs only
+		Since: (time.Now().Add(2 * time.Second).Format("2006-01-02T15:04:05.999999999Z07:00"))}
 	return client.ContainerLogs(ctx, c.ID, options)
 }
 
@@ -222,6 +227,7 @@ func (c *Container) LookupHostConfig(ctx context.Context, client *client.Client)
 	if err != nil {
 		return nil, err
 	}
+	c.ID = id
 	c.runtimeHostConfig = *jsn.HostConfig
 	c.runtimeContainerConfig = *jsn.Config
 	return c, nil

@@ -24,7 +24,8 @@ brew install tmctl
 Linux, MacOS:
 
 ```
-curl -L https://github.com/triggermesh/tmctl/releases/download/v0.0.1/tmctl_0.0.1_$(uname -m -o | awk '{print tolower($1)"_"$2}') -o tmctl \
+export TMCTL_VERSION=$(curl -s -I HEAD https://github.com/triggermesh/tmctl/releases/latest | grep "location:" | awk -F / '{print $NF}')
+curl -L https://github.com/triggermesh/tmctl/releases/download/$TMCTL_VERSION/tmctl_${TMCTL_VERSION:1}_$(uname -m -o | awk '{print tolower($1)"_"$2}') -o tmctl \
     && chmod +x tmctl \
     && sudo mv tmctl /usr/local/bin
 ```

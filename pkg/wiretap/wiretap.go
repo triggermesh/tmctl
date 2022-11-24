@@ -20,11 +20,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 
 	"knative.dev/pkg/apis"
 	v1 "knative.dev/pkg/apis/duck/v1"
 
+	"github.com/docker/docker/client"
 	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/triggermesh-core/pkg/apis/eventing/v1alpha1"
 )
@@ -33,6 +36,8 @@ type Wiretap struct {
 	Broker      string
 	ConfigBase  string
 	Destination string
+
+	client *client.Client
 }
 
 const (
@@ -40,18 +45,19 @@ const (
 	port  = "8080/tcp"
 )
 
-func New(broker, configBase string) *Wiretap {
+func New(broker, configBase string) (*Wiretap, error) {
+	dockerClient, err := docker.NewClient()
+	if err != nil {
+		return nil, err
+	}
 	return &Wiretap{
 		Broker:     broker,
 		ConfigBase: configBase,
-	}
+		client:     dockerClient,
+	}, nil
 }
 
 func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
-	client, err := docker.NewClient()
-	if err != nil {
-		return nil, fmt.Errorf("docker client: %w", err)
-	}
 	co := []docker.ContainerOption{
 		docker.WithImage(image),
 		docker.WithPort(port),
@@ -67,7 +73,7 @@ func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
 		CreateHostOptions:      ho,
 		CreateContainerOptions: co,
 	}
-	c, err := container.Start(ctx, client, true)
+	c, err := container.Start(ctx, w.client, true)
 	if err != nil {
 		return nil, fmt.Errorf("starting container: %w", err)
 	}
@@ -75,7 +81,7 @@ func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("container connect: %w", err)
 	}
 	w.Destination = fmt.Sprintf("http://host.docker.internal:%s", c.HostPort())
-	return c.Logs(ctx, client)
+	return c.Logs(ctx, w.client)
 }
 
 func (w *Wiretap) CreateTrigger(eventTypes []string) error {
@@ -99,11 +105,19 @@ func (w *Wiretap) CreateTrigger(eventTypes []string) error {
 	return nil
 }
 
-func (w *Wiretap) Cleanup(ctx context.Context) error {
-	client, err := docker.NewClient()
+func (w *Wiretap) BrokerLogs(ctx context.Context) (io.ReadCloser, error) {
+	bro, err := tmbroker.New(w.Broker, path.Join(w.ConfigBase, w.Broker, triggermesh.ManifestFile))
 	if err != nil {
-		return fmt.Errorf("docker client: %w", err)
+		return nil, err
 	}
+	broc, err := bro.(triggermesh.Runnable).Info(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return broc.Logs(ctx, w.client)
+}
+
+func (w *Wiretap) Cleanup(ctx context.Context) error {
 	trigger := &tmbroker.Trigger{
 		Name:       "wiretap",
 		ConfigBase: w.ConfigBase,
@@ -116,5 +130,5 @@ func (w *Wiretap) Cleanup(ctx context.Context) error {
 	if err := trigger.RemoveFromLocalConfig(); err != nil {
 		return fmt.Errorf("removing trigger: %v", err)
 	}
-	return docker.ForceStop(ctx, fmt.Sprintf("%s-wiretap", w.Broker), client)
+	return docker.ForceStop(ctx, fmt.Sprintf("%s-wiretap", w.Broker), w.client)
 }
