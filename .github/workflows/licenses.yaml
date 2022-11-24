@@ -73,7 +73,7 @@ jobs:
 
     - name: Check third-party licenses
       run: |
-        go-licenses save ./... --save_path LICENSES/vendor/ --force --ignore github.com/triggermesh
+        go-licenses save ./... --save_path LICENSES/vendor/ --force
 
         git_status="$(git status --porcelain)"
         if [[ ${git_status} ]]; then
