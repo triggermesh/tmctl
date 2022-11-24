@@ -16,13 +16,54 @@ limitations under the License.
 
 package triggermesh
 
-// TriggerMesh constant values used as default paths, config names, etc.
-const (
-	Namespace    = "local"
-	ManifestFile = "manifest.yaml"
+import (
+	"encoding/json"
+	"net/http"
+)
 
+var DefaultConfig = map[string]interface{}{
+	"context":                                   defaultContext,
+	"triggermesh.version":                       latestOrDefault(defaultVersion),
+	"triggermesh.broker.image":                  MemoryBrokerImage,
+	"triggermesh.broker.memory.buffer-size":     MemoryBrokerBufferSize,
+	"triggermesh.broker.memory.produce-timeout": MemoryBrokerProduceTimeout,
+}
+
+// TriggerMesh constant values used as default paths, configs, etc.
+const (
 	ConfigFile = "config.yaml"
 	ConfigDir  = ".triggermesh/cli"
 
-	DefaultVersion = "v1.21.1"
+	defaultContext = ""
+	Namespace      = "local"
+	ManifestFile   = "manifest.yaml"
+
+	// version default parameters
+	ghLatestRelease = "https://api.github.com/repos/triggermesh/triggermesh/releases/latest"
+	defaultVersion  = "v1.21.1"
+
+	// broker default parameters
+	MemoryBrokerImage          = "gcr.io/triggermesh/memory-broker:dev"
+	MemoryBrokerBufferSize     = "100"
+	MemoryBrokerProduceTimeout = "1s"
 )
+
+type release struct {
+	TagName string `json:"tag_name"`
+}
+
+func latestOrDefault(defaultVersion string) string {
+	r, err := http.Get(ghLatestRelease)
+	if err != nil {
+		return defaultVersion
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		return defaultVersion
+	}
+	var j release
+	if err := json.NewDecoder(r.Body).Decode(&j); err != nil {
+		return defaultVersion
+	}
+	return j.TagName
+}
