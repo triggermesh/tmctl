@@ -232,15 +232,6 @@ func sources(object unstructured.Unstructured) (EventAttributes, error) {
 			ProducedEventTypes:  o.GetEventTypes(),
 			ProducedEventSource: o.AsEventSource(),
 		}, nil
-	case "GoogleCloudIoTSource":
-		var o *sourcesv1alpha1.GoogleCloudIoTSource
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return EventAttributes{}, err
-		}
-		return EventAttributes{
-			ProducedEventTypes:  o.GetEventTypes(),
-			ProducedEventSource: o.AsEventSource(),
-		}, nil
 	case "GoogleCloudPubSubSource":
 		var o *sourcesv1alpha1.GoogleCloudPubSubSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {

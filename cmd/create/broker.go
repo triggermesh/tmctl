@@ -54,7 +54,7 @@ func (o *CreateOptions) broker(name string) error {
 	}
 
 	if err := o.Manifest.Read(); err != nil {
-		return fmt.Errorf("broekr manifest: %w", err)
+		return fmt.Errorf("broker manifest: %w", err)
 	}
 
 	log.Println("Updating manifest")

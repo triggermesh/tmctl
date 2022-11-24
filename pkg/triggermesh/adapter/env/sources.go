@@ -47,7 +47,6 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/cloudeventssource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudauditlogssource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudbillingsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudiotsource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudpubsubsource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudsourcerepositoriessource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudstoragesource"
@@ -201,12 +200,6 @@ func sources(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return googlecloudbillingsource.MakeAppEnv(o), nil
-	case "GoogleCloudIoTSource":
-		var o *sourcesv1alpha1.GoogleCloudIoTSource
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
-		}
-		return googlecloudiotsource.MakeAppEnv(o), nil
 	case "GoogleCloudPubSubSource":
 		var o *sourcesv1alpha1.GoogleCloudPubSubSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
