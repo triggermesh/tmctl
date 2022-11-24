@@ -35,7 +35,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/wiretap"
 )
 
-type WatchOptions struct {
+type watchOptions struct {
 	ConfigDir  string
 	EventTypes string
 	Source     string
@@ -49,7 +49,7 @@ type brokerLog struct {
 }
 
 func NewCmd() *cobra.Command {
-	o := WatchOptions{}
+	o := watchOptions{}
 	watchCmd := &cobra.Command{
 		Use:   "watch [broker]",
 		Short: "Watch events flowing through the broker",
@@ -64,13 +64,11 @@ func NewCmd() *cobra.Command {
 			return o.watch(viper.GetString("context"))
 		},
 	}
-
 	watchCmd.Flags().StringVarP(&o.EventTypes, "event-types", "e", "", "Filter events based on type attribute")
-
 	return watchCmd
 }
 
-func (o *WatchOptions) watch(broker string) error {
+func (o *watchOptions) watch(broker string) error {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 

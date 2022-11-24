@@ -36,7 +36,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-func (o *CreateOptions) NewTargetCmd() *cobra.Command {
+func (o *createOptions) NewTargetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use: "target [kind]/[--from-image <image>][--name <name>][--source <name>,<name>...][--event-types <type>,<type>...]",
 		// Short:              "TriggerMesh target",
@@ -100,7 +100,7 @@ func (o *CreateOptions) NewTargetCmd() *cobra.Command {
 	}
 }
 
-func (o *CreateOptions) target(name, kind string, args map[string]string, eventSourcesFilter, eventTypesFilter []string) error {
+func (o *createOptions) target(name, kind string, args map[string]string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
 
 	et, err := o.translateEventSource(eventSourcesFilter)
@@ -154,7 +154,7 @@ func (o *CreateOptions) target(name, kind string, args map[string]string, eventS
 	return nil
 }
 
-func (o *CreateOptions) createTrigger(name string, target triggermesh.Component, filter *eventingbroker.Filter) (triggermesh.Component, error) {
+func (o *createOptions) createTrigger(name string, target triggermesh.Component, filter *eventingbroker.Filter) (triggermesh.Component, error) {
 	trigger, err := tmbroker.NewTrigger(name, o.Context, o.ConfigBase, target, filter)
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func (o *CreateOptions) createTrigger(name string, target triggermesh.Component,
 	return trigger, nil
 }
 
-func (o *CreateOptions) updateTriggers(target triggermesh.Component) error {
+func (o *createOptions) updateTriggers(target triggermesh.Component) error {
 	triggers, err := tmbroker.GetTargetTriggers(target.GetName(), o.Context, o.ConfigBase)
 	if err != nil {
 		return fmt.Errorf("target triggers: %w", err)
@@ -182,7 +182,7 @@ func (o *CreateOptions) updateTriggers(target triggermesh.Component) error {
 	return nil
 }
 
-func (o *CreateOptions) targetFromImage(name, image string, params map[string]string, eventSourcesFilter, eventTypesFilter []string) error {
+func (o *createOptions) targetFromImage(name, image string, params map[string]string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
 
 	et, err := o.translateEventSource(eventSourcesFilter)
