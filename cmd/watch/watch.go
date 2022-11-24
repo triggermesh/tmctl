@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/signal"
 	"path"
@@ -31,6 +30,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/wiretap"
 )
 
@@ -74,6 +74,7 @@ func (o *WatchOptions) watch(broker string) error {
 			log.Printf("Cleanup: %v", err)
 		}
 	}()
+	log.Println("Connecting to broker")
 	logs, err := w.CreateAdapter(ctx)
 	if err != nil {
 		return fmt.Errorf("create container: %w", err)
@@ -84,7 +85,7 @@ func (o *WatchOptions) watch(broker string) error {
 	log.Println("Watching...")
 	go listenLogs(logs, c)
 	<-c
-	log.Println("Exiting")
+	log.Println("Cleaning up")
 	return nil
 }
 

@@ -19,7 +19,6 @@ package delete
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"strings"
@@ -32,6 +31,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
+	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"

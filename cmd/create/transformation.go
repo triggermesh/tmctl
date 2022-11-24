@@ -20,15 +20,14 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"log"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
 	"github.com/triggermesh/tmctl/pkg/completion"
+	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/output"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
@@ -157,6 +156,13 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 		return err
 	}
 
+	// update our triggers in case of target container restart
+	if restart {
+		if err := o.updateTriggers(t); err != nil {
+			return err
+		}
+	}
+
 	var targetTriggers []triggermesh.Component
 	// creating new trigger from transformation to target
 	if targetComponent != nil {
@@ -176,7 +182,8 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 		}
 		for _, component := range targetTriggers {
 			trigger := component.(*tmbroker.Trigger)
-			if len(trigger.Filters) != 1 || !reflect.DeepEqual(trigger.Filters[0], *filter) {
+			if trigger.Filters[0].Exact == nil ||
+				trigger.Filters[0].Exact["type"] != et {
 				continue
 			}
 			if err := trigger.RemoveFromLocalConfig(); err != nil {
@@ -190,6 +197,10 @@ func (o *CreateOptions) transformation(name, target, file string, eventSourcesFi
 
 	if len(eventTypesFilter) == 0 {
 		for _, trigger := range targetTriggers {
+			if len(trigger.(*tmbroker.Trigger).Filters) == 1 &&
+				trigger.(*tmbroker.Trigger).Filters[0].Exact["type"] == transformationEventType {
+				continue
+			}
 			trigger.(*tmbroker.Trigger).SetTarget(t)
 			if err := trigger.(*tmbroker.Trigger).WriteLocalConfig(); err != nil {
 				return err

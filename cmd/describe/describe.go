@@ -131,7 +131,7 @@ func (o DescribeOptions) describe(b string) error {
 						et = []string{"*"}
 					}
 					producersPrint = true
-					fmt.Fprintf(producers, "%s\tkn-service (%s)\t%s\t%s\n", c.GetName(), service.Image, strings.Join(et, ", "), status(c))
+					fmt.Fprintf(producers, "%s\tservice (%s)\t%s\t%s\n", c.GetName(), service.Image, strings.Join(et, ", "), status(c))
 				}
 				if service.IsTarget() {
 					et, _ := c.(triggermesh.Consumer).ConsumedEventTypes()
@@ -139,7 +139,7 @@ func (o DescribeOptions) describe(b string) error {
 						et = []string{"*"}
 					}
 					consumersPrint = true
-					fmt.Fprintf(consumers, "%s\tkn-service (%s)\t%s\t%s\n", c.GetName(), service.Image, strings.Join(et, ", "), status(c))
+					fmt.Fprintf(consumers, "%s\tservice (%s)\t%s\t%s\n", c.GetName(), service.Image, strings.Join(et, ", "), status(c))
 				}
 			}
 			// transformation

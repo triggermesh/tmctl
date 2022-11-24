@@ -19,12 +19,12 @@ package create
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/output"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"

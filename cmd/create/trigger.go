@@ -18,11 +18,11 @@ package create
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/spf13/cobra"
 
 	"github.com/triggermesh/tmctl/pkg/completion"
+	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"

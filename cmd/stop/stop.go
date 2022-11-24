@@ -19,13 +19,13 @@ package stop
 import (
 	"context"
 	"fmt"
-	"log"
 	"path"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/triggermesh/tmctl/pkg/docker"
+	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
