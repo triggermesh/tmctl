@@ -19,6 +19,7 @@ package watch
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -38,6 +39,13 @@ type WatchOptions struct {
 	ConfigDir  string
 	EventTypes string
 	Source     string
+}
+
+type brokerLog struct {
+	Level  string `json:"level"`
+	Logger string `json:"logger"`
+	Msg    string `json:"msg"`
+	Name   string `json:"name"`
 }
 
 func NewCmd() *cobra.Command {
@@ -68,28 +76,58 @@ func (o *WatchOptions) watch(broker string) error {
 
 	ctx := context.Background()
 
-	w := wiretap.New(broker, o.ConfigDir)
+	w, err := wiretap.New(broker, o.ConfigDir)
+	if err != nil {
+		return fmt.Errorf("wiretap: %w", err)
+	}
 	defer func() {
 		if err := w.Cleanup(ctx); err != nil {
 			log.Printf("Cleanup: %v", err)
 		}
 	}()
 	log.Println("Connecting to broker")
-	logs, err := w.CreateAdapter(ctx)
+	eventDisplayLogs, err := w.CreateAdapter(ctx)
 	if err != nil {
 		return fmt.Errorf("create container: %w", err)
 	}
 	if err := w.CreateTrigger(strings.Split(o.EventTypes, ",")); err != nil {
 		return fmt.Errorf("create trigger: %w", err)
 	}
+	brokerLogs, err := w.BrokerLogs(ctx)
+	if err != nil {
+		return fmt.Errorf("broker logs: %w", err)
+	}
 	log.Println("Watching...")
-	go listenLogs(logs, c)
+	go listenBroker(brokerLogs, c)
+	go listenEvents(eventDisplayLogs, c)
 	<-c
 	log.Println("Cleaning up")
 	return nil
 }
 
-func listenLogs(output io.ReadCloser, done chan os.Signal) {
+func listenEvents(output io.ReadCloser, done chan os.Signal) {
+	readLogs(output, done, func(data []byte) {
+		fmt.Println(string(data))
+	})
+}
+
+func listenBroker(output io.ReadCloser, done chan os.Signal) {
+	readLogs(output, done, func(data []byte) {
+		var logItem brokerLog
+		if err := json.Unmarshal(data, &logItem); err != nil {
+			return
+		}
+		if logItem.Level == "error" {
+			fmt.Printf("❗ error: %s", logItem)
+			return
+		}
+		if logItem.Logger == "subs" {
+			fmt.Printf("🔧 configuration: %s: %s\n", logItem.Msg, logItem.Name)
+		}
+	})
+}
+
+func readLogs(output io.ReadCloser, done chan os.Signal, handler func([]byte)) {
 	scanner := bufio.NewScanner(output)
 	for scanner.Scan() {
 		select {
@@ -101,7 +139,7 @@ func listenLogs(output io.ReadCloser, done chan os.Signal) {
 			if len(log) > 8 {
 				log = log[8:]
 			}
-			fmt.Println(string(log))
+			handler(log)
 		}
 	}
 }

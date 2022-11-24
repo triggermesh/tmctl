@@ -176,7 +176,7 @@ func New(name, crdFile, kind, broker, version string, params interface{}) trigge
 
 	// kind initially can be awss3, webhook, etc.
 	k := strings.ToLower(kind)
-	if !strings.Contains(k, "target") {
+	if !strings.HasSuffix(k, "target") {
 		k = fmt.Sprintf("%starget", kind)
 	}
 
