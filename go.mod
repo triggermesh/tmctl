@@ -15,9 +15,9 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.12.0
-	github.com/triggermesh/brokers v0.0.0-20221102122724-2474a474b653
+	github.com/triggermesh/brokers v0.0.0-20221123123337-aa4b29238452
 	github.com/triggermesh/triggermesh v1.21.2-0.20221108094818-4aef4699eb85
-	github.com/triggermesh/triggermesh-core v0.0.0-20221031193346-a2f2c6b771bd
+	github.com/triggermesh/triggermesh-core v0.0.0-20221124033527-19f51da8a54b
 	google.golang.org/api v0.102.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.25.3
@@ -111,7 +111,7 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/prometheus/statsd_exporter v0.21.0 // indirect
-	github.com/rickb777/date v1.20.0 // indirect
+	github.com/rickb777/date v1.20.1 // indirect
 	github.com/rickb777/plural v1.4.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/afero v1.8.2 // indirect
@@ -123,7 +123,7 @@ require (
 	github.com/tidwall/gjson v1.14.3 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
-	go.opencensus.io v0.23.0 // indirect
+	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.23.0 // indirect
