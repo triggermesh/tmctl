@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/spf13/viper"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
@@ -43,7 +44,6 @@ const (
 	APIVersion  = "eventing.triggermesh.io/v1alpha1"
 
 	brokerConfigFile = "broker.conf"
-	image            = "gcr.io/triggermesh/memory-broker:dev"
 )
 
 type Broker struct {
@@ -81,7 +81,7 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
-	co, ho, err := adapter.RuntimeParams(o, image, additionalEnvs)
+	co, ho, err := adapter.RuntimeParams(o, viper.GetString("triggermesh.broker.image"), additionalEnvs)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
@@ -89,9 +89,9 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 		"/memory-broker",
 		"start",
 		"--memory.buffer-size",
-		"100",
+		viper.GetString("triggermesh.broker.memory.buffer-size"),
 		"--memory.produce-timeout",
-		"1s",
+		viper.GetString("triggermesh.broker.memory.produce-timeout"),
 		"--broker-config-path",
 		"/etc/triggermesh/broker.conf",
 	}))
@@ -105,7 +105,7 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 	}
 	return &docker.Container{
 		Name:                   name,
-		Image:                  image,
+		Image:                  viper.GetString("triggermesh.broker.image"),
 		CreateHostOptions:      ho,
 		CreateContainerOptions: co,
 	}, nil

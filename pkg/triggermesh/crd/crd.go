@@ -17,7 +17,6 @@ limitations under the License.
 package crd
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,8 +31,7 @@ import (
 )
 
 const (
-	ghLatestRelease = "https://api.github.com/repos/triggermesh/triggermesh/releases/latest"
-	crdsURL         = "https://github.com/triggermesh/triggermesh/releases/download/$VERSION/triggermesh-crds.yaml"
+	crdsURL = "https://github.com/triggermesh/triggermesh/releases/download/$VERSION/triggermesh-crds.yaml"
 )
 
 type CRD struct {
@@ -76,30 +74,8 @@ type EventTypes []struct {
 	Type string `json:"type"`
 }
 
-type release struct {
-	TagName string `json:"tag_name"`
-}
-
-func latest() (string, error) {
-	r, err := http.Get(ghLatestRelease)
-	if err != nil {
-		return "", fmt.Errorf("latest release request: %w", err)
-	}
-	defer r.Body.Close()
-	if r.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("latest release status: %w", err)
-	}
-	var j release
-	return j.TagName, json.NewDecoder(r.Body).Decode(&j)
-}
-
 func Fetch(configDir, version string) (string, error) {
 	var err error
-	if version == "latest" {
-		if version, err = latest(); err != nil {
-			return "", fmt.Errorf("cannot fetch \"latest\" version: %w", err)
-		}
-	}
 	url := strings.ReplaceAll(crdsURL, "$VERSION", version)
 	crdDir := path.Join(configDir, "crd", version)
 	if err := os.MkdirAll(crdDir, os.ModePerm); err != nil {

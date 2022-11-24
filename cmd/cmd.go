@@ -37,8 +37,6 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
 
-const defaultBroker = ""
-
 func NewRootCommand(ver, commit string) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "tmctl",
@@ -51,8 +49,8 @@ Find more information at: https://docs.triggermesh.io`,
 
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().String("version", triggermesh.DefaultVersion, "TriggerMesh components version.")
-	rootCmd.PersistentFlags().String("broker", defaultBroker, "Optional broker name.")
+	rootCmd.PersistentFlags().String("version", "", "TriggerMesh components version.")
+	rootCmd.PersistentFlags().String("broker", "", "Optional broker name.")
 	// rootCmd.PersistentFlags().MarkHidden("broker")
 
 	cobra.CheckErr(viper.BindPFlag("context", rootCmd.PersistentFlags().Lookup("broker")))
@@ -94,8 +92,9 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			cobra.CheckErr(os.MkdirAll(configHome, os.ModePerm))
-			viper.SetDefault("context", defaultBroker)
-			viper.SetDefault("triggermesh.version", triggermesh.DefaultVersion)
+			for k, v := range triggermesh.DefaultConfig {
+				viper.SetDefault(k, v)
+			}
 			cobra.CheckErr(viper.SafeWriteConfig())
 			cobra.CheckErr(viper.ReadInConfig())
 		} else {
