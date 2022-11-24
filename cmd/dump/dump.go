@@ -17,12 +17,9 @@ limitations under the License.
 package dump
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -31,27 +28,22 @@ import (
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-type dumpOptions struct {
+type DumpOptions struct {
 	Format   string
 	Context  string
-	Version  string
-	CRD      string
 	Manifest *manifest.Manifest
 }
 
 func NewCmd() *cobra.Command {
-	o := &dumpOptions{}
+	o := &DumpOptions{}
 	knativeEventing := false
 	dumpCmd := &cobra.Command{
 		Use:   "dump [broker]",
 		Short: "Generate Kubernetes manifest",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.Version = viper.GetString("triggermesh.version")
 			broker := viper.GetString("context")
 			if len(args) == 1 {
 				broker = args[0]
@@ -59,9 +51,6 @@ func NewCmd() *cobra.Command {
 			o.Context = broker
 			o.Manifest = manifest.New(path.Join(path.Dir(viper.ConfigFileUsed()), broker, triggermesh.ManifestFile))
 			cobra.CheckErr(o.Manifest.Read())
-			crds, err := crd.Fetch(path.Dir(viper.ConfigFileUsed()), o.Version)
-			cobra.CheckErr(err)
-			o.CRD = crds
 			return o.dump(knativeEventing)
 		},
 	}
@@ -70,48 +59,37 @@ func NewCmd() *cobra.Command {
 	return dumpCmd
 }
 
-func (o *dumpOptions) dump(useKnativeEventing bool) error {
-	var externalReconcilable []string
-	for _, object := range o.Manifest.Objects {
-		if component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest); err == nil {
-			if _, ok := component.(triggermesh.Reconcilable); ok {
-				if container, ok := component.(triggermesh.Runnable); ok {
-					if _, err := container.Info(context.Background()); err == nil {
-						externalReconcilable = append(externalReconcilable, component.GetName())
-					}
-				}
-			}
+func (o *DumpOptions) dump(useKnativeEventing bool) error {
+	if useKnativeEventing {
+		for i, object := range o.Manifest.Objects {
+			o.Manifest.Objects[i] = o.knativeEventingTranformation(object)
 		}
-		if useKnativeEventing {
-			object = o.knativeEventingTransformation(object)
-		}
-		switch o.Format {
-		case "json":
+	}
+	switch o.Format {
+	case "json":
+		for _, object := range o.Manifest.Objects {
 			jsn, err := json.MarshalIndent(object, "", "  ")
 			if err != nil {
 				return err
 			}
 			fmt.Println(string(jsn))
-		case "yaml":
+		}
+	case "yaml":
+		for _, object := range o.Manifest.Objects {
 			yml, err := yaml.Marshal(object)
 			if err != nil {
 				return err
 			}
 			fmt.Println("---")
 			fmt.Println(string(yml))
-		default:
-			return fmt.Errorf("format %q is not supported", o.Format)
 		}
-	}
-	if len(externalReconcilable) != 0 {
-		fmt.Fprintf(os.Stderr, "\nWARNING: manifest contains running components that use external shared resources to produce events.\n"+
-			"It is strongly recommended to stop the broker before deploying integration in the cluster to avoid events read race conditions.\n"+
-			"Components with external resources: %s\n", strings.Join(externalReconcilable, ", "))
+	default:
+		return fmt.Errorf("format %q is not supported", o.Format)
 	}
 	return nil
 }
 
-func (o *dumpOptions) knativeEventingTransformation(object kubernetes.Object) kubernetes.Object {
+func (o *DumpOptions) knativeEventingTranformation(object kubernetes.Object) kubernetes.Object {
 	switch object.APIVersion {
 	case tmbroker.APIVersion:
 		switch object.Kind {

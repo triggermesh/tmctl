@@ -27,7 +27,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-func (o *createOptions) sourcesCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func (o *CreateOptions) sourcesCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
 		sources, err := crd.ListSources(o.CRD)
 		if err != nil {
@@ -100,7 +100,7 @@ func (o *createOptions) sourcesCompletion(cmd *cobra.Command, args []string, toC
 	return append(spec, "--name\tOptional component name."), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 }
 
-func (o *createOptions) targetsCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func (o *CreateOptions) targetsCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
 		targets, err := crd.ListTargets(o.CRD)
 		if err != nil {
