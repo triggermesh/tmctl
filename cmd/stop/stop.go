@@ -31,13 +31,13 @@ import (
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
-type StopOptions struct {
+type stopOptions struct {
 	ConfigBase string
 	Manifest   *manifest.Manifest
 }
 
 func NewCmd() *cobra.Command {
-	o := &StopOptions{}
+	o := &stopOptions{}
 	stopCmd := &cobra.Command{
 		Use:       "stop [broker]",
 		Short:     "Stops TriggerMesh components",
@@ -53,11 +53,10 @@ func NewCmd() *cobra.Command {
 			return o.stop(broker)
 		},
 	}
-
 	return stopCmd
 }
 
-func (o *StopOptions) stop(broker string) error {
+func (o *stopOptions) stop(broker string) error {
 	ctx := context.Background()
 	client, err := docker.NewClient()
 	if err != nil {

@@ -33,7 +33,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-type StartOptions struct {
+type startOptions struct {
 	ConfigBase string
 	Context    string
 	Version    string
@@ -43,7 +43,7 @@ type StartOptions struct {
 }
 
 func NewCmd() *cobra.Command {
-	o := &StartOptions{}
+	o := &startOptions{}
 	createCmd := &cobra.Command{
 		Use:   "start [broker]",
 		Short: "Starts TriggerMesh components",
@@ -66,7 +66,7 @@ func NewCmd() *cobra.Command {
 	return createCmd
 }
 
-func (o *StartOptions) initialize() {
+func (o *startOptions) initialize() {
 	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
@@ -76,7 +76,7 @@ func (o *StartOptions) initialize() {
 	o.CRD = crds
 }
 
-func (o *StartOptions) start(broker string) error {
+func (o *startOptions) start(broker string) error {
 	ctx := context.Background()
 	var brokerPort string
 	// start eventing first

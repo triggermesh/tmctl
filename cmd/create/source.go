@@ -34,7 +34,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-func (o *CreateOptions) NewSourceCmd() *cobra.Command {
+func (o *createOptions) NewSourceCmd() *cobra.Command {
 	return &cobra.Command{
 		Use: "source [kind]/[--from-image <image>][--name <name>]",
 		// Short:              "TriggerMesh source",
@@ -86,7 +86,7 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 	}
 }
 
-func (o *CreateOptions) source(name, kind string, params map[string]string) error {
+func (o *createOptions) source(name, kind string, params map[string]string) error {
 	ctx := context.Background()
 	broker, err := tmbroker.New(o.Context, o.Manifest.Path)
 	if err != nil {
@@ -134,7 +134,7 @@ func (o *CreateOptions) source(name, kind string, params map[string]string) erro
 	return nil
 }
 
-func (o *CreateOptions) sourceFromImage(name, image string, params map[string]string) error {
+func (o *createOptions) sourceFromImage(name, image string, params map[string]string) error {
 	ctx := context.Background()
 	broker, err := tmbroker.New(o.Context, o.Manifest.Path)
 	if err != nil {
