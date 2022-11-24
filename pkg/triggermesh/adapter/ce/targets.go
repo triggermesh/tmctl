@@ -180,8 +180,6 @@ func targets(object unstructured.Unstructured) (EventAttributes, error) {
 			ProducedEventSource: o.AsEventSource(),
 			AcceptedEventTypes:  o.AcceptedEventTypes(),
 		}, nil
-	case "InfraTarget":
-		return EventAttributes{}, nil
 	case "JiraTarget":
 		var o *targetsv1alpha1.JiraTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -257,16 +255,6 @@ func targets(object unstructured.Unstructured) (EventAttributes, error) {
 		}, nil
 	case "TwilioTarget":
 		var o *targetsv1alpha1.TwilioTarget
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return EventAttributes{}, err
-		}
-		return EventAttributes{
-			ProducedEventTypes:  o.GetEventTypes(),
-			ProducedEventSource: o.AsEventSource(),
-			AcceptedEventTypes:  o.AcceptedEventTypes(),
-		}, nil
-	case "UiPathTarget":
-		var o *targetsv1alpha1.UiPathTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
 			return EventAttributes{}, err
 		}
