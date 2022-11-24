@@ -38,6 +38,10 @@ const (
 	Namespace      = "local"
 	ManifestFile   = "manifest.yaml"
 
+	// objects meta
+	ContextLabel                = "triggermesh.io/context"
+	ExternalResourcesAnnotation = "triggermesh.io/external-resources"
+
 	// version default parameters
 	ghLatestRelease = "https://api.github.com/repos/triggermesh/triggermesh/releases/latest"
 	defaultVersion  = "v1.21.1"

@@ -55,7 +55,7 @@ type Source struct {
 }
 
 func (s *Source) asUnstructured() (unstructured.Unstructured, error) {
-	return kubernetes.CreateUnstructured(s.GetKind(), s.GetName(), triggermesh.Namespace, s.Broker, s.CRDFile, s.spec, s.status)
+	return kubernetes.CreateUnstructured(s.GetKind(), s.CRDFile, s.getMeta(), s.spec, s.status)
 }
 
 func (s *Source) AsK8sObject() (kubernetes.Object, error) {
@@ -70,7 +70,26 @@ func (s *Source) AsK8sObject() (kubernetes.Object, error) {
 			"apiVersion": tmbroker.APIVersion,
 		},
 	}
-	return kubernetes.CreateObject(s.GetKind(), s.GetName(), triggermesh.Namespace, s.Broker, s.CRDFile, spec)
+	return kubernetes.CreateObject(s.GetKind(), s.CRDFile, s.getMeta(), spec)
+}
+
+func (s *Source) getMeta() kubernetes.Metadata {
+	meta := kubernetes.Metadata{
+		Name:      s.GetName(),
+		Namespace: triggermesh.Namespace,
+		Labels: map[string]string{
+			triggermesh.ContextLabel: s.Broker,
+		},
+		Annotations: make(map[string]string, 0),
+	}
+	var externalResources []string
+	for k, v := range s.status {
+		externalResources = append(externalResources, fmt.Sprintf("%s=%s", k, v))
+	}
+	if len(externalResources) != 0 {
+		meta.Annotations[triggermesh.ExternalResourcesAnnotation] = strings.Join(externalResources, ",")
+	}
+	return meta
 }
 
 func (s *Source) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {
@@ -227,7 +246,11 @@ func (s *Source) UpdateStatus(status map[string]interface{}) {
 	s.status = status
 }
 
-func New(name, crdFile, kind, broker, version string, params interface{}) triggermesh.Component {
+func (s *Source) GetExternalResources() map[string]interface{} {
+	return s.status
+}
+
+func New(name, crdFile, kind, broker, version string, params interface{}, status map[string]interface{}) triggermesh.Component {
 	var spec map[string]interface{}
 	switch p := params.(type) {
 	case map[string]string:
@@ -255,5 +278,6 @@ func New(name, crdFile, kind, broker, version string, params interface{}) trigge
 		Kind:    k,
 		Version: version,
 		spec:    spec,
+		status:  status,
 	}
 }

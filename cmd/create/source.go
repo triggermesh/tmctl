@@ -34,7 +34,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-func (o *CreateOptions) NewSourceCmd() *cobra.Command {
+func (o *createOptions) NewSourceCmd() *cobra.Command {
 	return &cobra.Command{
 		Use: "source [kind]/[--from-image <image>][--name <name>]",
 		// Short:              "TriggerMesh source",
@@ -86,7 +86,7 @@ func (o *CreateOptions) NewSourceCmd() *cobra.Command {
 	}
 }
 
-func (o *CreateOptions) source(name, kind string, params map[string]string) error {
+func (o *createOptions) source(name, kind string, params map[string]string) error {
 	ctx := context.Background()
 	broker, err := tmbroker.New(o.Context, o.Manifest.Path)
 	if err != nil {
@@ -98,7 +98,7 @@ func (o *CreateOptions) source(name, kind string, params map[string]string) erro
 	}
 	params["sink.uri"] = "http://host.docker.internal:" + port
 
-	s := source.New(name, o.CRD, kind, o.Context, o.Version, params)
+	s := source.New(name, o.CRD, kind, o.Context, o.Version, params, nil)
 
 	secrets, secretsEnv, err := components.ProcessSecrets(s.(triggermesh.Parent), o.Manifest)
 	if err != nil {
@@ -116,16 +116,17 @@ func (o *CreateOptions) source(name, kind string, params map[string]string) erro
 			secretsChanged = true
 		}
 	}
-	restart, err := o.Manifest.Add(s)
-	if err != nil {
-		return fmt.Errorf("unable to update manifest: %w", err)
-	}
 
 	status, err := s.(triggermesh.Reconcilable).Initialize(ctx, secretsEnv)
 	if err != nil {
 		return fmt.Errorf("source initialization: %w", err)
 	}
 	s.(triggermesh.Reconcilable).UpdateStatus(status)
+
+	restart, err := o.Manifest.Add(s)
+	if err != nil {
+		return fmt.Errorf("unable to update manifest: %w", err)
+	}
 	log.Println("Starting container")
 	if _, err := s.(triggermesh.Runnable).Start(ctx, secretsEnv, (restart || secretsChanged)); err != nil {
 		return err
@@ -134,7 +135,7 @@ func (o *CreateOptions) source(name, kind string, params map[string]string) erro
 	return nil
 }
 
-func (o *CreateOptions) sourceFromImage(name, image string, params map[string]string) error {
+func (o *createOptions) sourceFromImage(name, image string, params map[string]string) error {
 	ctx := context.Background()
 	broker, err := tmbroker.New(o.Context, o.Manifest.Path)
 	if err != nil {

@@ -44,7 +44,7 @@ const (
 	offlineColorCode = "\u001b[31m"
 )
 
-type DescribeOptions struct {
+type describeOptions struct {
 	ConfigBase string
 	CRD        string
 	Version    string
@@ -52,7 +52,7 @@ type DescribeOptions struct {
 }
 
 func NewCmd() *cobra.Command {
-	o := &DescribeOptions{}
+	o := &describeOptions{}
 	return &cobra.Command{
 		Use:   "describe [broker]",
 		Short: "Show broker status",
@@ -78,7 +78,7 @@ func NewCmd() *cobra.Command {
 	}
 }
 
-func (o DescribeOptions) describe(b string) error {
+func (o *describeOptions) describe(b string) error {
 	broker := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
 	triggers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
 	producers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)

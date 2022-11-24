@@ -39,7 +39,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-type DeleteOptions struct {
+type deleteOptions struct {
 	ConfigBase string
 	Context    string
 	Version    string
@@ -48,7 +48,7 @@ type DeleteOptions struct {
 }
 
 func NewCmd() *cobra.Command {
-	o := &DeleteOptions{}
+	o := &deleteOptions{}
 	var broker string
 	deleteCmd := &cobra.Command{
 		Use:               "delete <component_name_1, component_name_2...> [--broker <name>]",
@@ -76,7 +76,7 @@ func NewCmd() *cobra.Command {
 	return deleteCmd
 }
 
-func (o *DeleteOptions) initialize() {
+func (o *deleteOptions) initialize() {
 	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
@@ -90,7 +90,7 @@ func (o *DeleteOptions) initialize() {
 	_ = o.Manifest.Read()
 }
 
-func (o *DeleteOptions) deleteBroker(broker string) error {
+func (o *deleteOptions) deleteBroker(broker string) error {
 	oo := *o
 	oo.Context = broker
 	oo.Manifest = manifest.New(path.Join(oo.ConfigBase, broker, triggermesh.ManifestFile))
@@ -108,7 +108,7 @@ func (o *DeleteOptions) deleteBroker(broker string) error {
 	return nil
 }
 
-func (o *DeleteOptions) deleteComponents(names []string, deleteBroker bool) error {
+func (o *deleteOptions) deleteComponents(names []string, deleteBroker bool) error {
 	ctx := context.Background()
 	client, err := docker.NewClient()
 	if err != nil {
@@ -143,13 +143,13 @@ func (o *DeleteOptions) deleteComponents(names []string, deleteBroker bool) erro
 	return nil
 }
 
-func (o *DeleteOptions) deleteEverything(ctx context.Context, object kubernetes.Object, client *client.Client) {
+func (o *deleteOptions) deleteEverything(ctx context.Context, object kubernetes.Object, client *client.Client) {
 	log.Printf("Deleting %q %s", object.Metadata.Name, strings.ToLower(object.Kind))
 	if object.Kind == tmbroker.BrokerKind {
 		object.Metadata.Name = object.Metadata.Name + "-broker"
 	}
-	if err := o.removeExternalServices(ctx, object); err != nil {
-		log.Printf("WARN: external services are not deleted: %v", err)
+	if err := o.removeExternalServices(ctx, object); err != nil && !strings.HasPrefix(err.Error(), "Unsubscribed from topic") {
+		log.Printf("WARNING: external services are not deleted: %v", err)
 	}
 	// not all components are runnable, but removeContainer should try to stop it anyway
 	_ = o.removeContainer(ctx, object.Metadata.Name, client)
@@ -158,7 +158,7 @@ func (o *DeleteOptions) deleteEverything(ctx context.Context, object kubernetes.
 	o.cleanupSecrets(object.Metadata.Name)
 }
 
-func (o *DeleteOptions) removeObject(component string) {
+func (o *deleteOptions) removeObject(component string) {
 	for _, object := range o.Manifest.Objects {
 		if component != object.Metadata.Name {
 			continue
@@ -179,11 +179,11 @@ func (o *DeleteOptions) removeObject(component string) {
 	}
 }
 
-func (o *DeleteOptions) removeContainer(ctx context.Context, name string, client *client.Client) error {
+func (o *deleteOptions) removeContainer(ctx context.Context, name string, client *client.Client) error {
 	return docker.ForceStop(ctx, name, client)
 }
 
-func (o *DeleteOptions) cleanupTriggers(target string) {
+func (o *deleteOptions) cleanupTriggers(target string) {
 	triggers, err := tmbroker.GetTargetTriggers(target, o.Context, o.ConfigBase)
 	if err != nil {
 		return
@@ -199,7 +199,7 @@ func (o *DeleteOptions) cleanupTriggers(target string) {
 	}
 }
 
-func (o *DeleteOptions) cleanupSecrets(component string) {
+func (o *deleteOptions) cleanupSecrets(component string) {
 	for _, object := range o.Manifest.Objects {
 		if object.Metadata.Name == component+"-secret" && object.Kind == "Secret" {
 			if err := o.Manifest.Remove(object.Metadata.Name, object.Kind); err != nil {
@@ -209,7 +209,7 @@ func (o *DeleteOptions) cleanupSecrets(component string) {
 	}
 }
 
-func (o *DeleteOptions) removeExternalServices(ctx context.Context, object kubernetes.Object) error {
+func (o *deleteOptions) removeExternalServices(ctx context.Context, object kubernetes.Object) error {
 	component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest)
 	if err != nil {
 		return err
@@ -229,7 +229,7 @@ func (o *DeleteOptions) removeExternalServices(ctx context.Context, object kuber
 	return r.Finalize(ctx, secretsEnv)
 }
 
-func (o *DeleteOptions) switchContext() error {
+func (o *deleteOptions) switchContext() error {
 	list, err := brokers.List(o.ConfigBase, o.Context)
 	if err != nil {
 		return fmt.Errorf("list brokers: %w", err)
@@ -243,7 +243,7 @@ func (o *DeleteOptions) switchContext() error {
 	return viper.WriteConfig()
 }
 
-func (o *DeleteOptions) deleteCompletion(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+func (o *deleteOptions) deleteCompletion(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
 		return append(completion.ListAll(o.Manifest), "--broker"),
 			cobra.ShellCompDirectiveNoFileComp

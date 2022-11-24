@@ -61,7 +61,7 @@ For more samples please visit:
 https://github.com/triggermesh/triggermesh/tree/main/config/samples/bumblebee`
 )
 
-func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
+func (o *createOptions) NewTransformationCmd() *cobra.Command {
 	var name, target, file string
 	var eventSourcesFilter, eventTypesFilter []string
 	transformationCmd := &cobra.Command{
@@ -94,7 +94,7 @@ func (o *CreateOptions) NewTransformationCmd() *cobra.Command {
 	return transformationCmd
 }
 
-func (o *CreateOptions) transformation(name, target, file string, eventSourcesFilter, eventTypesFilter []string) error {
+func (o *createOptions) transformation(name, target, file string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
 	var targetComponent triggermesh.Component
 	if target != "" {
@@ -239,7 +239,7 @@ func readInput() (string, error) {
 	return lines, scn.Err()
 }
 
-func (o *CreateOptions) lookupTarget(ctx context.Context, target string) (triggermesh.Component, error) {
+func (o *createOptions) lookupTarget(ctx context.Context, target string) (triggermesh.Component, error) {
 	targetObject, err := components.GetObject(target, o.CRD, o.Version, o.Manifest)
 	if err != nil {
 		return nil, fmt.Errorf("transformation target: %w", err)

@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"path"
+	"strings"
 
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
@@ -40,7 +41,17 @@ func GetObject(name, crdFile, version string, manifest *manifest.Manifest) (trig
 			}
 			switch object.APIVersion {
 			case "sources.triggermesh.io/v1alpha1":
-				return source.New(object.Metadata.Name, crdFile, object.Kind, broker, version, object.Spec), nil
+				status := make(map[string]interface{}, 0)
+				externalResources, set := object.Metadata.Annotations[triggermesh.ExternalResourcesAnnotation]
+				if set {
+					for _, resource := range strings.Split(externalResources, ",") {
+						entry := strings.Split(resource, "=")
+						if len(entry) == 2 {
+							status[entry[0]] = entry[1]
+						}
+					}
+				}
+				return source.New(object.Metadata.Name, crdFile, object.Kind, broker, version, object.Spec, status), nil
 			case "targets.triggermesh.io/v1alpha1":
 				return target.New(object.Metadata.Name, crdFile, object.Kind, broker, version, object.Spec), nil
 			case "flow.triggermesh.io/v1alpha1":

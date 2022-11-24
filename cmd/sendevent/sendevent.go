@@ -39,7 +39,7 @@ const (
 	defaultEventSource = "triggermesh-cli"
 )
 
-type SendOptions struct {
+type sendOptions struct {
 	Context   string
 	ConfigDir string
 	Version   string
@@ -48,7 +48,7 @@ type SendOptions struct {
 }
 
 func NewCmd() *cobra.Command {
-	o := &SendOptions{}
+	o := &sendOptions{}
 	var eventType, target string
 	sendCmd := &cobra.Command{
 		Use:   "send-event [--eventType <type>][--destination <name>] <data> ",
@@ -74,7 +74,7 @@ func NewCmd() *cobra.Command {
 	return sendCmd
 }
 
-func (o *SendOptions) initialize() {
+func (o *sendOptions) initialize() {
 	o.ConfigDir = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
@@ -88,7 +88,7 @@ func (o *SendOptions) initialize() {
 	_ = o.Manifest.Read()
 }
 
-func (o *SendOptions) send(eventType, target, data string) error {
+func (o *sendOptions) send(eventType, target, data string) error {
 	ctx := context.Background()
 	component, err := components.GetObject(target, o.CRD, o.Version, o.Manifest)
 	if err != nil {

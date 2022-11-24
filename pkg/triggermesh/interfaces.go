@@ -64,5 +64,7 @@ type Parent interface {
 type Reconcilable interface {
 	Initialize(context.Context, map[string]string) (map[string]interface{}, error)
 	Finalize(context.Context, map[string]string) error
+
 	UpdateStatus(map[string]interface{})
+	GetExternalResources() map[string]interface{}
 }

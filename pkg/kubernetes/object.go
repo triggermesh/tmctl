@@ -24,10 +24,6 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-const (
-	labelKey = "triggermesh.io/context"
-)
-
 type Object struct {
 	APIVersion string                 `json:"apiVersion" yaml:"apiVersion"`
 	Kind       string                 `json:"kind" yaml:"kind"`
@@ -40,19 +36,13 @@ type Object struct {
 }
 
 type Metadata struct {
-	Name            string            `json:"name" yaml:"name"`
-	Namespace       string            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-	Labels          map[string]string `json:"labels" yaml:"labels"`
-	OwnerReferences []struct {
-		APIVersion         string `json:"apiVersion" yaml:"apiVersion"`
-		BlockOwnerDeletion bool   `json:"blockOwnerDeletion" yaml:"blockOwnerDeletion"`
-		Kind               string `json:"kind" yaml:"kind"`
-		Name               string `json:"name" yaml:"name"`
-		UID                string `json:"uid" yaml:"uid"`
-	} `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Name        string            `json:"name" yaml:"name"`
+	Namespace   string            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Labels      map[string]string `json:"labels" yaml:"labels"`
+	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
-func CreateObject(resource, name, namespace, broker, crdFile string, spec map[string]interface{}) (Object, error) {
+func CreateObject(resource, crdFile string, metadata Metadata, spec map[string]interface{}) (Object, error) {
 	crdObject, err := crd.GetResourceCRD(resource, crdFile)
 	if err != nil {
 		return Object{}, fmt.Errorf("CRD schema not found: %w", err)
@@ -70,18 +60,12 @@ func CreateObject(resource, name, namespace, broker, crdFile string, spec map[st
 	return Object{
 		APIVersion: fmt.Sprintf("%s/%s", crdObject.Spec.Group, version),
 		Kind:       crdObject.Spec.Names.Kind,
-		Metadata: Metadata{
-			Name:      name,
-			Namespace: namespace,
-			Labels: map[string]string{
-				labelKey: broker,
-			},
-		},
-		Spec: spec,
+		Metadata:   metadata,
+		Spec:       spec,
 	}, nil
 }
 
-func CreateUnstructured(resource, name, namespace, broker, crdFile string, spec map[string]interface{}, status map[string]interface{}) (unstructured.Unstructured, error) {
+func CreateUnstructured(resource, crdFile string, metadata Metadata, spec, status map[string]interface{}) (unstructured.Unstructured, error) {
 	crdObject, err := crd.GetResourceCRD(resource, crdFile)
 	if err != nil {
 		return unstructured.Unstructured{}, fmt.Errorf("CRD schema not found: %w", err)
@@ -99,9 +83,10 @@ func CreateUnstructured(resource, name, namespace, broker, crdFile string, spec 
 	u := unstructured.Unstructured{}
 	u.SetAPIVersion(fmt.Sprintf("%s/%s", crdObject.Spec.Group, version))
 	u.SetKind(crdObject.Spec.Names.Kind)
-	u.SetName(name)
-	u.SetNamespace(namespace)
-	u.SetLabels(map[string]string{labelKey: broker})
+	u.SetName(metadata.Name)
+	u.SetNamespace(metadata.Namespace)
+	u.SetLabels(metadata.Labels)
+	u.SetAnnotations(metadata.Annotations)
 	for k, v := range spec {
 		switch val := v.(type) {
 		case []string:
