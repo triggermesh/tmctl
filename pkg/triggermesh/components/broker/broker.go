@@ -180,7 +180,6 @@ func New(name, manifestPath string) (triggermesh.Component, error) {
 	if err := os.MkdirAll(path.Dir(manifestPath), os.ModePerm); err != nil {
 		return nil, fmt.Errorf("broker dir creation: %w", err)
 	}
-
 	// create empty manifest
 	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
 		if _, err := os.Create(manifestPath); err != nil {
