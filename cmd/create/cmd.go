@@ -30,7 +30,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-type CreateOptions struct {
+type createOptions struct {
 	ConfigBase string
 	Context    string
 	Version    string
@@ -39,7 +39,7 @@ type CreateOptions struct {
 }
 
 func NewCmd() *cobra.Command {
-	o := &CreateOptions{}
+	o := &createOptions{}
 	createCmd := &cobra.Command{
 		Use:   "create <resource>",
 		Short: "Create TriggerMesh objects",
@@ -58,7 +58,7 @@ func NewCmd() *cobra.Command {
 	return createCmd
 }
 
-func (o *CreateOptions) initialize() {
+func (o *createOptions) initialize() {
 	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
@@ -94,7 +94,7 @@ func argsToMap(args []string) map[string]string {
 	return result
 }
 
-func (o *CreateOptions) translateEventSource(eventSourcesFilter []string) ([]string, error) {
+func (o *createOptions) translateEventSource(eventSourcesFilter []string) ([]string, error) {
 	var result []string
 	for _, source := range eventSourcesFilter {
 		s, err := components.GetObject(source, o.CRD, o.Version, o.Manifest)

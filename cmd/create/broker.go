@@ -30,7 +30,7 @@ import (
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
-func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
+func (o *createOptions) NewBrokerCmd() *cobra.Command {
 	return &cobra.Command{
 		Use: "broker <name>",
 		// Short: "TriggerMesh broker",
@@ -44,7 +44,7 @@ func (o *CreateOptions) NewBrokerCmd() *cobra.Command {
 	}
 }
 
-func (o *CreateOptions) broker(name string) error {
+func (o *createOptions) broker(name string) error {
 	ctx := context.Background()
 
 	o.Manifest.Path = path.Join(o.ConfigBase, name, triggermesh.ManifestFile)
