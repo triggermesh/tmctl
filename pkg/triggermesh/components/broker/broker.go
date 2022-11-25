@@ -177,12 +177,8 @@ func (b *Broker) Info(ctx context.Context) (*docker.Container, error) {
 
 func New(name, manifestPath string) (triggermesh.Component, error) {
 	// create config folder
-	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
-		if err := os.MkdirAll(path.Dir(manifestPath), os.ModePerm); err != nil {
-			return nil, fmt.Errorf("broker dir creation: %w", err)
-		}
-	} else {
-		return nil, fmt.Errorf("broker %s already exists", name)
+	if err := os.MkdirAll(path.Dir(manifestPath), os.ModePerm); err != nil {
+		return nil, fmt.Errorf("broker dir creation: %w", err)
 	}
 
 	// create empty manifest
