@@ -47,7 +47,6 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/hasuratarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/httptarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/ibmmqtarget"
-	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/infratarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/jiratarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/kafkatarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/logzmetricstarget"
@@ -59,7 +58,6 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/splunktarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/tektontarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/twiliotarget"
-	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/uipathtarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/zendesktarget"
 )
 
@@ -198,12 +196,6 @@ func targets(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return ibmmqtarget.MakeAppEnv(o), nil
-	case "InfraTarget":
-		var o *targetsv1alpha1.InfraTarget
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
-		}
-		return infratarget.MakeAppEnv(o), nil
 	case "JiraTarget":
 		var o *targetsv1alpha1.JiraTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -270,12 +262,6 @@ func targets(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return twiliotarget.MakeAppEnv(o), nil
-	case "UiPathTarget":
-		var o *targetsv1alpha1.UiPathTarget
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
-		}
-		return uipathtarget.MakeAppEnv(o), nil
 	case "ZendeskTarget":
 		var o *targetsv1alpha1.ZendeskTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {

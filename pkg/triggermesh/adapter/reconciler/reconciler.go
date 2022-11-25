@@ -184,7 +184,6 @@ func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructure
 	case "AzureActivityLogsSource",
 		"AzureEventGridSource",
 		"GoogleCloudBillingSource",
-		"GoogleCloudIoTSource",
 		"ZendeskSource":
 		return nil, fmt.Errorf("this component is not suitable for local env yet")
 	}
@@ -314,7 +313,6 @@ func Finalize(ctx context.Context, object unstructured.Unstructured, secrets map
 	case "AzureActivityLogsSource",
 		"AzureEventGridSource",
 		"GoogleCloudBillingSource",
-		"GoogleCloudIoTSource",
 		"ZendeskSource":
 		return fmt.Errorf("this component is not suitable for local env yet")
 	}
