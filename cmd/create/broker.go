@@ -47,11 +47,6 @@ func (o *createOptions) NewBrokerCmd() *cobra.Command {
 func (o *createOptions) broker(name string) error {
 	ctx := context.Background()
 
-	// Check if broker already exists.
-	if o.Manifest.Path == path.Join(o.ConfigBase, name, triggermesh.ManifestFile) {
-		return fmt.Errorf("broker: %s already exists", name)
-	}
-
 	o.Manifest.Path = path.Join(o.ConfigBase, name, triggermesh.ManifestFile)
 	broker, err := tmbroker.New(name, o.Manifest.Path)
 	if err != nil {
