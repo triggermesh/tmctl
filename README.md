@@ -19,18 +19,21 @@ TriggerMesh CLI can be installed from different sources: brew repository, pre-bu
 brew install tmctl
 ```
 
-### Pre-built binary
+### Manual install
 
-Linux, MacOS:
+Download and install the latest version for your platform from the [releases page](https://github.com/triggermesh/tmctl/releases). For example,
 
+```bash
+curl -L https://github.com/triggermesh/tmctl/releases/latest/download/tmctl_macOS_amd64 -o /tmp/tmctl
+mv /tmp/tmctl /usr/local/bin/tmctl
+chmod +x /usr/local/bin/tmctl
 ```
-export TMCTL_VERSION=$(curl -s -I HEAD https://github.com/triggermesh/tmctl/releases/latest | grep "location:" | awk -F / '{print $NF}')
-curl -L https://github.com/triggermesh/tmctl/releases/download/$TMCTL_VERSION/tmctl_${TMCTL_VERSION:1}_$(uname -m -o | awk '{print tolower($1)"_"$2}') -o tmctl \
-    && chmod +x tmctl \
-    && sudo mv tmctl /usr/local/bin
-```
 
-To view more versions and architectures of pre-built binaries please visit our GitHub [release page](https://github.com/triggermesh/tmctl/releases/latest). 
+Alternatively, if you're feeling brave, use the following one-liner to automatically download and install the CLI:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/triggermesh/tmctl/HEAD/hack/install.sh | sh
+```
 
 ### Source
 

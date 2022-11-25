@@ -2,6 +2,7 @@ dist: releases
 
 builds:
   - id: default
+    mod_timestamp: "{{ .CommitTimestamp }}"
     env:
       - CGO_ENABLED=0
     goos:
@@ -24,6 +25,9 @@ builds:
 archives:
   - id: default
     format: binary
+    name_template: '{{ .Binary }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+    replacements:
+      darwin: macOS
 
 checksum:
   name_template: 'checksums.txt'
