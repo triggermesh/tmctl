@@ -36,8 +36,13 @@ import (
 
 func (o *createOptions) NewSourceCmd() *cobra.Command {
 	return &cobra.Command{
-		Use: "source [kind]/[--from-image <image>][--name <name>]",
-		// Short:              "TriggerMesh source",
+		Use:   "source [kind]/[--from-image <image>][--name <name>]",
+		Short: "Create TriggerMesh source",
+		Example: `tmctl create source httppoller \
+	--endpoint https://www.example.com \
+	--eventType sample-event \
+	--interval 30s  \
+	--method GET`,
 		DisableFlagParsing: true,
 		SilenceErrors:      true,
 		ValidArgsFunction:  o.sourcesCompletion,

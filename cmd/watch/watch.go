@@ -51,8 +51,9 @@ type brokerLog struct {
 func NewCmd() *cobra.Command {
 	o := watchOptions{}
 	watchCmd := &cobra.Command{
-		Use:   "watch [broker]",
-		Short: "Watch events flowing through the broker",
+		Use:     "watch [broker]",
+		Short:   "Watch events flowing through the broker",
+		Example: "tmctl watch",
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		},

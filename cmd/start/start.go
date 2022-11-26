@@ -45,8 +45,9 @@ type startOptions struct {
 func NewCmd() *cobra.Command {
 	o := &startOptions{}
 	createCmd := &cobra.Command{
-		Use:   "start [broker]",
-		Short: "Starts TriggerMesh components",
+		Use:     "start [broker]",
+		Short:   "Starts TriggerMesh components",
+		Example: "tmctl start",
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 			return []string{"--broker", "--restart", "--version"}, cobra.ShellCompDirectiveNoFileComp
 		},

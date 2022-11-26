@@ -32,7 +32,7 @@ func NewCmd() *cobra.Command {
 	var broker string
 	brokersCmd := &cobra.Command{
 		Use:       "brokers [--set <broker>]",
-		Short:     "Show the list of brokers",
+		Short:     "Show list and switch between existing brokers",
 		ValidArgs: []string{"--set"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if broker != "" {

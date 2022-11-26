@@ -54,8 +54,9 @@ type describeOptions struct {
 func NewCmd() *cobra.Command {
 	o := &describeOptions{}
 	return &cobra.Command{
-		Use:   "describe [broker]",
-		Short: "Show broker status",
+		Use:     "describe [broker]",
+		Short:   "Show broker status",
+		Example: "tmctl describe",
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		},

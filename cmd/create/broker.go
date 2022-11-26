@@ -32,9 +32,10 @@ import (
 
 func (o *createOptions) NewBrokerCmd() *cobra.Command {
 	return &cobra.Command{
-		Use: "broker <name>",
-		// Short: "TriggerMesh broker",
-		Args: cobra.MinimumNArgs(1),
+		Use:     "broker <name>",
+		Short:   "Create TriggerMesh Broker. More information at https://docs.triggermesh.io/brokers/",
+		Example: "tmctl create broker foo",
+		Args:    cobra.MinimumNArgs(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		},

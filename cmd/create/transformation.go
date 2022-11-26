@@ -65,8 +65,15 @@ func (o *createOptions) NewTransformationCmd() *cobra.Command {
 	var name, target, file string
 	var eventSourcesFilter, eventTypesFilter []string
 	transformationCmd := &cobra.Command{
-		Use: "transformation [--target <name>][--source <name>,<name>...][--event-types <type>,<type>...][--from <path>]",
-		// Short:     "TriggerMesh transformation",
+		Use:   "transformation [--target <name>][--source <name>...][--event-types <type>...][--from <path>]",
+		Short: "Create TriggerMesh transformation. More information at https://docs.triggermesh.io/transformation/jsontransformation/",
+		Example: `tmctl create transformation <<EOF
+  data:
+  - operation: add
+    paths:
+    - key: new-field
+      value: hello from Transformation!
+EOF`,
 		ValidArgs: []string{"--name", "--target", "--source", "--event-types", "--from"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cobra.CheckErr(o.Manifest.Read())

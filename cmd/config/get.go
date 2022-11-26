@@ -25,8 +25,8 @@ import (
 
 func NewGetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "get <key> <value>",
-		Short: "Read config value",
+		Use:   "get [key]",
+		Short: "Show config value",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key, err := ParseGetCmd(args)
 			if err != nil {
