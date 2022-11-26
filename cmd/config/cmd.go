@@ -22,7 +22,7 @@ import (
 
 func NewCmd() *cobra.Command {
 	configCmd := &cobra.Command{
-		Use:   "config [set,get]",
+		Use:   "config [set|get]",
 		Short: "Read and write config values",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.HelpFunc()(cmd, args)

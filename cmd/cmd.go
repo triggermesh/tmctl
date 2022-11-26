@@ -21,6 +21,7 @@ import (
 	"path"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
 	"github.com/spf13/viper"
 
 	"github.com/triggermesh/tmctl/cmd/brokers"
@@ -34,6 +35,8 @@ import (
 	"github.com/triggermesh/tmctl/cmd/stop"
 	"github.com/triggermesh/tmctl/cmd/version"
 	"github.com/triggermesh/tmctl/cmd/watch"
+
+	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
 
@@ -78,6 +81,12 @@ Find more information at: https://docs.triggermesh.io`,
 	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("version", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return []string{}, cobra.ShellCompDirectiveNoFileComp
 	}))
+
+	if os.Getenv("TMCTL_GENERATE_DOCS") == "true" {
+		if err := doc.GenMarkdownTree(rootCmd, "./docs"); err != nil {
+			log.Fatal(err)
+		}
+	}
 	return rootCmd
 }
 

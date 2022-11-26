@@ -41,8 +41,8 @@ type createOptions struct {
 func NewCmd() *cobra.Command {
 	o := &createOptions{}
 	createCmd := &cobra.Command{
-		Use:   "create <resource>",
-		Short: "Create TriggerMesh objects",
+		Use:   "create <kind>",
+		Short: "Create TriggerMesh component",
 		// CompletionOptions: cobra.CompletionOptions{DisableDescriptions: true},
 		Args: cobra.MinimumNArgs(1),
 	}

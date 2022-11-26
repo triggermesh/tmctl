@@ -51,8 +51,9 @@ func NewCmd() *cobra.Command {
 	o := &sendOptions{}
 	var eventType, target string
 	sendCmd := &cobra.Command{
-		Use:   "send-event [--eventType <type>][--destination <name>] <data> ",
-		Short: "Send CloudEvent to the broker",
+		Use:     "send-event [--eventType <type>][--target <name>] <data>",
+		Short:   "Send CloudEvent to the target",
+		Example: "tmctl send-event '{\"hello\":\"world\"}'",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if target == "" {
 				target = o.Context
@@ -62,7 +63,7 @@ func NewCmd() *cobra.Command {
 	}
 	cobra.OnInitialize(o.initialize)
 
-	sendCmd.Flags().StringVar(&target, "target", "", "Component to send event to")
+	sendCmd.Flags().StringVar(&target, "target", "", "Component to send the event to. Default is the broker")
 	sendCmd.Flags().StringVar(&eventType, "eventType", defaultEventType, "CloudEvent Type attribute")
 
 	cobra.CheckErr(sendCmd.RegisterFlagCompletionFunc("eventType", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {

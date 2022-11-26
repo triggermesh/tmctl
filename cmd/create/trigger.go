@@ -32,8 +32,9 @@ func (o *createOptions) NewTriggerCmd() *cobra.Command {
 	var name, target string
 	var eventSourcesFilter, eventTypesFilter []string
 	triggerCmd := &cobra.Command{
-		Use: "trigger --target <name> [--source <name>][--eventType <event type>]",
-		// Short:     "TriggerMesh trigger",
+		Use:       "trigger --target <name> [--source <name>...][--event-types <type>...]",
+		Short:     "Create TriggerMesh trigger. More information at https://docs.triggermesh.io/brokers/triggers/",
+		Example:   "tmctl create trigger --target sockeye --source foo-httppollersource",
 		ValidArgs: []string{"--target", "--name", "--source", "--event-types"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cobra.CheckErr(o.Manifest.Read())

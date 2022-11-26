@@ -40,7 +40,8 @@ func NewCmd() *cobra.Command {
 	o := &stopOptions{}
 	stopCmd := &cobra.Command{
 		Use:       "stop [broker]",
-		Short:     "Stops TriggerMesh components",
+		Short:     "Stops TriggerMesh components, removes docker containers",
+		Example:   "tmctl stop",
 		ValidArgs: []string{},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			broker := viper.GetString("context")

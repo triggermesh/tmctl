@@ -38,8 +38,12 @@ import (
 
 func (o *createOptions) NewTargetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use: "target [kind]/[--from-image <image>][--name <name>][--source <name>,<name>...][--event-types <type>,<type>...]",
-		// Short:              "TriggerMesh target",
+		Use:   "target [kind]/[--from-image <image>][--name <name>][--source <name>...][--event-types <type>...]",
+		Short: "Create TriggerMesh target",
+		Example: `tmctl create target http \
+	--endpoint https://image-charts.com \
+	--method GET \
+	--response.eventType qr-data.response`,
 		DisableFlagParsing: true,
 		SilenceErrors:      true,
 		ValidArgsFunction:  o.targetsCompletion,

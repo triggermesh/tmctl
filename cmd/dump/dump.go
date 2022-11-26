@@ -48,8 +48,9 @@ func NewCmd() *cobra.Command {
 	o := &dumpOptions{}
 	knativeEventing := false
 	dumpCmd := &cobra.Command{
-		Use:   "dump [broker]",
-		Short: "Generate Kubernetes manifest",
+		Use:     "dump [broker]",
+		Short:   "Generate Kubernetes manifest",
+		Example: "tmctl dump",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Version = viper.GetString("triggermesh.version")
 			broker := viper.GetString("context")

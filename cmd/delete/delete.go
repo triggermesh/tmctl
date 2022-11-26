@@ -51,8 +51,10 @@ func NewCmd() *cobra.Command {
 	o := &deleteOptions{}
 	var broker string
 	deleteCmd := &cobra.Command{
-		Use:               "delete <component_name_1, component_name_2...> [--broker <name>]",
-		Short:             "Delete components by names",
+		Use:   "delete <component_name_1, component_name_2...> [--broker <name>]",
+		Short: "Delete components by names",
+		Example: `tmctl delete foo-httptarget, foo-awss3source
+tmctl delete --broker foo`,
 		ValidArgsFunction: o.deleteCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if broker != "" {
