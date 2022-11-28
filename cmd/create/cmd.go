@@ -19,6 +19,7 @@ package create
 import (
 	"fmt"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -59,7 +60,9 @@ func NewCmd() *cobra.Command {
 }
 
 func (o *createOptions) initialize() {
-	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
+	configBase, err := filepath.Abs(path.Dir(viper.ConfigFileUsed()))
+	cobra.CheckErr(err)
+	o.ConfigBase = configBase
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
 	o.Manifest = manifest.New(path.Join(o.ConfigBase, o.Context, triggermesh.ManifestFile))

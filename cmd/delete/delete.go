@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/docker/docker/client"
@@ -79,7 +80,9 @@ tmctl delete --broker foo`,
 }
 
 func (o *deleteOptions) initialize() {
-	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
+	configBase, err := filepath.Abs(path.Dir(viper.ConfigFileUsed()))
+	cobra.CheckErr(err)
+	o.ConfigBase = configBase
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
 	o.Manifest = manifest.New(path.Join(o.ConfigBase, o.Context, triggermesh.ManifestFile))

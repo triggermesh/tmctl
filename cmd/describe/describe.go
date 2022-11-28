@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
@@ -65,7 +66,11 @@ func NewCmd() *cobra.Command {
 			if len(args) == 1 {
 				broker = args[0]
 			}
-			o.ConfigBase = path.Dir(viper.ConfigFileUsed())
+			configBase, err := filepath.Abs(path.Dir(viper.ConfigFileUsed()))
+			if err != nil {
+				return err
+			}
+			o.ConfigBase = configBase
 			o.Version = viper.GetString("triggermesh.version")
 			o.Manifest = manifest.New(path.Join(o.ConfigBase, broker, triggermesh.ManifestFile))
 			cobra.CheckErr(o.Manifest.Read())

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -190,11 +189,7 @@ func New(name, manifestPath string) (triggermesh.Component, error) {
 		return nil, fmt.Errorf("manifest file access: %w", err)
 	}
 
-	config, err := filepath.Abs(path.Join(path.Dir(manifestPath), brokerConfigFile))
-	if err != nil {
-		return nil, fmt.Errorf("obtaining broker configuration absolute path: %w", err)
-	}
-
+	config := path.Join(path.Dir(manifestPath), brokerConfigFile)
 	if _, err := os.Stat(config); os.IsNotExist(err) {
 		if _, err := os.Create(config); err != nil {
 			return nil, fmt.Errorf("creating broker config: %w", err)
