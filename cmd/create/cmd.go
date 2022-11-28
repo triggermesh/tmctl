@@ -49,11 +49,11 @@ func NewCmd() *cobra.Command {
 
 	cobra.OnInitialize(o.initialize)
 
-	createCmd.AddCommand(o.NewBrokerCmd())
-	createCmd.AddCommand(o.NewSourceCmd())
-	createCmd.AddCommand(o.NewTargetCmd())
-	createCmd.AddCommand(o.NewTransformationCmd())
-	createCmd.AddCommand(o.NewTriggerCmd())
+	createCmd.AddCommand(o.newBrokerCmd())
+	createCmd.AddCommand(o.newSourceCmd())
+	createCmd.AddCommand(o.newTargetCmd())
+	createCmd.AddCommand(o.newTransformationCmd())
+	createCmd.AddCommand(o.newTriggerCmd())
 
 	return createCmd
 }

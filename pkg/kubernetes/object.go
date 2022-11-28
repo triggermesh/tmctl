@@ -122,6 +122,9 @@ func getObjectCRD(crdObject crd.CRD) (*crd.Schema, string, error) {
 	return nil, "", fmt.Errorf("CRD schema not found")
 }
 
+// ExtractSecrets looks up resource schema, extracts secret objects
+// if passed spec contains secret data and returns a map with base64 encoded values.
+// It does not validate the spec against the CRD.
 func ExtractSecrets(componentName, resource, crdFile string, spec map[string]interface{}) (map[string]string, error) {
 	crdObject, err := crd.GetResourceCRD(resource, crdFile)
 	if err != nil {

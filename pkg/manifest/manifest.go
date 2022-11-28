@@ -30,6 +30,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
 
+// Manifest is the representation of the YAML file with the TriggerMesh components.
 type Manifest struct {
 	sync.Mutex
 	Path    string
