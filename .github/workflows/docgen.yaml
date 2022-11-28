@@ -32,7 +32,7 @@ jobs:
 
     - name: CLI ref check
       run: |
-        TMCTL_GENERATE_DOCS=true go run main.go --help
+        TMCTL_GENERATE_DOCS=true go run main.go
         
         git_status="$(git status --porcelain)"
         if [[ ${git_status} ]]; then

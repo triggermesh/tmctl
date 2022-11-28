@@ -83,9 +83,11 @@ Find more information at: https://docs.triggermesh.io`,
 	}))
 
 	if os.Getenv("TMCTL_GENERATE_DOCS") == "true" {
+		rootCmd.DisableAutoGenTag = true
 		if err := doc.GenMarkdownTree(rootCmd, "./docs"); err != nil {
 			log.Fatal(err)
 		}
+		os.Exit(0)
 	}
 	return rootCmd
 }
