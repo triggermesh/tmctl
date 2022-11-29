@@ -112,6 +112,8 @@ func parseYAML(path string) ([]kubernetes.Object, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer file.Close()
+
 	var result []kubernetes.Object
 	decoder := yaml.NewDecoder(file)
 	for {
