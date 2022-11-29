@@ -19,6 +19,7 @@ package create
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
 
 	"github.com/spf13/cobra"
@@ -49,6 +50,10 @@ func (o *createOptions) broker(name string) error {
 	ctx := context.Background()
 
 	o.Manifest.Path = path.Join(o.ConfigBase, name, triggermesh.ManifestFile)
+	if _, err := os.Stat(o.Manifest.Path); !os.IsNotExist(err) {
+		return fmt.Errorf("broker %s already exists", name)
+	}
+
 	broker, err := tmbroker.New(name, o.Manifest.Path)
 	if err != nil {
 		return fmt.Errorf("broker: %w", err)
