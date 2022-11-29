@@ -23,12 +23,12 @@ import (
 	"github.com/spf13/viper"
 )
 
-func NewGetCmd() *cobra.Command {
+func newGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get [key]",
 		Short: "Show config value",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			key, err := ParseGetCmd(args)
+			key, err := parseGetCmd(args)
 			if err != nil {
 				return err
 			}
@@ -38,7 +38,7 @@ func NewGetCmd() *cobra.Command {
 	}
 }
 
-func ParseGetCmd(args []string) (string, error) {
+func parseGetCmd(args []string) (string, error) {
 	switch len(args) {
 	case 0:
 		return "", nil

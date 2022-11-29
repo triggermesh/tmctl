@@ -74,9 +74,8 @@ type EventTypes []struct {
 	Type string `json:"type"`
 }
 
+// Fetch downloads the release version of TriggerMesh CRDs for specified version.
 func Fetch(configDir, version string) (string, error) {
-	var err error
-	url := strings.ReplaceAll(crdsURL, "$VERSION", version)
 	crdDir := filepath.Join(configDir, "crd", version)
 	if err := os.MkdirAll(crdDir, os.ModePerm); err != nil {
 		return "", err
@@ -92,7 +91,7 @@ func Fetch(configDir, version string) (string, error) {
 	}
 	defer out.Close()
 
-	resp, err := http.Get(url)
+	resp, err := http.Get(strings.ReplaceAll(crdsURL, "$VERSION", version))
 	if err != nil {
 		return "", err
 	}
@@ -146,6 +145,7 @@ func readFile(path string) (map[string]CRD, error) {
 	return result, nil
 }
 
+// ListSources returns the list of resources of the "source" API group from CRD.
 func ListSources(crdFile string) ([]string, error) {
 	crds, err := readFile(crdFile)
 	if err != nil {
@@ -161,6 +161,7 @@ func ListSources(crdFile string) ([]string, error) {
 	return result, nil
 }
 
+// ListTargets returns the list of resources of the "target" API group from CRD.
 func ListTargets(crdFile string) ([]string, error) {
 	crds, err := readFile(crdFile)
 	if err != nil {

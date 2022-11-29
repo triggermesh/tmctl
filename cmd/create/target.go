@@ -36,7 +36,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-func (o *createOptions) NewTargetCmd() *cobra.Command {
+func (o *createOptions) newTargetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "target [kind]/[--from-image <image>][--name <name>][--source <name>...][--event-types <type>...]",
 		Short: "Create TriggerMesh target",

@@ -14,21 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config
+package test
 
 import (
-	"github.com/spf13/cobra"
+	"path"
+	"runtime"
 )
 
-func NewCmd() *cobra.Command {
-	configCmd := &cobra.Command{
-		Use:   "config [set|get]",
-		Short: "Read and write config values",
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.HelpFunc()(cmd, args)
-		},
-	}
-	configCmd.AddCommand(newGetCmd())
-	configCmd.AddCommand(newSetCmd())
-	return configCmd
+func Manifest() string {
+	_, filename, _, _ := runtime.Caller(0)
+	return path.Dir(filename) + "/fixtures/manifest.yaml"
+}
+
+func CRD() string {
+	_, filename, _, _ := runtime.Caller(0)
+	return path.Dir(filename) + "/fixtures/crd.yaml"
+}
+
+func ConfigBase() string {
+	_, filename, _, _ := runtime.Caller(0)
+	return path.Dir(filename) + "/fixtures"
 }

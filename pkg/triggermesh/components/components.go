@@ -119,12 +119,11 @@ func readSecrets(p triggermesh.Parent, manifest *manifest.Manifest) []triggermes
 		// Secrets are already extracted, read manifest
 		for _, object := range manifest.Objects {
 			if object.Kind == "Secret" && object.Metadata.Name == p.(triggermesh.Component).GetName()+"-secret" {
+				data := make(map[string]string)
 				for key, value := range object.Data {
-					secret := secret.New(object.Metadata.Name, "", map[string]string{
-						key: string(value),
-					})
-					secrets = append(secrets, secret)
+					data[key] = value
 				}
+				secrets = append(secrets, secret.New(object.Metadata.Name, "", data))
 			}
 		}
 	}

@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func NewSetCmd() *cobra.Command {
+func newSetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set <key> <value>",
 		Short: "Write config value",

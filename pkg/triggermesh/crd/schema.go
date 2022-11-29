@@ -213,6 +213,7 @@ type Property struct {
 	Description string
 }
 
+// GetAttributesCompletion returns the completion options for requested schema path.
 func (s *Schema) GetAttributesCompletion(path ...string) (bool, map[string]Property) {
 	result := make(map[string]Property, len(s.schema.Properties))
 	schema := s.schema.Properties

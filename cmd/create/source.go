@@ -34,7 +34,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-func (o *createOptions) NewSourceCmd() *cobra.Command {
+func (o *createOptions) newSourceCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "source [kind]/[--from-image <image>][--name <name>]",
 		Short: "Create TriggerMesh source",
