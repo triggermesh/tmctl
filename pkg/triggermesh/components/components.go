@@ -19,7 +19,7 @@ package components
 import (
 	"encoding/base64"
 	"fmt"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/triggermesh/tmctl/pkg/manifest"
@@ -61,8 +61,8 @@ func GetObject(name, crdFile, version string, manifest *manifest.Manifest) (trig
 				case "RedisBroker":
 					return tmbroker.New(object.Metadata.Name, manifest.Path)
 				case "Trigger":
-					brokerConfigPath := path.Dir(manifest.Path)
-					baseConfigPath := path.Dir(brokerConfigPath)
+					brokerConfigPath := filepath.Dir(manifest.Path)
+					baseConfigPath := filepath.Dir(brokerConfigPath)
 					trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, baseConfigPath, nil, nil)
 					if err != nil {
 						return nil, fmt.Errorf("creating trigger object: %w", err)

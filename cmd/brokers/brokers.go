@@ -19,7 +19,7 @@ package brokers
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -41,7 +41,7 @@ func NewCmd() *cobra.Command {
 					return err
 				}
 			}
-			list, err := List(path.Dir(viper.ConfigFileUsed()), viper.GetString("context"))
+			list, err := List(filepath.Dir(viper.ConfigFileUsed()), viper.GetString("context"))
 			if err != nil {
 				return err
 			}
@@ -54,7 +54,7 @@ func NewCmd() *cobra.Command {
 	}
 	brokersCmd.Flags().StringVar(&broker, "set", "", "Change the current broker")
 	cobra.CheckErr(brokersCmd.RegisterFlagCompletionFunc("set", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		list, err := List(path.Dir(viper.ConfigFileUsed()), "")
+		list, err := List(filepath.Dir(viper.ConfigFileUsed()), "")
 		if err != nil {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -73,7 +73,7 @@ func List(configDir, currentContext string) ([]string, error) {
 		if !dir.IsDir() {
 			continue
 		}
-		files, err := os.ReadDir(path.Join(configDir, dir.Name()))
+		files, err := os.ReadDir(filepath.Join(configDir, dir.Name()))
 		if err != nil {
 			return nil, fmt.Errorf("listing files: %w", err)
 		}

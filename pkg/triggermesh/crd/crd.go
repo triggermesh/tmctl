@@ -21,7 +21,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -77,11 +77,11 @@ type EventTypes []struct {
 func Fetch(configDir, version string) (string, error) {
 	var err error
 	url := strings.ReplaceAll(crdsURL, "$VERSION", version)
-	crdDir := path.Join(configDir, "crd", version)
+	crdDir := filepath.Join(configDir, "crd", version)
 	if err := os.MkdirAll(crdDir, os.ModePerm); err != nil {
 		return "", err
 	}
-	crdFile := path.Join(crdDir, "crd.yaml")
+	crdFile := filepath.Join(crdDir, "crd.yaml")
 	if _, err := os.Stat(crdFile); err == nil {
 		return crdFile, nil
 	}
