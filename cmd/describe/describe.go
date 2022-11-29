@@ -65,7 +65,7 @@ func NewCmd() *cobra.Command {
 			if len(args) == 1 {
 				broker = args[0]
 			}
-                        o.ConfigBase = filepath.Dir(viper.ConfigFileUsed())
+			o.ConfigBase = filepath.Dir(viper.ConfigFileUsed())
 			o.Version = viper.GetString("triggermesh.version")
 			o.Manifest = manifest.New(filepath.Join(o.ConfigBase, broker, triggermesh.ManifestFile))
 			cobra.CheckErr(o.Manifest.Read())
