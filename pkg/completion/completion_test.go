@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmctl/test"
@@ -39,6 +40,12 @@ func TestListTargets(t *testing.T) {
 	assert.NoError(t, m.Read())
 	expectedTargets := []string{"sockeye", "foo-transformation"}
 	assert.Equal(t, expectedTargets, ListTargets(m))
+}
+
+func TestListAll(t *testing.T) {
+	m := manifest.New(test.Manifest())
+	assert.NoError(t, m.Read())
+	assert.Len(t, ListAll(m), 7)
 }
 
 func TestListEventTypes(t *testing.T) {

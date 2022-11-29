@@ -64,7 +64,10 @@ func TestRuntimeParams(t *testing.T) {
 		object unstructured.Unstructured
 	}{
 		"source": {
-			object: newUnstructured(t, "test-source", "HTTPPollerSource", "sources.triggermesh.io/v1alpha1", map[string]interface{}{}),
+			object: newUnstructured(t, "test-source", "AWSS3Source", "sources.triggermesh.io/v1alpha1", map[string]interface{}{
+				"arn":         "arn:aws:s3:::dev",
+				"accessKeyID": "test",
+			}),
 		},
 		"target": {
 			object: newUnstructured(t, "test-target", "CloudEventsTarget", "targets.triggermesh.io/v1alpha1", map[string]interface{}{}),
@@ -79,7 +82,9 @@ func TestRuntimeParams(t *testing.T) {
 
 	for name, test := range testObjects {
 		t.Run(name, func(t *testing.T) {
-			co, ho, err := RuntimeParams(test.object, "registry/image", map[string]string{"additional-env": "value"})
+			co, ho, err := RuntimeParams(test.object, "registry/image", map[string]string{
+				"additional-env": "value",
+			})
 			assert.NoError(t, err)
 
 			cc := &container.Config{}
@@ -90,7 +95,21 @@ func TestRuntimeParams(t *testing.T) {
 			for _, opt := range ho {
 				opt(hc)
 			}
-			// validate cc and hc
+			assert.Equal(t, "registry/image", cc.Image)
+			assert.Contains(t, cc.Env, "additional-env=value")
+			assert.Equal(t, "host.docker.internal:host-gateway", hc.ExtraHosts[0])
+			assert.Len(t, hc.PortBindings["8080/tcp"], 1)
 		})
 	}
+}
+
+func TestEventAttributes(t *testing.T) {
+	source := newUnstructured(t, "test-source", "AWSS3Source", "sources.triggermesh.io/v1alpha1", map[string]interface{}{
+		"arn":         "arn:aws:s3:::dev",
+		"accessKeyID": "test",
+	})
+	attributes, err := EventAttributes(source)
+	assert.NoError(t, err)
+	assert.Equal(t, "arn:aws:s3:::dev", attributes.ProducedEventSource)
+	assert.Equal(t, "com.amazon.s3.testevent", attributes.ProducedEventTypes[0])
 }
