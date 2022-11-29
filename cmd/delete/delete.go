@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/docker/docker/client"
@@ -69,7 +69,7 @@ tmctl delete --broker foo`,
 	cobra.OnInitialize(o.initialize)
 	deleteCmd.Flags().StringVar(&broker, "broker", "", "Delete the broker")
 	cobra.CheckErr(deleteCmd.RegisterFlagCompletionFunc("broker", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		list, err := brokers.List(path.Dir(viper.ConfigFileUsed()), "")
+		list, err := brokers.List(filepath.Dir(viper.ConfigFileUsed()), "")
 		if err != nil {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -79,10 +79,10 @@ tmctl delete --broker foo`,
 }
 
 func (o *deleteOptions) initialize() {
-	o.ConfigBase = path.Dir(viper.ConfigFileUsed())
+	o.ConfigBase = filepath.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
-	o.Manifest = manifest.New(path.Join(o.ConfigBase, o.Context, triggermesh.ManifestFile))
+	o.Manifest = manifest.New(filepath.Join(o.ConfigBase, o.Context, triggermesh.ManifestFile))
 	crds, err := crd.Fetch(o.ConfigBase, o.Version)
 	cobra.CheckErr(err)
 	o.CRD = crds
@@ -95,13 +95,13 @@ func (o *deleteOptions) initialize() {
 func (o *deleteOptions) deleteBroker(broker string) error {
 	oo := *o
 	oo.Context = broker
-	oo.Manifest = manifest.New(path.Join(oo.ConfigBase, broker, triggermesh.ManifestFile))
+	oo.Manifest = manifest.New(filepath.Join(oo.ConfigBase, broker, triggermesh.ManifestFile))
 	cobra.CheckErr(oo.Manifest.Read())
 
 	if err := oo.deleteComponents([]string{}, true); err != nil {
 		return fmt.Errorf("deleting component: %w", err)
 	}
-	if err := os.RemoveAll(path.Join(oo.ConfigBase, broker)); err != nil {
+	if err := os.RemoveAll(filepath.Join(oo.ConfigBase, broker)); err != nil {
 		return fmt.Errorf("delete broker %q: %v", broker, err)
 	}
 	if broker == o.Context {

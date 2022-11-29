@@ -18,7 +18,7 @@ package cmd
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
@@ -72,7 +72,7 @@ Find more information at: https://docs.triggermesh.io`,
 	rootCmd.AddCommand(version.NewCmd(ver, commit))
 
 	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("broker", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		list, err := brokers.List(path.Dir(viper.ConfigFileUsed()), "")
+		list, err := brokers.List(filepath.Dir(viper.ConfigFileUsed()), "")
 		if err != nil {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -95,7 +95,7 @@ Find more information at: https://docs.triggermesh.io`,
 func initConfig() {
 	home, err := os.UserHomeDir()
 	cobra.CheckErr(err)
-	configHome := path.Join(home, triggermesh.ConfigDir)
+	configHome := filepath.Join(home, triggermesh.ConfigDir)
 
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")

@@ -21,7 +21,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -159,7 +159,7 @@ func (t *Trigger) SetTarget(target triggermesh.Component) {
 }
 
 func (t *Trigger) LookupTarget() {
-	config, err := readBrokerConfig(path.Join(t.ConfigBase, t.Broker.Name, brokerConfigFile))
+	config, err := readBrokerConfig(filepath.Join(t.ConfigBase, t.Broker.Name, brokerConfigFile))
 	if err != nil {
 		return
 	}

@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -177,7 +177,7 @@ func (b *Broker) Info(ctx context.Context) (*docker.Container, error) {
 
 func New(name, manifestPath string) (triggermesh.Component, error) {
 	// create config folder
-	if err := os.MkdirAll(path.Dir(manifestPath), os.ModePerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(manifestPath), os.ModePerm); err != nil {
 		return nil, fmt.Errorf("broker dir creation: %w", err)
 	}
 	// create empty manifest
@@ -189,7 +189,7 @@ func New(name, manifestPath string) (triggermesh.Component, error) {
 		return nil, fmt.Errorf("manifest file access: %w", err)
 	}
 
-	config := path.Join(path.Dir(manifestPath), brokerConfigFile)
+	config := filepath.Join(filepath.Dir(manifestPath), brokerConfigFile)
 	if _, err := os.Stat(config); os.IsNotExist(err) {
 		if _, err := os.Create(config); err != nil {
 			return nil, fmt.Errorf("creating broker config: %w", err)

@@ -20,7 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path"
+	"path/filepath"
 	"strings"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -76,10 +76,10 @@ func NewCmd() *cobra.Command {
 }
 
 func (o *sendOptions) initialize() {
-	o.ConfigDir = path.Dir(viper.ConfigFileUsed())
+	o.ConfigDir = filepath.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
-	o.Manifest = manifest.New(path.Join(o.ConfigDir, o.Context, triggermesh.ManifestFile))
+	o.Manifest = manifest.New(filepath.Join(o.ConfigDir, o.Context, triggermesh.ManifestFile))
 	crds, err := crd.Fetch(o.ConfigDir, o.Version)
 	cobra.CheckErr(err)
 	o.CRD = crds

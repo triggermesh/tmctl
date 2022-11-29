@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path"
+	"path/filepath"
 
 	"knative.dev/pkg/apis"
 	v1 "knative.dev/pkg/apis/duck/v1"
@@ -106,7 +106,7 @@ func (w *Wiretap) CreateTrigger(eventTypes []string) error {
 }
 
 func (w *Wiretap) BrokerLogs(ctx context.Context) (io.ReadCloser, error) {
-	bro, err := tmbroker.New(w.Broker, path.Join(w.ConfigBase, w.Broker, triggermesh.ManifestFile))
+	bro, err := tmbroker.New(w.Broker, filepath.Join(w.ConfigBase, w.Broker, triggermesh.ManifestFile))
 	if err != nil {
 		return nil, err
 	}

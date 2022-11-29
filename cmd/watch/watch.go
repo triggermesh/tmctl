@@ -24,7 +24,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"path"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -58,7 +58,7 @@ func NewCmd() *cobra.Command {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.ConfigDir = path.Dir(viper.ConfigFileUsed())
+			o.ConfigDir = filepath.Dir(viper.ConfigFileUsed())
 			if len(args) == 1 {
 				return o.watch(args[0])
 			}

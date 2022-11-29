@@ -19,7 +19,7 @@ package stop
 import (
 	"context"
 	"fmt"
-	"path"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -48,8 +48,8 @@ func NewCmd() *cobra.Command {
 			if len(args) == 1 {
 				broker = args[0]
 			}
-			o.ConfigBase = path.Dir(viper.ConfigFileUsed())
-			o.Manifest = manifest.New(path.Join(o.ConfigBase, broker, triggermesh.ManifestFile))
+			o.ConfigBase = filepath.Dir(viper.ConfigFileUsed())
+			o.Manifest = manifest.New(filepath.Join(o.ConfigBase, broker, triggermesh.ManifestFile))
 			cobra.CheckErr(o.Manifest.Read())
 			return o.stop(broker)
 		},
