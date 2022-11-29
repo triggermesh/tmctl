@@ -59,8 +59,7 @@ func NewCmd() *cobra.Command {
 }
 
 func (o *createOptions) initialize() {
-	configBase := filepath.Dir(viper.ConfigFileUsed())
-	o.ConfigBase = configBase
+        o.ConfigBase = filepath.Dir(viper.ConfigFileUsed())
 	o.Context = viper.GetString("context")
 	o.Version = viper.GetString("triggermesh.version")
 	o.Manifest = manifest.New(filepath.Join(o.ConfigBase, o.Context, triggermesh.ManifestFile))
