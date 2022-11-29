@@ -32,7 +32,7 @@ import (
 
 // Manifest is the representation of the YAML file with the TriggerMesh components.
 type Manifest struct {
-	sync.Mutex
+	mut     sync.Mutex
 	Path    string
 	Objects []kubernetes.Object
 }
@@ -44,8 +44,8 @@ func New(path string) *Manifest {
 }
 
 func (m *Manifest) Read() error {
-	m.Lock()
-	defer m.Unlock()
+	m.mut.Lock()
+	defer m.mut.Unlock()
 	o, err := parseYAML(m.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -74,8 +74,8 @@ func (m *Manifest) write() error {
 }
 
 func (m *Manifest) Add(object triggermesh.Component) (bool, error) {
-	m.Lock()
-	defer m.Unlock()
+	m.mut.Lock()
+	defer m.mut.Unlock()
 	k8sObject, err := object.AsK8sObject()
 	if err != nil {
 		return false, fmt.Errorf("creating k8s object: %w", err)
@@ -84,19 +84,22 @@ func (m *Manifest) Add(object triggermesh.Component) (bool, error) {
 	for i, o := range m.Objects {
 		if matchObjects(k8sObject, o) {
 			if reflect.DeepEqual(k8sObject, o) {
+				fmt.Println("RETURNING FALSE")
 				return false, nil
 			}
+			fmt.Println("RETURNING TRUE")
 			m.Objects[i] = k8sObject
 			return true, m.write()
 		}
 	}
+	fmt.Println("RETURNING TRUE 2")
 	m.Objects = append(m.Objects, k8sObject)
 	return true, m.write()
 }
 
 func (m *Manifest) Remove(name, kind string) error {
-	m.Lock()
-	defer m.Unlock()
+	m.mut.Lock()
+	defer m.mut.Unlock()
 	objects := make([]kubernetes.Object, 0, len(m.Objects))
 	for _, o := range m.Objects {
 		if o.Metadata.Name == name && o.Kind == kind {
