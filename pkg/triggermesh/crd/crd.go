@@ -120,6 +120,7 @@ func readFile(path string) (map[string]CRD, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	var crds []CRD
 	decoder := yaml.NewDecoder(f)

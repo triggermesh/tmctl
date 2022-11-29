@@ -84,15 +84,12 @@ func (m *Manifest) Add(object triggermesh.Component) (bool, error) {
 	for i, o := range m.Objects {
 		if matchObjects(k8sObject, o) {
 			if reflect.DeepEqual(k8sObject, o) {
-				fmt.Println("RETURNING FALSE")
 				return false, nil
 			}
-			fmt.Println("RETURNING TRUE")
 			m.Objects[i] = k8sObject
 			return true, m.write()
 		}
 	}
-	fmt.Println("RETURNING TRUE 2")
 	m.Objects = append(m.Objects, k8sObject)
 	return true, m.write()
 }
@@ -116,6 +113,8 @@ func parseYAML(path string) ([]kubernetes.Object, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer file.Close()
+
 	var result []kubernetes.Object
 	decoder := yaml.NewDecoder(file)
 	for {
