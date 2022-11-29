@@ -1,3 +1,6 @@
+[![Release](https://img.shields.io/github/v/release/triggermesh/tmctl?label=release)](https://github.com/triggermesh/tmctl/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/triggermesh/tmctl)](https://goreportcard.com/report/github.com/triggermesh/tmctl)
+
 # TriggerMesh CLI
 
 `tmctl` is the TriggerMesh CLI (part of the Shaker project) to create, manage and debug event-driven integration apps. This CLI provides a simple user experience in your local environment and supports further deployment to a  Kubernetes cluster.

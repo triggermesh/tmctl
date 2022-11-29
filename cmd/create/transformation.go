@@ -61,7 +61,7 @@ For more samples please visit:
 https://github.com/triggermesh/triggermesh/tree/main/config/samples/bumblebee`
 )
 
-func (o *createOptions) NewTransformationCmd() *cobra.Command {
+func (o *createOptions) newTransformationCmd() *cobra.Command {
 	var name, target, file string
 	var eventSourcesFilter, eventTypesFilter []string
 	transformationCmd := &cobra.Command{

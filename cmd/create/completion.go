@@ -27,6 +27,9 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
+// Completion functions are responsible for the logic
+// behind the CLI commands autocompletion.
+
 func (o *createOptions) sourcesCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
 		sources, err := crd.ListSources(o.CRD)

@@ -31,7 +31,7 @@ import (
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
-func (o *createOptions) NewBrokerCmd() *cobra.Command {
+func (o *createOptions) newBrokerCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "broker <name>",
 		Short:   "Create TriggerMesh Broker. More information at https://docs.triggermesh.io/brokers/",

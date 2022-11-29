@@ -28,7 +28,7 @@ import (
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
-func (o *createOptions) NewTriggerCmd() *cobra.Command {
+func (o *createOptions) newTriggerCmd() *cobra.Command {
 	var name, target string
 	var eventSourcesFilter, eventTypesFilter []string
 	triggerCmd := &cobra.Command{

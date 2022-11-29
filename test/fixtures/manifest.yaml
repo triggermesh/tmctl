@@ -1,0 +1,121 @@
+---
+apiVersion: eventing.triggermesh.io/v1alpha1
+kind: RedisBroker
+metadata:
+  labels:
+    triggermesh.io/context: foo
+  name: foo
+---
+apiVersion: v1
+data:
+  accessKeyID: QVdTQUNDRVNTS0VZSUQ=
+  secretAccessKey: QVdTU0VDUkVUQUNDRVNTS0VZ
+kind: Secret
+metadata:
+  labels:
+    triggermesh.io/context: foo
+  name: foo-awss3source-secret
+type: Opaque
+---
+apiVersion: sources.triggermesh.io/v1alpha1
+kind: AWSS3Source
+metadata:
+  annotations:
+    triggermesh.io/external-resources: queueARN=arn:aws:sqs:us-west-1:011041780301:s3-events-dev
+  labels:
+    triggermesh.io/context: foo
+  name: foo-awss3source
+spec:
+  arn: arn:aws:s3:::dev
+  auth:
+    credentials:
+      accessKeyID:
+        valueFromSecret:
+          key: accessKeyID
+          name: foo-awss3source-secret
+      secretAccessKey:
+        valueFromSecret:
+          key: secretAccessKey
+          name: foo-awss3source-secret
+  eventTypes:
+  - s3:ObjectCreated:*
+  - s3:ObjectRemoved:*
+  - s3:Replication:OperationFailedReplication
+  sink:
+    ref:
+      apiVersion: eventing.triggermesh.io/v1alpha1
+      kind: RedisBroker
+      name: foo
+---
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  labels:
+    triggermesh.io/context: foo
+    triggermesh.io/role: target
+  name: sockeye
+spec:
+  template:
+    spec:
+      containers:
+      - env: []
+        image: docker.io/n3wscott/sockeye:v0.7.0
+        name: user-container
+---
+apiVersion: flow.triggermesh.io/v1alpha1
+kind: Transformation
+metadata:
+  labels:
+    triggermesh.io/context: foo
+  name: foo-transformation
+spec:
+  context:
+  - operation: add
+    paths:
+    - key: type
+      value: foo-transformation.output
+  data:
+  - operation: add
+    paths:
+    - key: foo
+      value: bar
+---
+apiVersion: eventing.triggermesh.io/v1alpha1
+kind: Trigger
+metadata:
+  labels:
+    triggermesh.io/context: foo
+  name: foo-trigger-9dad7875
+spec:
+  broker:
+    group: eventing.triggermesh.io
+    kind: RedisBroker
+    name: foo
+  filters:
+  - exact:
+      type: foo-transformation.output
+  target:
+    ref:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      name: sockeye
+---
+apiVersion: eventing.triggermesh.io/v1alpha1
+kind: Trigger
+metadata:
+  labels:
+    triggermesh.io/context: foo
+  name: foo-trigger-6ada801c
+spec:
+  broker:
+    group: eventing.triggermesh.io
+    kind: RedisBroker
+    name: foo
+  filters:
+  - exact:
+      type: com.amazon.s3.objectcreated
+  target:
+    ref:
+      apiVersion: flow.triggermesh.io/v1alpha1
+      kind: transformation
+      name: foo-transformation

@@ -25,6 +25,9 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
+// Completion package is used to list different kinds of components
+// and resources to display them in shell command completion suggestions.
+
 func ListSources(m *manifest.Manifest) []string {
 	var list []string
 	for _, object := range m.Objects {
@@ -99,6 +102,7 @@ func ListFilteredEventTypes(broker, configBase string, m *manifest.Manifest) []s
 	return eventTypes
 }
 
+// SpecFromCRD returns spec completions based on OpenAPI schema of custom resource.
 func SpecFromCRD(name, crdFile string, path ...string) (bool, map[string]crd.Property) {
 	result := make(map[string]crd.Property, 0)
 	c, err := crd.GetResourceCRD(name, crdFile)
