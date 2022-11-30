@@ -161,7 +161,7 @@ func sources(object unstructured.Unstructured) (EventAttributes, error) {
 			ProducedEventSource: o.AsEventSource(),
 		}, nil
 	case "AzureEventHubSource":
-		var o *sourcesv1alpha1.AzureEventHubSource
+		var o *sourcesv1alpha1.AzureEventHubsSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
 			return EventAttributes{}, err
 		}

@@ -39,7 +39,7 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureactivitylogssource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureblobstoragesource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureeventgridsource"
-	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureeventhubsource"
+	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureeventhubssource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureiothubsource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azurequeuestoragesource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureservicebusqueuesource"
@@ -152,12 +152,12 @@ func sources(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return azureeventgridsource.MakeAppEnv(o), nil
-	case "AzureEventHubSource":
-		var o *sourcesv1alpha1.AzureEventHubSource
+	case "AzureEventHubsSource":
+		var o *sourcesv1alpha1.AzureEventHubsSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
 			return nil, err
 		}
-		return azureeventhubsource.MakeAppEnv(o), nil
+		return azureeventhubssource.MakeAppEnv(o), nil
 	case "AzureIOTHubSource":
 		var o *sourcesv1alpha1.AzureIOTHubSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
