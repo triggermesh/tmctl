@@ -40,5 +40,8 @@ func pubSubClient(ctx context.Context, spec sourcesv1alpha1.GoogleCloudSourcePub
 		pubsubProject = topic.Project
 	}
 	psCli, err := pubsub.NewClient(ctx, pubsubProject, credsCliOpt)
-	return psCli, credsCliOpt, fmt.Errorf("creating Google Cloud Pub/Sub API client: %w", err)
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating Google Cloud Pub/Sub API client: %w", err)
+	}
+	return psCli, credsCliOpt, nil
 }
