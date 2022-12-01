@@ -44,10 +44,10 @@ const (
 
 	// version default parameters
 	ghLatestRelease = "https://api.github.com/repos/triggermesh/triggermesh/releases/latest"
-	defaultVersion  = "v1.21.1"
+	defaultVersion  = "v1.22.0"
 
 	// broker default parameters
-	MemoryBrokerImage          = "gcr.io/triggermesh/memory-broker:dev"
+	MemoryBrokerImage          = "gcr.io/triggermesh/memory-broker:latest"
 	MemoryBrokerBufferSize     = "100"
 	MemoryBrokerProduceTimeout = "1s"
 )
