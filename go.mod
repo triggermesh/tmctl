@@ -17,7 +17,7 @@ require (
 	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.1
 	github.com/triggermesh/brokers v0.0.2
-	github.com/triggermesh/triggermesh v1.21.2-0.20221130111624-12a01ff34c6b
+	github.com/triggermesh/triggermesh v1.22.0
 	github.com/triggermesh/triggermesh-core v0.0.2
 	google.golang.org/api v0.103.0
 	gopkg.in/yaml.v3 v3.0.1
