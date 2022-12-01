@@ -43,3 +43,12 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^Merge pull request"
+
+brews:
+  - description: "tmctl"
+    homepage: "https://github.com/triggermesh/tmctl"
+    license: "Apache 2.0"
+    tap:
+      owner: triggermesh
+      name: homebrew-cli
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
