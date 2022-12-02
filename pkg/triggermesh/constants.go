@@ -29,6 +29,10 @@ var DefaultConfig = map[string]interface{}{
 	"triggermesh.broker.memory.produce-timeout": MemoryBrokerProduceTimeout,
 }
 
+var WindowsConfig = map[string]interface{}{
+	"triggermesh.broker.memory.config-polling-period": MemoryBrokerConfigPollingPeriod,
+}
+
 // TriggerMesh constant values used as default paths, configs, etc.
 const (
 	ConfigFile = "config.yaml"
@@ -50,6 +54,9 @@ const (
 	MemoryBrokerImage          = "gcr.io/triggermesh/memory-broker:latest"
 	MemoryBrokerBufferSize     = "100"
 	MemoryBrokerProduceTimeout = "1s"
+
+	// Broker config polling period. On Windows only.
+	MemoryBrokerConfigPollingPeriod = "PT2S"
 )
 
 type release struct {

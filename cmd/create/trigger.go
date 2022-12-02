@@ -32,10 +32,10 @@ func (o *createOptions) newTriggerCmd() *cobra.Command {
 	var name, target string
 	var eventSourcesFilter, eventTypesFilter []string
 	triggerCmd := &cobra.Command{
-		Use:       "trigger --target <name> [--source <name>...][--event-types <type>...]",
+		Use:       "trigger --target <name> [--source <name>...][--eventTypes <type>...]",
 		Short:     "Create TriggerMesh trigger. More information at https://docs.triggermesh.io/brokers/triggers/",
 		Example:   "tmctl create trigger --target sockeye --source foo-httppollersource",
-		ValidArgs: []string{"--target", "--name", "--source", "--event-types"},
+		ValidArgs: []string{"--target", "--name", "--source", "--eventTypes"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cobra.CheckErr(o.Manifest.Read())
 			return o.trigger(name, eventSourcesFilter, eventTypesFilter, target)
@@ -44,7 +44,7 @@ func (o *createOptions) newTriggerCmd() *cobra.Command {
 	triggerCmd.Flags().StringVar(&name, "name", "", "Trigger name")
 	triggerCmd.Flags().StringVar(&target, "target", "", "Target name")
 	triggerCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Event sources filter")
-	triggerCmd.Flags().StringSliceVar(&eventTypesFilter, "event-types", []string{}, "Event types filter")
+	triggerCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
 	cobra.CheckErr(triggerCmd.MarkFlagRequired("target"))
 
 	cobra.CheckErr(triggerCmd.RegisterFlagCompletionFunc("name", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
@@ -53,7 +53,7 @@ func (o *createOptions) newTriggerCmd() *cobra.Command {
 	cobra.CheckErr(triggerCmd.RegisterFlagCompletionFunc("source", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	}))
-	cobra.CheckErr(triggerCmd.RegisterFlagCompletionFunc("event-types", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+	cobra.CheckErr(triggerCmd.RegisterFlagCompletionFunc("eventTypes", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version), cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(triggerCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {

@@ -38,8 +38,8 @@ import (
 
 func (o *createOptions) newTargetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "target [kind]/[--from-image <image>][--name <name>][--source <name>...][--event-types <type>...]",
-		Short: "Create TriggerMesh target",
+		Use:   "target [kind]/[--from-image <image>][--name <name>][--source <name>...][--eventTypes <type>...]",
+		Short: "Create TriggerMesh target. More information at https://docs.triggermesh.io",
 		Example: `tmctl create target http \
 	--endpoint https://image-charts.com \
 	--method GET \
@@ -77,12 +77,12 @@ func (o *createOptions) newTargetCmd() *cobra.Command {
 				}
 				delete(params, "source")
 			}
-			if tf, exists := params["event-types"]; exists {
+			if tf, exists := params["eventTypes"]; exists {
 				eventTypesFilter = strings.Split(tf, ",")
 				if len(eventTypesFilter) == 1 {
 					eventTypesFilter = strings.Split(tf, " ")
 				}
-				delete(params, "event-types")
+				delete(params, "eventTypes")
 			}
 			if _, readDisabled := params["disable-file-args"]; !readDisabled {
 				for key, value := range params {

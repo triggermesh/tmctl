@@ -37,7 +37,7 @@ import (
 func (o *createOptions) newSourceCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "source [kind]/[--from-image <image>][--name <name>]",
-		Short: "Create TriggerMesh source",
+		Short: "Create TriggerMesh source. More information at https://docs.triggermesh.io",
 		Example: `tmctl create source httppoller \
 	--endpoint https://www.example.com \
 	--eventType sample-event \

@@ -1,9 +1,9 @@
 ## tmctl create target
 
-Create TriggerMesh target
+Create TriggerMesh target. More information at https://docs.triggermesh.io
 
 ```
-tmctl create target [kind]/[--from-image <image>][--name <name>][--source <name>...][--event-types <type>...] [flags]
+tmctl create target [kind]/[--from-image <image>][--name <name>][--source <name>...][--eventTypes <type>...] [flags]
 ```
 
 ### Examples

@@ -19,6 +19,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
@@ -105,6 +106,11 @@ func initConfig() {
 			cobra.CheckErr(os.MkdirAll(configHome, os.ModePerm))
 			for k, v := range triggermesh.DefaultConfig {
 				viper.SetDefault(k, v)
+			}
+			if runtime.GOOS == "windows" {
+				for k, v := range triggermesh.WindowsConfig {
+					viper.SetDefault(k, v)
+				}
 			}
 			cobra.CheckErr(viper.SafeWriteConfig())
 			cobra.CheckErr(viper.ReadInConfig())
