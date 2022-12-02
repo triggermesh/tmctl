@@ -116,13 +116,13 @@ func (o *createOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 	}
 
-	if lastParam(args) == "--event-types" && strings.HasSuffix(args[len(args)-1], ",") {
+	if lastParam(args) == "--eventTypes" && strings.HasSuffix(args[len(args)-1], ",") {
 		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version),
 			cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 	}
 
 	if toComplete == "--source" ||
-		toComplete == "--event-types" ||
+		toComplete == "--eventTypes" ||
 		toComplete == "--name" ||
 		toComplete == "--from-image" {
 		return []string{toComplete}, cobra.ShellCompDirectiveNoFileComp
@@ -130,7 +130,7 @@ func (o *createOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 	switch args[len(args)-1] {
 	case "--source":
 		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
-	case "--event-types":
+	case "--eventTypes":
 		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version),
 			cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 	case "--broker":
@@ -184,7 +184,7 @@ func (o *createOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 	}
 	return append(spec,
 		"--source\tEvent source name.",
-		"--event-types\tEvent types filter.",
+		"--eventTypes\tEvent types filter.",
 		"--name\tOptional component name.",
 	), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 }

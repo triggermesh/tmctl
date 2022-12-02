@@ -1,6 +1,6 @@
 ## tmctl create source
 
-Create TriggerMesh source
+Create TriggerMesh source. More information at https://docs.triggermesh.io
 
 ```
 tmctl create source [kind]/[--from-image <image>][--name <name>] [flags]

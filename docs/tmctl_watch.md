@@ -15,8 +15,8 @@ tmctl watch
 ### Options
 
 ```
-  -e, --event-types string   Filter events based on type attribute
-  -h, --help                 help for watch
+  -e, --eventTypes string   Filter events based on type attribute
+  -h, --help                help for watch
 ```
 
 ### Options inherited from parent commands

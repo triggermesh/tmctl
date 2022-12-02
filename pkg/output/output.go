@@ -49,7 +49,7 @@ func PrintStatus(kind string, object triggermesh.Component, eventSourcesFilter, 
 		}
 		result = fmt.Sprintf("%s%s\n%s", successColorCode, result, defaultColorCode)
 		// result = fmt.Sprintf("%s\nNext steps:", result)
-		// result = fmt.Sprintf("%s\n\ttmctl create target <kind> --source %s [--event-types <types>]\t - create target that will consume events from this source", result, object.GetName())
+		// result = fmt.Sprintf("%s\n\ttmctl create target <kind> --source %s [--eventTypes <types>]\t - create target that will consume events from this source", result, object.GetName())
 		// result = fmt.Sprintf("%s\n\ttmctl watch\t\t\t\t\t\t\t\t\t - show events flowing through the broker in the real time", result)
 	case "consumer":
 		et, _ := object.(triggermesh.Consumer).ConsumedEventTypes()

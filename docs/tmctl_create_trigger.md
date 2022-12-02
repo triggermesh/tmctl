@@ -3,7 +3,7 @@
 Create TriggerMesh trigger. More information at https://docs.triggermesh.io/brokers/triggers/
 
 ```
-tmctl create trigger --target <name> [--source <name>...][--event-types <type>...] [flags]
+tmctl create trigger --target <name> [--source <name>...][--eventTypes <type>...] [flags]
 ```
 
 ### Examples
@@ -15,11 +15,11 @@ tmctl create trigger --target sockeye --source foo-httppollersource
 ### Options
 
 ```
-      --event-types strings   Event types filter
-  -h, --help                  help for trigger
-      --name string           Trigger name
-      --source strings        Event sources filter
-      --target string         Target name
+      --eventTypes strings   Event types filter
+  -h, --help                 help for trigger
+      --name string          Trigger name
+      --source strings       Event sources filter
+      --target string        Target name
 ```
 
 ### Options inherited from parent commands

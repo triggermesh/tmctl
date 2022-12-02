@@ -65,7 +65,7 @@ func (o *createOptions) newTransformationCmd() *cobra.Command {
 	var name, target, file string
 	var eventSourcesFilter, eventTypesFilter []string
 	transformationCmd := &cobra.Command{
-		Use:   "transformation [--target <name>][--source <name>...][--event-types <type>...][--from <path>]",
+		Use:   "transformation [--target <name>][--source <name>...][--eventTypes <type>...][--from <path>]",
 		Short: "Create TriggerMesh transformation. More information at https://docs.triggermesh.io/transformation/jsontransformation/",
 		Example: `tmctl create transformation <<EOF
   data:
@@ -74,7 +74,7 @@ func (o *createOptions) newTransformationCmd() *cobra.Command {
     - key: new-field
       value: hello from Transformation!
 EOF`,
-		ValidArgs: []string{"--name", "--target", "--source", "--event-types", "--from"},
+		ValidArgs: []string{"--name", "--target", "--source", "--eventTypes", "--from"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cobra.CheckErr(o.Manifest.Read())
 			return o.transformation(name, target, file, eventSourcesFilter, eventTypesFilter)
@@ -84,7 +84,7 @@ EOF`,
 	transformationCmd.Flags().StringVarP(&file, "from", "f", "", "Transformation specification file")
 	transformationCmd.Flags().StringVar(&target, "target", "", "Target name")
 	transformationCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Sources component names")
-	transformationCmd.Flags().StringSliceVar(&eventTypesFilter, "event-types", []string{}, "Event types filter")
+	transformationCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
 
 	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("name", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return []string{}, cobra.ShellCompDirectiveNoFileComp
@@ -92,7 +92,7 @@ EOF`,
 	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("source", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	}))
-	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("event-types", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("eventTypes", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version), cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
