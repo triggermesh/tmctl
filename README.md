@@ -1,5 +1,6 @@
 [![Release](https://img.shields.io/github/v/release/triggermesh/tmctl?label=release)](https://github.com/triggermesh/tmctl/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/triggermesh/tmctl)](https://goreportcard.com/report/github.com/triggermesh/tmctl)
+[![Slack](https://img.shields.io/badge/Slack-Join%20chat-4a154b?style=flat&logo=slack)](https://join.slack.com/t/triggermesh-community/shared_invite/zt-1kngevosm-MY7kqn9h6bT08hWh8PeltA)
 
 # TriggerMesh CLI
 
