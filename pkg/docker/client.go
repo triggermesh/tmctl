@@ -54,8 +54,9 @@ type Container struct {
 	CreateContainerOptions []ContainerOption
 	CreateHostOptions      []HostOption
 
-	runtimeHostConfig      container.HostConfig
-	runtimeContainerConfig container.Config
+	runtimeHostConfig container.HostConfig
+	// TODO
+	RuntimeContainerConfig container.Config
 }
 
 func NewClient() (*client.Client, error) {
@@ -163,7 +164,7 @@ func (c *Container) Start(ctx context.Context, client *client.Client, restart bo
 
 	c.ID = resp.ID
 	c.runtimeHostConfig = hc
-	c.runtimeContainerConfig = cc
+	c.RuntimeContainerConfig = cc
 
 	if err := client.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		return nil, fmt.Errorf("docker start: %w", err)
@@ -238,7 +239,7 @@ func (c *Container) LookupHostConfig(ctx context.Context, client *client.Client)
 	}
 	c.ID = id
 	c.runtimeHostConfig = *jsn.HostConfig
-	c.runtimeContainerConfig = *jsn.Config
+	c.RuntimeContainerConfig = *jsn.Config
 	return c, nil
 }
 
