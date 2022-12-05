@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -79,9 +78,9 @@ func NewCmd() *cobra.Command {
 				broker = args[0]
 			}
 			o.Context = broker
-			o.Manifest = manifest.New(path.Join(path.Dir(viper.ConfigFileUsed()), broker, triggermesh.ManifestFile))
+			o.Manifest = manifest.New(filepath.Join(filepath.Dir(viper.ConfigFileUsed()), broker, triggermesh.ManifestFile))
 			cobra.CheckErr(o.Manifest.Read())
-			crds, err := crd.Fetch(path.Dir(viper.ConfigFileUsed()), o.Version)
+			crds, err := crd.Fetch(filepath.Dir(viper.ConfigFileUsed()), o.Version)
 			cobra.CheckErr(err)
 			o.CRD = crds
 			return o.dump(knativeEventing, dockerComposeDump)
