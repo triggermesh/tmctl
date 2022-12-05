@@ -62,6 +62,15 @@ func NewClient() (*client.Client, error) {
 	return client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 }
 
+func CheckDaemon() error {
+	c, err := NewClient()
+	if err != nil {
+		return err
+	}
+	_, err = c.ServerVersion(context.Background())
+	return err
+}
+
 func (c *Container) Logs(ctx context.Context, client *client.Client) (io.ReadCloser, error) {
 	options := types.ContainerLogsOptions{
 		ShowStdout: true,

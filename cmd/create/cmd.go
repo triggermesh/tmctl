@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
@@ -45,6 +46,9 @@ func NewCmd() *cobra.Command {
 		Short: "Create TriggerMesh component",
 		// CompletionOptions: cobra.CompletionOptions{DisableDescriptions: true},
 		Args: cobra.MinimumNArgs(1),
+		PersistentPreRun: func(_ *cobra.Command, _ []string) {
+			cobra.CheckErr(docker.CheckDaemon())
+		},
 	}
 
 	cobra.OnInitialize(o.initialize)

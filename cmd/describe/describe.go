@@ -55,7 +55,7 @@ func NewCmd() *cobra.Command {
 	o := &describeOptions{}
 	return &cobra.Command{
 		Use:     "describe [broker]",
-		Short:   "Show broker status",
+		Short:   "List broker components and their statuses",
 		Example: "tmctl describe",
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
