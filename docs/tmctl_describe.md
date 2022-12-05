@@ -1,6 +1,6 @@
 ## tmctl describe
 
-Show broker status
+List broker components and their statuses
 
 ```
 tmctl describe [broker] [flags]
