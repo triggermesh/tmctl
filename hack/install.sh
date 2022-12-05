@@ -6,7 +6,6 @@ PKG_VERSION=
 GITHUB_URL=https://github.com/triggermesh/tmctl
 
 PLATFORM=
-EXT=
 ARCH=
 
 SUDO=sudo
@@ -36,6 +35,7 @@ if [ -z "${BIN_DIR}" ]; then
 fi
 
 # os platform
+EXT=".tar.gz"
 if [ -z "${PLATFORM}" ]; then
   case $(uname) in
     Linux)
@@ -46,7 +46,7 @@ if [ -z "${PLATFORM}" ]; then
       ;;
     Windows)
       PLATFORM="windows"
-      EXT=".exe"
+      EXT=".zip"
       ;;
     *)
       fatal "Unsupported platform ${PLATFORM}"
@@ -82,9 +82,26 @@ else
   DOWNLOAD_URL="${GITHUB_URL}/releases/latest/download/${PKG_NAME}_${PLATFORM}_${ARCH}${EXT}"
 fi
 
-info "Downloading ${DOWNLOAD_URL}..."
-TMP_BIN=$(mktemp -u /tmp/${PKG_NAME}.XXXXXX)
-${CURL} -sfL ${DOWNLOAD_URL} -o ${TMP_BIN}
+TMP_DIR=$(mktemp -d -t tmctl-install.XXXXXX)
+TMP_ARCHIVE=${TMP_DIR}/${PKG_NAME}_${PLATFORM}_${ARCH}${EXT}
+TMP_BIN=${TMP_DIR}/tmctl
+cleanup() {
+  code=$?
+  set +e
+  trap - EXIT
+  rm -rf ${TMP_DIR}
+  exit $code
+}
+trap cleanup INT EXIT
+
+info "Downloading ${DOWNLOAD_URL}... to ${TMP_ARCHIVE}"
+${CURL} -sfL ${DOWNLOAD_URL} -o ${TMP_ARCHIVE}
+
+if [ "${EXT}" = ".zip" ]; then
+  unzip ${TMP_ARCHIVE} -d ${TMP_DIR}
+else
+  tar xzf ${TMP_ARCHIVE} -C ${TMP_DIR}
+fi
 
 info "Installing to ${BIN_DIR}/${PKG_NAME}"
 chmod 755 ${TMP_BIN}

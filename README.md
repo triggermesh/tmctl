@@ -27,8 +27,9 @@ brew install triggermesh/cli/tmctl
 Download and install the latest version for your platform from the [releases page](https://github.com/triggermesh/tmctl/releases). For example,
 
 ```bash
-curl -L https://github.com/triggermesh/tmctl/releases/latest/download/tmctl_macOS_amd64 -o /tmp/tmctl
-mv /tmp/tmctl /usr/local/bin/tmctl
+curl -L https://github.com/triggermesh/tmctl/releases/latest/download/tmctl_macOS_amd64.tar.gz
+tar -zxf tmctl_macOS_amd64.tar.gz
+mv tmctl /usr/local/bin/tmctl
 chmod +x /usr/local/bin/tmctl
 ```
 
