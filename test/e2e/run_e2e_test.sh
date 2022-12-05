@@ -95,6 +95,26 @@ validate_watch_log() {
     done
 }
 
+validate_stop() {
+    $TMCTL stop
+    DESCRIBE_OUTPUT="`$TMCTL describe`"
+    ONLINE_COMPONENTS=$(echo "$DESCRIBE_OUTPUT" | grep "online" | sed -r '/^\s*$/d')
+    if [ ! -z "$ONLINE_COMPONENTS" ]; then
+        printf "Some components are online after \"stop\" command:\n%s\n" $ONLINE_COMPONENTS
+        return 1
+    fi
+}
+
+validate_start() {
+    $TMCTL start
+    DESCRIBE_OUTPUT="`$TMCTL describe`"
+    OFFLINE_COMPONENTS=$(echo "$DESCRIBE_OUTPUT" | grep "offline" | sed -r '/^\s*$/d')
+    if [ ! -z "$OFFLINE_COMPONENTS" ]; then
+        printf "Some components are offline after \"start\" command:\n%s\n" $OFFLINE_COMPONENTS
+        return 1
+    fi
+}
+
 cleanup() {
     echo "Cleaning up test environment"
     kill -INT $WATCH_PID
@@ -132,8 +152,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-sleep 3
-
 send_event
 if [ $? -ne 0 ]; then 
     cleanup
@@ -152,6 +170,20 @@ validate_watch_log
 if [ $? -ne 0 ]; then 
     cleanup
     printf "\"tmctl watch\" output validation failed\n"
+    exit 1
+fi
+
+validate_stop
+if [ $? -ne 0 ]; then 
+    cleanup
+    printf "\"tmctl stop\" validation failed\n"
+    exit 1
+fi
+
+validate_start
+if [ $? -ne 0 ]; then 
+    cleanup
+    printf "\"tmctl start\" validation failed\n"
     exit 1
 fi
 
