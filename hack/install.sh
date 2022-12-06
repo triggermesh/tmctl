@@ -36,6 +36,7 @@ fi
 
 # os platform
 EXT=".tar.gz"
+BIN_NAME="tmctl"
 if [ -z "${PLATFORM}" ]; then
   case $(uname) in
     Linux)
@@ -47,6 +48,7 @@ if [ -z "${PLATFORM}" ]; then
     Windows)
       PLATFORM="windows"
       EXT=".zip"
+      BIN_NAME="tmctl.exe"
       ;;
     *)
       fatal "Unsupported platform ${PLATFORM}"
@@ -84,7 +86,7 @@ fi
 
 TMP_DIR=$(mktemp -d -t tmctl-install.XXXXXX)
 TMP_ARCHIVE=${TMP_DIR}/${PKG_NAME}_${PLATFORM}_${ARCH}${EXT}
-TMP_BIN=${TMP_DIR}/tmctl
+TMP_BIN=${TMP_DIR}/${BIN_NAME}
 cleanup() {
   code=$?
   set +e
@@ -106,4 +108,4 @@ fi
 info "Installing to ${BIN_DIR}/${PKG_NAME}"
 chmod 755 ${TMP_BIN}
 ${SUDO} chown root ${TMP_BIN}
-${SUDO} mv -f ${TMP_BIN} ${BIN_DIR}/${PKG_NAME}${EXT}
+${SUDO} mv -f ${TMP_BIN} ${BIN_DIR}/${BIN_NAME}
