@@ -181,8 +181,8 @@ github.com/ashanbrown/makezero v0.0.0-20210520155254-b6261585ddde/go.mod h1:oG9D
 github.com/aws/aws-sdk-go v1.23.20/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aws/aws-sdk-go v1.25.37/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aws/aws-sdk-go v1.36.30/go.mod h1:hcU610XS61/+aQV88ixoOzUoG7v3b31pl2zKMmprdro=
-github.com/aws/aws-sdk-go v1.44.146 h1:7YdGgPxDPRJu/yYffzZp/H7yHzQ6AqmuNFZPYraaN8I=
-github.com/aws/aws-sdk-go v1.44.146/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
+github.com/aws/aws-sdk-go v1.44.154 h1:2TaEC8JIM/t7Fu+FBmdOBK5jFUAVL07tbpfJsLuVo3Q=
+github.com/aws/aws-sdk-go v1.44.154/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
 github.com/benbjohnson/clock v1.0.3/go.mod h1:bGMdMPoPVvcYyt1gHDf4J2KE153Yf9BuiUKYMaxlTDM=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
@@ -1036,8 +1036,6 @@ github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce/go.mod h1:o8v6yHRoi
 github.com/tommy-muehle/go-mnd/v2 v2.4.0/go.mod h1:WsUAkMJMYww6l/ufffCD3m+P7LEvr8TnZn9lwVDlgzw=
 github.com/triggermesh/brokers v0.0.2 h1:x6zUuC8ooGuCXe94OhBVk4MoA9iAIHVd6Z6Gy+FQr64=
 github.com/triggermesh/brokers v0.0.2/go.mod h1:8tqxffAcoVUGqb2sQLPrfu3PaZ6vK3q6+oqPJH2XUq4=
-github.com/triggermesh/triggermesh v1.21.2-0.20221130111624-12a01ff34c6b h1:GtLhwmDpr2Lu/RaewbNJxLnZ6RGnS2a+UwQCJD50Fss=
-github.com/triggermesh/triggermesh v1.21.2-0.20221130111624-12a01ff34c6b/go.mod h1:KMjb69J/4aufYEXGHUwJi3DC7JdQPYE6BLbvDo9d++o=
 github.com/triggermesh/triggermesh v1.22.0 h1:u0Sie90czBxkMc/zgsXZqRwHOkGFMggL7K48tGO8ctE=
 github.com/triggermesh/triggermesh v1.22.0/go.mod h1:KMjb69J/4aufYEXGHUwJi3DC7JdQPYE6BLbvDo9d++o=
 github.com/triggermesh/triggermesh-core v0.0.2 h1:VLhsIxs8uOpjzBpZgT8+gUd8zSH1ziaT9Prut8+IXac=
