@@ -16,7 +16,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.1
-	github.com/triggermesh/brokers v0.0.2
+	github.com/triggermesh/brokers v1.0.0
 	github.com/triggermesh/triggermesh v1.22.0
 	github.com/triggermesh/triggermesh-core v1.0.0
 	google.golang.org/api v0.103.0
