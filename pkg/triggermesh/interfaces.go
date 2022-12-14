@@ -26,6 +26,7 @@ import (
 // Component is the common interface for all TriggerMesh components.
 type Component interface {
 	AsK8sObject() (kubernetes.Object, error)
+	AsDockerComposeObject() (*DockerComposeService, error)
 
 	GetName() string
 	GetKind() string
@@ -67,4 +68,25 @@ type Reconcilable interface {
 
 	UpdateStatus(map[string]interface{})
 	GetExternalResources() map[string]interface{}
+}
+
+// TODO (move to another place?)
+type DockerCompose struct {
+	Services Services `json:"services"`
+}
+
+type Services map[string]DockerComposeService
+
+type DockerComposeService struct {
+	Command     string                `json:"command"`
+	Image       string                `json:"image"`
+	Ports       []string              `json:"ports"`
+	Environment []string              `json:"environment"`
+	Volumes     []DockerComposeVolume `json:"volumes"`
+}
+
+type DockerComposeVolume struct {
+	Type   string `json:"type"`
+	Source string `json:"source"`
+	Target string `json:"target"`
 }

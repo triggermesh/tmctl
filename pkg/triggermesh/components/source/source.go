@@ -22,12 +22,14 @@ import (
 	"fmt"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/env"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
@@ -71,6 +73,37 @@ func (s *Source) AsK8sObject() (kubernetes.Object, error) {
 		},
 	}
 	return kubernetes.CreateObject(s.GetKind(), s.CRDFile, s.getMeta(), spec)
+}
+
+func (s *Source) AsDockerComposeObject() (*triggermesh.DockerComposeService, error) {
+	o, err := s.asUnstructured()
+	if err != nil {
+		return nil, fmt.Errorf("creating object: %w", err)
+	}
+	image := adapter.Image(o, s.Version)
+
+	adapterEnv, err := env.Build(o)
+	if err != nil {
+		return nil, fmt.Errorf("adapter environment: %w", err)
+	}
+
+	// TODO(sinkURI should contain the broker port)
+	sinkURI, set, err := unstructured.NestedString(o.Object, "spec", "sink", "uri")
+	if err != nil {
+		return nil, fmt.Errorf("sink URI type: %w", err)
+	}
+	if set {
+		adapterEnv = append(adapterEnv, corev1.EnvVar{Name: "K_SINK", Value: sinkURI})
+	}
+
+	envs := envsToString(adapterEnv)
+
+	return &triggermesh.DockerComposeService{
+		Image:       image,
+		Environment: envs,
+		Ports:       []string{"8080"},
+		Volumes:     []triggermesh.DockerComposeVolume{},
+	}, nil
 }
 
 func (s *Source) getMeta() kubernetes.Metadata {
@@ -280,4 +313,12 @@ func New(name, crdFile, kind, broker, version string, params interface{}, status
 		spec:    spec,
 		status:  status,
 	}
+}
+
+func envsToString(envs []corev1.EnvVar) []string {
+	var result []string
+	for _, env := range envs {
+		result = append(result, fmt.Sprintf("%s=%s", env.Name, env.Value))
+	}
+	return result
 }

@@ -44,29 +44,9 @@ type dumpOptions struct {
 	Manifest *manifest.Manifest
 }
 
-type dockerCompose struct {
-	Version  string
-	Services map[string]dockerComposeService
-}
-
-type dockerComposeService struct {
-	Command     string                `json:"command"`
-	Image       string                `json:"image"`
-	Ports       []string              `json:"ports"`
-	Environment []string              `json:"environment"`
-	Volumes     []dockerComposeVolume `json:"volumes"`
-}
-
-type dockerComposeVolume struct {
-	Type   string `json:"type"`
-	Source string `json:"source"`
-	Target string `json:"target"`
-}
-
 func NewCmd() *cobra.Command {
 	o := &dumpOptions{}
 	knativeEventing := false
-	dockerComposeDump := false
 	dumpCmd := &cobra.Command{
 		Use:     "dump [broker]",
 		Short:   "Generate Kubernetes manifest",
@@ -83,30 +63,16 @@ func NewCmd() *cobra.Command {
 			crds, err := crd.Fetch(filepath.Dir(viper.ConfigFileUsed()), o.Version)
 			cobra.CheckErr(err)
 			o.CRD = crds
-			return o.dump(knativeEventing, dockerComposeDump)
+			return o.dump(knativeEventing)
 		},
 	}
 	dumpCmd.Flags().StringVarP(&o.Format, "output", "o", "yaml", "Output format")
 	dumpCmd.Flags().BoolVar(&knativeEventing, "knative", false, "Use Knative Eventing components")
-	dumpCmd.Flags().BoolVar(&dockerComposeDump, "docker-compose", false, "Use Docker Compose components")
 	return dumpCmd
 }
 
-func (o *dumpOptions) dump(useKnativeEventing, userDockerCompose bool) error {
+func (o *dumpOptions) dump(useKnativeEventing bool) error {
 	var externalReconcilable []string
-	if userDockerCompose {
-		output, err := o.dockerComposeTransformation(o.Manifest.Objects)
-		if err != nil {
-			return err
-		}
-		composeYaml, err := yaml.Marshal(output)
-		if err != nil {
-			return err
-		}
-		fmt.Println("---")
-		fmt.Println(string(composeYaml))
-		return nil
-	}
 
 	for _, object := range o.Manifest.Objects {
 		if component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest); err == nil {
@@ -181,81 +147,4 @@ func (o *dumpOptions) knativeEventingTransformation(object kubernetes.Object) ku
 		}
 	}
 	return object
-}
-
-func (o *dumpOptions) dockerComposeTransformation(objects []kubernetes.Object) (*dockerCompose, error) {
-	dockerComposeOutput := dockerCompose{
-		Version:  "1.0",
-		Services: map[string]dockerComposeService{}}
-
-	var name string
-	var command string
-	var image string
-	var envs []string
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-	configHome := filepath.Join(home, triggermesh.ConfigDir)
-
-	for _, object := range o.Manifest.Objects {
-		name = object.Metadata.Name
-		if component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest); err == nil {
-			if _, ok := component.(triggermesh.Reconcilable); ok {
-				if container, ok := component.(triggermesh.Runnable); ok {
-					if containerInfo, err := container.Info(context.Background()); err == nil {
-						envs = containerInfo.RuntimeContainerConfig.Env
-						command = containerInfo.RuntimeContainerConfig.Entrypoint[0]
-						image = containerInfo.Image
-					}
-				}
-			}
-		}
-
-		switch object.APIVersion {
-		case tmbroker.APIVersion:
-			switch object.Kind {
-			case tmbroker.BrokerKind:
-				volume := dockerComposeVolume{
-					Type:   "bind",
-					Source: fmt.Sprintf("%s/cli/foo/broker.conf", configHome),
-					Target: "/etc/triggermesh/broker.conf",
-				}
-				broker := dockerComposeService{
-					Image:   triggermesh.MemoryBrokerImage,
-					Ports:   []string{"8080:8080"},
-					Volumes: []dockerComposeVolume{volume},
-					Command: "start --memory.buffer-size 100 --memory.produce-timeout 1s --broker-config-path /etc/triggermesh/broker.conf",
-				}
-				dockerComposeOutput.Services[name] = broker
-
-				// TODO
-				// case tmbroker.TriggerKind:
-			}
-		case "sources.triggermesh.io/v1alpha1":
-			source := dockerComposeService{
-				Command: command,
-				Image:   image,
-				// TODO Ports
-				Ports:       []string{"add-ports"},
-				Environment: envs,
-			}
-			dockerComposeOutput.Services[name] = source
-
-		case "targets.triggermesh.io/v1alpha1":
-
-			target := dockerComposeService{
-				Command: command,
-				Image:   image,
-				// TODO Ports
-				Ports:       []string{"add-ports"},
-				Environment: envs,
-			}
-			dockerComposeOutput.Services[name] = target
-
-		}
-	}
-
-	return &dockerComposeOutput, nil
 }

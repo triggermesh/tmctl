@@ -73,6 +73,11 @@ func (t *Trigger) AsK8sObject() (kubernetes.Object, error) {
 	}, nil
 }
 
+// TODO
+func (t *Trigger) AsDockerComposeObject() (*triggermesh.DockerComposeService, error) {
+	return nil, nil
+}
+
 func (t *Trigger) GetKind() string {
 	return TriggerKind
 }

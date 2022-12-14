@@ -132,6 +132,10 @@ func (o *createOptions) source(name, kind string, params map[string]string) erro
 	if err != nil {
 		return fmt.Errorf("unable to update manifest: %w", err)
 	}
+	_, err = o.Manifest.AddCompose(s)
+	if err != nil {
+		return fmt.Errorf("unable to update manifest: %w", err)
+	}
 	log.Println("Starting container")
 	if _, err := s.(triggermesh.Runnable).Start(ctx, secretsEnv, (restart || secretsChanged)); err != nil {
 		return err
