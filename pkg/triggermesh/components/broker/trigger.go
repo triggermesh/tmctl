@@ -74,7 +74,7 @@ func (t *Trigger) AsK8sObject() (kubernetes.Object, error) {
 }
 
 // TODO
-func (t *Trigger) AsDockerComposeObject() (*triggermesh.DockerComposeService, error) {
+func (t *Trigger) AsDockerComposeObject(additionalEnvs map[string]string) (*triggermesh.DockerComposeService, error) {
 	return nil, nil
 }
 

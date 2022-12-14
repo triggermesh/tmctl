@@ -90,16 +90,26 @@ func (s *Service) AsK8sObject() (kubernetes.Object, error) {
 	}, nil
 }
 
-func (s *Service) AsDockerComposeObject() (*triggermesh.DockerComposeService, error) {
+func (s *Service) AsDockerComposeObject(additionalEnvs map[string]string) (*triggermesh.DockerComposeService, error) {
 	u, err := s.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
 
 	image := adapter.Image(u, s.Image)
-	// TODO
+
+	port, err := s.GetPort(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO envs
+
 	return &triggermesh.DockerComposeService{
-		Image: image,
+		Image:       image,
+		Environment: []string{},
+		Ports:       []string{port + ":8080"},
+		Volumes:     []triggermesh.DockerComposeVolume{},
 	}, nil
 }
 

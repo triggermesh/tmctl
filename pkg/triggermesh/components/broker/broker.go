@@ -76,7 +76,7 @@ func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
 	}, nil
 }
 
-func (b *Broker) AsDockerComposeObject() (*triggermesh.DockerComposeService, error) {
+func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (*triggermesh.DockerComposeService, error) {
 	entrypoint := []string{
 		"start",
 		"--memory.buffer-size",
@@ -99,13 +99,16 @@ func (b *Broker) AsDockerComposeObject() (*triggermesh.DockerComposeService, err
 		Target: "/etc/triggermesh/broker.conf",
 	}
 
-	// TODO: Get ports
+	port, err := b.GetPort(context.Background())
+	if err != nil {
+		return nil, err
+	}
 
 	composeService := triggermesh.DockerComposeService{
 		Image:       viper.GetString("triggermesh.broker.image"),
 		Command:     command,
 		Volumes:     []triggermesh.DockerComposeVolume{volume},
-		Ports:       []string{"8080"},
+		Ports:       []string{port + ":8080"},
 		Environment: []string{},
 	}
 

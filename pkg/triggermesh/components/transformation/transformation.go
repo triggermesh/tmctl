@@ -62,7 +62,7 @@ func (t *Transformation) getMeta() kubernetes.Metadata {
 	}
 }
 
-func (t *Transformation) AsDockerComposeObject() (*triggermesh.DockerComposeService, error) {
+func (t *Transformation) AsDockerComposeObject(additionalEnvs map[string]string) (*triggermesh.DockerComposeService, error) {
 	o, err := t.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)

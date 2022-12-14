@@ -47,7 +47,7 @@ func (s *Secret) AsK8sObject() (kubernetes.Object, error) {
 }
 
 // TODO
-func (s *Secret) AsDockerComposeObject() (*triggermesh.DockerComposeService, error) {
+func (s *Secret) AsDockerComposeObject(additionalEnvs map[string]string) (*triggermesh.DockerComposeService, error) {
 	return nil, nil
 }
 

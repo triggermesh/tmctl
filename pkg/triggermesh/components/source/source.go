@@ -75,7 +75,7 @@ func (s *Source) AsK8sObject() (kubernetes.Object, error) {
 	return kubernetes.CreateObject(s.GetKind(), s.CRDFile, s.getMeta(), spec)
 }
 
-func (s *Source) AsDockerComposeObject() (*triggermesh.DockerComposeService, error) {
+func (s *Source) AsDockerComposeObject(additionalEnvs map[string]string) (*triggermesh.DockerComposeService, error) {
 	o, err := s.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -96,11 +96,25 @@ func (s *Source) AsDockerComposeObject() (*triggermesh.DockerComposeService, err
 		adapterEnv = append(adapterEnv, corev1.EnvVar{Name: "K_SINK", Value: sinkURI})
 	}
 
-	envs := envsToString(adapterEnv)
+	envs := []corev1.EnvVar{}
+	for _, v := range adapterEnv {
+		if v.ValueFrom != nil && additionalEnvs != nil {
+			if secret, ok := additionalEnvs[v.ValueFrom.SecretKeyRef.Key]; ok {
+				envs = append(envs, corev1.EnvVar{Name: v.Name, Value: string(secret)})
+				delete(additionalEnvs, v.ValueFrom.SecretKeyRef.Key)
+			}
+		} else {
+			envs = append(envs, v)
+		}
+	}
+
+	for k, v := range additionalEnvs {
+		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
+	}
 
 	return &triggermesh.DockerComposeService{
 		Image:       image,
-		Environment: envs,
+		Environment: envsToString(envs),
 		Ports:       []string{"8080"},
 		Volumes:     []triggermesh.DockerComposeVolume{},
 	}, nil
@@ -315,6 +329,7 @@ func New(name, crdFile, kind, broker, version string, params interface{}, status
 	}
 }
 
+// TODO: move it to a common place
 func envsToString(envs []corev1.EnvVar) []string {
 	var result []string
 	for _, env := range envs {

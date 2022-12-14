@@ -123,11 +123,11 @@ func (m *Manifest) Add(object triggermesh.Component) (bool, error) {
 	return true, m.write()
 }
 
-func (m *Manifest) AddCompose(object triggermesh.Component) (bool, error) {
+func (m *Manifest) AddCompose(object triggermesh.Component, additionalEnvs map[string]string) (bool, error) {
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
-	composeService, err := object.AsDockerComposeObject()
+	composeService, err := object.AsDockerComposeObject(additionalEnvs)
 	if err != nil {
 		return false, fmt.Errorf("creating docker compose object: %w", err)
 	}

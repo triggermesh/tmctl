@@ -21,12 +21,14 @@ import (
 	"fmt"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/env"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 )
@@ -67,16 +69,52 @@ func (t *Target) getMeta() kubernetes.Metadata {
 	}
 }
 
-func (t *Target) AsDockerComposeObject() (*triggermesh.DockerComposeService, error) {
+func (t *Target) AsDockerComposeObject(additionalEnvs map[string]string) (*triggermesh.DockerComposeService, error) {
 	o, err := t.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
 	image := adapter.Image(o, t.Version)
 
-	// TODO
+	adapterEnv, err := env.Build(o)
+	if err != nil {
+		return nil, fmt.Errorf("adapter environment: %w", err)
+	}
+
+	sinkURI, set, err := unstructured.NestedString(o.Object, "spec", "sink", "uri")
+	if err != nil {
+		return nil, fmt.Errorf("sink URI type: %w", err)
+	}
+	if set {
+		adapterEnv = append(adapterEnv, corev1.EnvVar{Name: "K_SINK", Value: sinkURI})
+	}
+
+	envs := []corev1.EnvVar{}
+	for _, v := range adapterEnv {
+		if v.ValueFrom != nil && additionalEnvs != nil {
+			if secret, ok := additionalEnvs[v.ValueFrom.SecretKeyRef.Key]; ok {
+				envs = append(envs, corev1.EnvVar{Name: v.Name, Value: string(secret)})
+				delete(additionalEnvs, v.ValueFrom.SecretKeyRef.Key)
+			}
+		} else {
+			envs = append(envs, v)
+		}
+	}
+
+	for k, v := range additionalEnvs {
+		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
+	}
+
+	port, err := t.GetPort(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	return &triggermesh.DockerComposeService{
-		Image: image,
+		Image:       image,
+		Environment: envsToString(envs),
+		Ports:       []string{port + ":8080"},
+		Volumes:     []triggermesh.DockerComposeVolume{},
 	}, nil
 }
 
@@ -215,4 +253,12 @@ func New(name, crdFile, kind, broker, version string, params interface{}) trigge
 		Version: version,
 		spec:    spec,
 	}
+}
+
+func envsToString(envs []corev1.EnvVar) []string {
+	var result []string
+	for _, env := range envs {
+		result = append(result, fmt.Sprintf("%s=%s", env.Name, env.Value))
+	}
+	return result
 }

@@ -26,7 +26,7 @@ import (
 // Component is the common interface for all TriggerMesh components.
 type Component interface {
 	AsK8sObject() (kubernetes.Object, error)
-	AsDockerComposeObject() (*DockerComposeService, error)
+	AsDockerComposeObject(additionalEnvs map[string]string) (*DockerComposeService, error)
 
 	GetName() string
 	GetKind() string

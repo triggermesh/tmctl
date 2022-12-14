@@ -132,7 +132,7 @@ func (o *createOptions) source(name, kind string, params map[string]string) erro
 	if err != nil {
 		return fmt.Errorf("unable to update manifest: %w", err)
 	}
-	_, err = o.Manifest.AddCompose(s)
+	_, err = o.Manifest.AddCompose(s, secretsEnv)
 	if err != nil {
 		return fmt.Errorf("unable to update manifest: %w", err)
 	}

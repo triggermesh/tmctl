@@ -69,15 +69,15 @@ func (o *createOptions) broker(name string) error {
 		return fmt.Errorf("unable to update manifest: %w", err)
 	}
 
-	// TODO
-	_, err = o.Manifest.AddCompose(broker)
-	if err != nil {
-		return fmt.Errorf("unable to update manifest: %w", err)
-	}
-
 	log.Println("Starting container")
 	if _, err := broker.(triggermesh.Runnable).Start(ctx, nil, restart); err != nil {
 		return err
+	}
+
+	// TODO
+	_, err = o.Manifest.AddCompose(broker, nil)
+	if err != nil {
+		return fmt.Errorf("unable to update manifest: %w", err)
 	}
 
 	viper.Set("context", name)
