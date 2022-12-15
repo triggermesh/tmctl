@@ -45,7 +45,7 @@ func Image(object unstructured.Unstructured, version string) string {
 		"AzureServiceBusQueueSource":
 		return fmt.Sprintf("%s/azureservicebussource-adapter:%s", registry, version)
 	case "AzureBlobStorageSource":
-		return fmt.Sprintf("%s/azureeventhubsource-adapter:%s", registry, version)
+		return fmt.Sprintf("%s/azureeventhubssource-adapter:%s", registry, version)
 	case "GoogleCloudAuditLogsSource",
 		"GoogleCloudStorageSource",
 		"GoogleCloudSourceRepositoriesSource":
