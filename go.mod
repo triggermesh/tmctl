@@ -19,7 +19,7 @@ require (
 	github.com/triggermesh/brokers v1.0.0
 	github.com/triggermesh/triggermesh v1.22.0
 	github.com/triggermesh/triggermesh-core v1.0.0
-	google.golang.org/api v0.104.0
+	google.golang.org/api v0.105.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.25.3
 	k8s.io/apimachinery v0.25.3
