@@ -37,6 +37,11 @@ jobs:
         restore-keys: |
           ${{ github.job }}-${{ runner.os }}-go-
 
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: go
+
     # The code compiled in this step is also the one being analyzed in the next
     # step, due to build tracing being enabled via the CODEQL_EXTRACTOR_GO_BUILD_TRACING
     # environment variable.
