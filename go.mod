@@ -11,7 +11,7 @@ require (
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
 	github.com/aws/aws-sdk-go v1.44.146
 	github.com/cloudevents/sdk-go/v2 v2.12.0
-	github.com/docker/docker v20.10.21+incompatible
+	github.com/docker/docker v20.10.22+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.14.0
