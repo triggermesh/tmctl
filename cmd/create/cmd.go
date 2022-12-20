@@ -79,7 +79,7 @@ func (o *createOptions) initialize() {
 func argsToMap(args []string) map[string]string {
 	result := make(map[string]string)
 	for k := 0; k < len(args); k++ {
-		if strings.HasPrefix(args[k], "--") {
+		if isFlag(args[k]) {
 			key := args[k]
 			var value string
 			if kv := strings.Split(args[k], "="); len(kv) == 2 {
@@ -87,7 +87,7 @@ func argsToMap(args []string) map[string]string {
 				value = kv[1]
 			}
 			key = strings.TrimLeft(key, "-")
-			for j := k + 1; j < len(args) && !strings.HasPrefix(args[j], "--"); j++ {
+			for j := k + 1; j < len(args) && !isFlag(args[j]); j++ {
 				value = fmt.Sprintf("%s %s", value, args[j])
 				k = j
 			}
@@ -96,6 +96,10 @@ func argsToMap(args []string) map[string]string {
 		}
 	}
 	return result
+}
+
+func isFlag(s string) bool {
+	return len(strings.TrimLeft(s, "-")) == len(s)-2
 }
 
 func (o *createOptions) translateEventSource(eventSourcesFilter []string) ([]string, error) {
