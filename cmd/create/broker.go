@@ -74,12 +74,6 @@ func (o *createOptions) broker(name string) error {
 		return err
 	}
 
-	// TODO
-	_, err = o.Manifest.AddCompose(broker, nil)
-	if err != nil {
-		return fmt.Errorf("unable to update manifest: %w", err)
-	}
-
 	viper.Set("context", name)
 	if err := viper.WriteConfig(); err != nil {
 		return fmt.Errorf("write config: %w", err)

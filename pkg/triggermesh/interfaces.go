@@ -19,6 +19,7 @@ package triggermesh
 import (
 	"context"
 
+	"github.com/digitalocean/godo"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 )
@@ -26,7 +27,6 @@ import (
 // Component is the common interface for all TriggerMesh components.
 type Component interface {
 	AsK8sObject() (kubernetes.Object, error)
-	AsDockerComposeObject(additionalEnvs map[string]string) (*DockerComposeService, error)
 
 	GetName() string
 	GetKind() string
@@ -70,23 +70,7 @@ type Reconcilable interface {
 	GetExternalResources() map[string]interface{}
 }
 
-// TODO (move to another place?)
-type DockerCompose struct {
-	Services Services `json:"services"`
-}
-
-type Services map[string]DockerComposeService
-
-type DockerComposeService struct {
-	Command     string                `json:"command"`
-	Image       string                `json:"image"`
-	Ports       []string              `json:"ports"`
-	Environment []string              `json:"environment"`
-	Volumes     []DockerComposeVolume `json:"volumes"`
-}
-
-type DockerComposeVolume struct {
-	Type   string `json:"type"`
-	Source string `json:"source"`
-	Target string `json:"target"`
+type Platform interface {
+	AsDockerComposeObject(additionalEnvs map[string]string) (*DockerComposeService, error)
+	AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServiceSpec, error)
 }

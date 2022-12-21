@@ -17,7 +17,6 @@ limitations under the License.
 package manifest
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -33,16 +32,14 @@ import (
 
 // Manifest is the representation of the YAML file with the TriggerMesh components.
 type Manifest struct {
-	mut            sync.Mutex
-	Path           string
-	Objects        []kubernetes.Object
-	ComposeObjects map[string]triggermesh.DockerComposeService
+	mut     sync.Mutex
+	Path    string
+	Objects []kubernetes.Object
 }
 
 func New(path string) *Manifest {
 	return &Manifest{
-		Path:           path,
-		ComposeObjects: make(map[string]triggermesh.DockerComposeService),
+		Path: path,
 	}
 }
 
@@ -76,32 +73,6 @@ func (m *Manifest) write() error {
 	return nil
 }
 
-func (m *Manifest) writeCompose() error {
-	composeObject := triggermesh.DockerCompose{
-		Services: m.ComposeObjects,
-	}
-
-	body, err := kyaml.Marshal(composeObject)
-	if err != nil {
-		return err
-	}
-
-	if _, err := os.Stat(m.Path + "-compose.yaml"); err == nil {
-		i := bytes.Index(body, []byte("\n"))
-		body = body[i:]
-	}
-
-	file, err := os.OpenFile(m.Path+"-compose.yaml", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	file.Write(body)
-
-	return nil
-}
-
 func (m *Manifest) Add(object triggermesh.Component) (bool, error) {
 	m.mut.Lock()
 	defer m.mut.Unlock()
@@ -121,28 +92,6 @@ func (m *Manifest) Add(object triggermesh.Component) (bool, error) {
 	}
 	m.Objects = append(m.Objects, k8sObject)
 	return true, m.write()
-}
-
-func (m *Manifest) AddCompose(object triggermesh.Component, additionalEnvs map[string]string) (bool, error) {
-	m.mut.Lock()
-	defer m.mut.Unlock()
-
-	composeService, err := object.AsDockerComposeObject(additionalEnvs)
-	if err != nil {
-		return false, fmt.Errorf("creating docker compose object: %w", err)
-	}
-	for i, o := range m.ComposeObjects {
-		if matchCompose(*composeService, o) {
-			if reflect.DeepEqual(composeService, o) {
-				return false, nil
-			}
-			m.ComposeObjects[i] = *composeService
-			return true, m.write()
-		}
-	}
-
-	m.ComposeObjects[object.GetName()] = *composeService
-	return true, m.writeCompose()
 }
 
 func (m *Manifest) Remove(name, kind string) error {
@@ -189,9 +138,4 @@ func matchObjects(a, b kubernetes.Object) bool {
 	return (a.APIVersion == b.APIVersion) &&
 		(a.Kind == b.Kind) &&
 		(a.Metadata.Name == b.Metadata.Name)
-}
-
-// TODO check Name
-func matchCompose(a, b triggermesh.DockerComposeService) bool {
-	return (a.Image == b.Image)
 }

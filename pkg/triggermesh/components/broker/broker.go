@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/digitalocean/godo"
 	"github.com/spf13/viper"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
@@ -36,6 +37,7 @@ var (
 	_ triggermesh.Component = (*Broker)(nil)
 	_ triggermesh.Runnable  = (*Broker)(nil)
 	_ triggermesh.Consumer  = (*Broker)(nil)
+	_ triggermesh.Platform  = (*Broker)(nil)
 )
 
 const (
@@ -105,14 +107,54 @@ func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (*trigg
 	}
 
 	composeService := triggermesh.DockerComposeService{
-		Image:       viper.GetString("triggermesh.broker.image"),
-		Command:     command,
-		Volumes:     []triggermesh.DockerComposeVolume{volume},
-		Ports:       []string{port + ":8080"},
-		Environment: []string{},
+		ContainerName: b.Name,
+		Image:         viper.GetString("triggermesh.broker.image"),
+		Command:       command,
+		Volumes:       []triggermesh.DockerComposeVolume{volume},
+		Ports:         []string{port + ":8080"},
+		Environment:   []string{},
 	}
 
 	return &composeService, nil
+}
+
+// TODO
+func (b *Broker) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServiceSpec, error) {
+	entrypoint := []string{
+		"start",
+		"--memory.buffer-size",
+		viper.GetString("triggermesh.broker.memory.buffer-size"),
+		"--memory.produce-timeout",
+		viper.GetString("triggermesh.broker.memory.produce-timeout"),
+		"--broker-config-path",
+		"/etc/triggermesh/broker.conf",
+	}
+	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
+	if pollingPeriod != "" {
+		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
+	}
+	command := strings.Join(entrypoint, " ")
+
+	service := &godo.AppServiceSpec{
+		Name: b.Name,
+		Image: &godo.ImageSourceSpec{
+			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
+			Repository:   "memory-broker",
+			Tag:          "latest",
+		},
+		RunCommand: command,
+		HTTPPort:   8080,
+		Routes: []*godo.AppRouteSpec{
+			{
+				Path: "/",
+			},
+		},
+		Envs:             []*godo.AppVariableDefinition{},
+		InstanceCount:    1,
+		InstanceSizeSlug: "professional-xs",
+	}
+
+	return service, nil
 }
 
 func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {

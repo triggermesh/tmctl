@@ -141,10 +141,10 @@ func (o *createOptions) target(name, kind string, args map[string]string, eventS
 		return err
 	}
 
-	_, err = o.Manifest.AddCompose(t, secretsEnv)
-	if err != nil {
-		return fmt.Errorf("unable to update compose manifest: %w", err)
-	}
+	// err = o.Manifest.AddCompose(t, secretsEnv)
+	// if err != nil {
+	// 	return fmt.Errorf("unable to update compose manifest: %w", err)
+	// }
 
 	// update our triggers in case of target container restart
 	if restart || secretsChanged {
@@ -207,14 +207,10 @@ func (o *createOptions) targetFromImage(name, image string, params map[string]st
 	if err != nil {
 		return fmt.Errorf("unable to update manifest: %w", err)
 	}
+
 	log.Println("Starting container")
 	if _, err := s.(triggermesh.Runnable).Start(ctx, nil, restart); err != nil {
 		return err
-	}
-
-	_, err = o.Manifest.AddCompose(s, nil)
-	if err != nil {
-		return fmt.Errorf("unable to update compose manifest: %w", err)
 	}
 
 	// update our triggers in case of target container restart

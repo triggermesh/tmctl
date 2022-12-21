@@ -19,14 +19,18 @@ package service
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/digitalocean/godo"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 )
 
 const (
@@ -45,6 +49,7 @@ var (
 	_ triggermesh.Consumer  = (*Service)(nil)
 	_ triggermesh.Producer  = (*Service)(nil)
 	_ triggermesh.Runnable  = (*Service)(nil)
+	_ triggermesh.Platform  = (*Service)(nil)
 )
 
 type Role string
@@ -96,20 +101,77 @@ func (s *Service) AsDockerComposeObject(additionalEnvs map[string]string) (*trig
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
 
-	image := adapter.Image(u, s.Image)
-
 	port, err := s.GetPort(context.Background())
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO envs
+	envs := []corev1.EnvVar{}
+	sinkURI, set, err := unstructured.NestedString(u.Object, "spec", "sink", "uri")
+	if err != nil {
+		return nil, fmt.Errorf("sink URI type: %w", err)
+	}
+	if set {
+		envs = append(envs, corev1.EnvVar{Name: "K_SINK", Value: sinkURI})
+	}
+
+	for k, v := range additionalEnvs {
+		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
+	}
 
 	return &triggermesh.DockerComposeService{
-		Image:       image,
-		Environment: []string{},
-		Ports:       []string{port + ":8080"},
-		Volumes:     []triggermesh.DockerComposeVolume{},
+		ContainerName: s.Name,
+		Image:         s.Image,
+		Environment:   pkg.EnvsToString(envs),
+		Ports:         []string{port + ":8080"},
+		Volumes:       []triggermesh.DockerComposeVolume{},
+	}, nil
+}
+
+func (s *Service) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServiceSpec, error) {
+	u, err := s.asUnstructured()
+	if err != nil {
+		return nil, fmt.Errorf("creating object: %w", err)
+	}
+
+	port, err := s.GetPort(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	intPort, err := strconv.ParseInt(port, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	envs := []*godo.AppVariableDefinition{}
+	sinkURI, set, err := unstructured.NestedString(u.Object, "spec", "sink", "uri")
+	if err != nil {
+		return nil, fmt.Errorf("sink URI type: %w", err)
+	}
+	if set {
+		envs = append(envs, &godo.AppVariableDefinition{Key: "K_SINK", Value: sinkURI})
+	}
+
+	for k, v := range additionalEnvs {
+		envs = append(envs, &godo.AppVariableDefinition{Key: k, Value: v})
+	}
+
+	return &godo.AppServiceSpec{
+		Name: s.Name,
+		Image: &godo.ImageSourceSpec{
+			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
+			Repository:   s.Image,
+			Tag:          "latest",
+		},
+		HTTPPort: intPort,
+		Routes: []*godo.AppRouteSpec{
+			{
+				Path: "/",
+			},
+		},
+		Envs:             envs,
+		InstanceCount:    1,
+		InstanceSizeSlug: "professional-xs",
 	}, nil
 }
 
