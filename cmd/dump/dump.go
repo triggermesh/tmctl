@@ -57,7 +57,7 @@ type dumpOptions struct {
 func NewCmd() *cobra.Command {
 	o := &dumpOptions{}
 	dumpCmd := &cobra.Command{
-		Use:     "dump [broker] -p [platform]",
+		Use:     "dump [broker]",
 		Short:   "Generate manifest",
 		Example: "tmctl dump",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -147,10 +147,16 @@ func (o *dumpOptions) dump() error {
 		switch o.Platform {
 		case platformKubernetes:
 			fmt.Println("---")
-			o.format(object)
+			err := o.format(object)
+			if err != nil {
+				return err
+			}
 		case platformKnative:
 			fmt.Println("---")
-			o.format(o.knativeEventingTransformation(object))
+			err := o.format(o.knativeEventingTransformation(object))
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -159,7 +165,10 @@ func (o *dumpOptions) dump() error {
 		composeObject := triggermesh.DockerCompose{
 			Services: composeObjects,
 		}
-		o.format(composeObject)
+		err := o.format(composeObject)
+		if err != nil {
+			return err
+		}
 	case platformDigitalOcean:
 		for _, service := range doServices {
 			if service.Name == o.Context {
@@ -177,7 +186,10 @@ func (o *dumpOptions) dump() error {
 			Services: doServices,
 		}
 
-		o.format(doObject)
+		err := o.format(doObject)
+		if err != nil {
+			return err
+		}
 	}
 
 	if len(externalReconcilable) != 0 {

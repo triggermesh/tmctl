@@ -18,6 +18,7 @@ tmctl dump
   -h, --help            help for dump
       --knative         Use Knative Eventing components
   -o, --output string   Output format (default "yaml")
+  -p, --platform string   kubernetes, knative, docker-compose, digitalocean (default "kubernetes")
 ```
 
 ### Options inherited from parent commands
