@@ -19,6 +19,7 @@ package triggermesh
 import (
 	"context"
 
+	"github.com/digitalocean/godo"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 )
@@ -67,4 +68,9 @@ type Reconcilable interface {
 
 	UpdateStatus(map[string]interface{})
 	GetExternalResources() map[string]interface{}
+}
+
+type Platform interface {
+	AsDockerComposeObject(additionalEnvs map[string]string) (*DockerComposeService, error)
+	AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServiceSpec, error)
 }

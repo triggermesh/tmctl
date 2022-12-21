@@ -17,7 +17,10 @@ limitations under the License.
 package pkg
 
 import (
+	"fmt"
 	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 func ParseArgs(args map[string]string) map[string]interface{} {
@@ -57,4 +60,12 @@ func mergeMaps(src, dst map[string]interface{}) map[string]interface{} {
 		}
 	}
 	return dst
+}
+
+func EnvsToString(envs []corev1.EnvVar) []string {
+	result := []string{}
+	for _, env := range envs {
+		result = append(result, fmt.Sprintf("%s=%s", env.Name, env.Value))
+	}
+	return result
 }

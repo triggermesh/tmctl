@@ -28,6 +28,8 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
+require github.com/google/go-querystring v1.1.0 // indirect
+
 replace k8s.io/client-go => k8s.io/client-go v0.25.3
 
 require (
@@ -61,6 +63,7 @@ require (
 	github.com/cloudevents/sdk-go/observability/opencensus/v2 v2.12.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/digitalocean/godo v1.93.0
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/docker/distribution v2.8.0+incompatible // indirect
 	github.com/docker/go-units v0.4.0 // indirect

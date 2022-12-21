@@ -78,3 +78,24 @@ func latestOrDefault(defaultVersion string) string {
 	}
 	return j.TagName
 }
+
+type DockerCompose struct {
+	Services Services `json:"services"`
+}
+
+type Services map[string]DockerComposeService
+
+type DockerComposeService struct {
+	ContainerName string                `json:"container_name"`
+	Command       string                `json:"command,omitempty"`
+	Image         string                `json:"image"`
+	Ports         []string              `json:"ports"`
+	Environment   []string              `json:"environment"`
+	Volumes       []DockerComposeVolume `json:"volumes"`
+}
+
+type DockerComposeVolume struct {
+	Type   string `json:"type"`
+	Source string `json:"source"`
+	Target string `json:"target"`
+}
