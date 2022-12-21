@@ -1,6 +1,6 @@
 ## tmctl dump
 
-Generate Kubernetes manifest
+Generate manifest
 
 ```
 tmctl dump [broker] [flags]
@@ -15,9 +15,8 @@ tmctl dump
 ### Options
 
 ```
-  -h, --help            help for dump
-      --knative         Use Knative Eventing components
-  -o, --output string   Output format (default "yaml")
+  -h, --help              help for dump
+  -o, --output string     Output format (default "yaml")
   -p, --platform string   kubernetes, knative, docker-compose, digitalocean (default "kubernetes")
 ```
 
