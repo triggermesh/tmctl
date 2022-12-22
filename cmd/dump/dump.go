@@ -35,6 +35,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 	kyaml "sigs.k8s.io/yaml"
 )
 
@@ -83,9 +84,9 @@ func NewCmd() *cobra.Command {
 func (o *dumpOptions) dump() error {
 	var externalReconcilable []string
 	var doServices []*godo.AppServiceSpec
-	composeObjects := make(map[string]triggermesh.DockerComposeService)
-	brokerConfig := eventingbroker.Config{
-		Triggers: make(map[string]eventingbroker.Trigger),
+	composeObjects := make(map[string]compose.DockerComposeService)
+	brokerConfig := tmbroker.Configuration{
+		Triggers: make(map[string]tmbroker.LocalTriggerSpec),
 	}
 
 	for _, object := range o.Manifest.Objects {
@@ -93,7 +94,7 @@ func (o *dumpOptions) dump() error {
 		if component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest); err == nil {
 			if container, ok := component.(triggermesh.Runnable); ok {
 				if _, err := container.Info(context.Background()); err == nil {
-					if platform, ok := component.(triggermesh.Platform); ok {
+					if platform, ok := component.(triggermesh.Exportable); ok {
 						if _, ok := component.(triggermesh.Parent); ok {
 							_, secretsEnv, err = components.ProcessSecrets(component.(triggermesh.Parent), o.Manifest)
 							if err != nil {
@@ -106,7 +107,7 @@ func (o *dumpOptions) dump() error {
 							if err != nil {
 								return fmt.Errorf("processing DigitalOcean: %v", err)
 							}
-							doServices = append(doServices, doService)
+							doServices = append([]*godo.AppServiceSpec{}, doService)
 
 						case platformDockerCompose:
 							composeService, err := platform.AsDockerComposeObject(secretsEnv)
@@ -127,33 +128,33 @@ func (o *dumpOptions) dump() error {
 					}
 				}
 			}
-			switch o.Platform {
-			case platformDigitalOcean:
-				switch object.Kind {
-				case tmbroker.TriggerKind:
-					trigger := eventingbroker.Trigger{}
+			if o.Platform == platformDigitalOcean && object.Kind == tmbroker.TriggerKind {
+				trigger := tmbroker.LocalTriggerSpec{}
+				filter := eventingbroker.Filter{}
 
-					target := component.(*tmbroker.Trigger).Target
-					targetURL := fmt.Sprintf("${%s.PRIVATE_URL}", target.Ref.Name)
-					filter := component.(*tmbroker.Trigger).Filters[0]
-					trigger.Filters = append(trigger.Filters, filter)
-					trigger.Target = eventingbroker.Target{
-						URL: &targetURL,
-					}
-					brokerConfig.Triggers[object.Metadata.Name] = trigger
+				target := component.(*tmbroker.Trigger).Target
+				targetURL := fmt.Sprintf("${%s.PRIVATE_URL}", target.Ref.Name)
+				if component.(*tmbroker.Trigger).Filters != nil {
+					filter = component.(*tmbroker.Trigger).Filters[0]
 				}
+
+				trigger.Filters = append(trigger.Filters, filter)
+				trigger.Target = tmbroker.LocalTarget{
+					URL: targetURL,
+				}
+				brokerConfig.Triggers[object.Metadata.Name] = trigger
 			}
 		}
 		switch o.Platform {
 		case platformKubernetes:
 			fmt.Println("---")
-			err := o.format(object)
+			err := o.formatAndPrint(object)
 			if err != nil {
 				return err
 			}
 		case platformKnative:
 			fmt.Println("---")
-			err := o.format(o.knativeEventingTransformation(object))
+			err := o.formatAndPrint(o.knativeEventingTransformation(object))
 			if err != nil {
 				return err
 			}
@@ -162,10 +163,10 @@ func (o *dumpOptions) dump() error {
 
 	switch o.Platform {
 	case platformDockerCompose:
-		composeObject := triggermesh.DockerCompose{
+		composeObject := compose.DockerCompose{
 			Services: composeObjects,
 		}
-		err := o.format(composeObject)
+		err := o.formatAndPrint(composeObject)
 		if err != nil {
 			return err
 		}
@@ -186,7 +187,7 @@ func (o *dumpOptions) dump() error {
 			Services: doServices,
 		}
 
-		err := o.format(doObject)
+		err := o.formatAndPrint(doObject)
 		if err != nil {
 			return err
 		}
@@ -230,7 +231,7 @@ func (o *dumpOptions) knativeEventingTransformation(object kubernetes.Object) ku
 	return object
 }
 
-func (o *dumpOptions) format(object interface{}) error {
+func (o *dumpOptions) formatAndPrint(object interface{}) error {
 	switch o.Format {
 	case "json":
 		jsn, err := json.MarshalIndent(object, "", "  ")

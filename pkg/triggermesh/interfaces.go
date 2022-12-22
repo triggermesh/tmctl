@@ -22,6 +22,7 @@ import (
 	"github.com/digitalocean/godo"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
 // Component is the common interface for all TriggerMesh components.
@@ -70,7 +71,7 @@ type Reconcilable interface {
 	GetExternalResources() map[string]interface{}
 }
 
-type Platform interface {
-	AsDockerComposeObject(additionalEnvs map[string]string) (*DockerComposeService, error)
+type Exportable interface {
+	AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error)
 	AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServiceSpec, error)
 }

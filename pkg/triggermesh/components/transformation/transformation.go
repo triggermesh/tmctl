@@ -19,6 +19,7 @@ package transformation
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -30,14 +31,15 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/env"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
 var (
-	_ triggermesh.Component = (*Transformation)(nil)
-	_ triggermesh.Consumer  = (*Transformation)(nil)
-	_ triggermesh.Producer  = (*Transformation)(nil)
-	_ triggermesh.Runnable  = (*Transformation)(nil)
-	_ triggermesh.Platform  = (*Transformation)(nil)
+	_ triggermesh.Component  = (*Transformation)(nil)
+	_ triggermesh.Consumer   = (*Transformation)(nil)
+	_ triggermesh.Producer   = (*Transformation)(nil)
+	_ triggermesh.Runnable   = (*Transformation)(nil)
+	_ triggermesh.Exportable = (*Transformation)(nil)
 )
 
 type Transformation struct {
@@ -67,7 +69,7 @@ func (t *Transformation) getMeta() kubernetes.Metadata {
 	}
 }
 
-func (t *Transformation) AsDockerComposeObject(additionalEnvs map[string]string) (*triggermesh.DockerComposeService, error) {
+func (t *Transformation) AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error) {
 	o, err := t.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -108,12 +110,12 @@ func (t *Transformation) AsDockerComposeObject(additionalEnvs map[string]string)
 		return nil, err
 	}
 
-	return &triggermesh.DockerComposeService{
+	return &compose.DockerComposeService{
 		ContainerName: t.Name,
 		Image:         image,
 		Environment:   pkg.EnvsToString(envs),
 		Ports:         []string{port + ":8080"},
-		Volumes:       []triggermesh.DockerComposeVolume{},
+		Volumes:       []compose.DockerComposeVolume{},
 	}, nil
 }
 
@@ -144,12 +146,16 @@ func (t *Transformation) AsDigitalOcean(additionalEnvs map[string]string) (*godo
 		envs = append(envs, &godo.AppVariableDefinition{Key: k, Value: v})
 	}
 
+	// Get the image and tag
+	imageSplit := strings.Split(adapter.Image(o, t.Version), "/")[2]
+	image := strings.Split(imageSplit, ":")
+
 	service := &godo.AppServiceSpec{
 		Name: t.Name,
 		Image: &godo.ImageSourceSpec{
 			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
-			Repository:   adapter.Image(o, t.Version),
-			Tag:          "latest",
+			Repository:   image[0],
+			Tag:          image[1],
 		},
 		HTTPPort: 8080,
 		Routes: []*godo.AppRouteSpec{

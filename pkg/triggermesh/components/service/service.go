@@ -31,6 +31,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
 const (
@@ -45,11 +46,11 @@ var (
 	Producer Role = "source"
 	Consumer Role = "target"
 
-	_ triggermesh.Component = (*Service)(nil)
-	_ triggermesh.Consumer  = (*Service)(nil)
-	_ triggermesh.Producer  = (*Service)(nil)
-	_ triggermesh.Runnable  = (*Service)(nil)
-	_ triggermesh.Platform  = (*Service)(nil)
+	_ triggermesh.Component  = (*Service)(nil)
+	_ triggermesh.Consumer   = (*Service)(nil)
+	_ triggermesh.Producer   = (*Service)(nil)
+	_ triggermesh.Runnable   = (*Service)(nil)
+	_ triggermesh.Exportable = (*Service)(nil)
 )
 
 type Role string
@@ -95,7 +96,7 @@ func (s *Service) AsK8sObject() (kubernetes.Object, error) {
 	}, nil
 }
 
-func (s *Service) AsDockerComposeObject(additionalEnvs map[string]string) (*triggermesh.DockerComposeService, error) {
+func (s *Service) AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error) {
 	u, err := s.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -119,12 +120,12 @@ func (s *Service) AsDockerComposeObject(additionalEnvs map[string]string) (*trig
 		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
 	}
 
-	return &triggermesh.DockerComposeService{
+	return &compose.DockerComposeService{
 		ContainerName: s.Name,
 		Image:         s.Image,
 		Environment:   pkg.EnvsToString(envs),
 		Ports:         []string{port + ":8080"},
-		Volumes:       []triggermesh.DockerComposeVolume{},
+		Volumes:       []compose.DockerComposeVolume{},
 	}, nil
 }
 
@@ -144,12 +145,16 @@ func (s *Service) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppSer
 		envs = append(envs, &godo.AppVariableDefinition{Key: k, Value: v})
 	}
 
+	// Get the image and tag
+	imageSplit := strings.Split(s.Image, "/")[2]
+	image := strings.Split(imageSplit, ":")
+
 	return &godo.AppServiceSpec{
 		Name: s.Name,
 		Image: &godo.ImageSourceSpec{
 			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
-			Repository:   s.Image,
-			Tag:          "latest",
+			Repository:   image[0],
+			Tag:          image[1],
 		},
 		HTTPPort: intPort,
 		Routes: []*godo.AppRouteSpec{

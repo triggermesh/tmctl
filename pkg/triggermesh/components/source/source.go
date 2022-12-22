@@ -35,6 +35,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
 var (
@@ -43,7 +44,7 @@ var (
 	_ triggermesh.Producer     = (*Source)(nil)
 	_ triggermesh.Runnable     = (*Source)(nil)
 	_ triggermesh.Parent       = (*Source)(nil)
-	_ triggermesh.Platform     = (*Source)(nil)
+	_ triggermesh.Exportable   = (*Source)(nil)
 )
 
 type Source struct {
@@ -77,7 +78,7 @@ func (s *Source) AsK8sObject() (kubernetes.Object, error) {
 	return kubernetes.CreateObject(s.GetKind(), s.CRDFile, s.getMeta(), spec)
 }
 
-func (s *Source) AsDockerComposeObject(additionalEnvs map[string]string) (*triggermesh.DockerComposeService, error) {
+func (s *Source) AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error) {
 	o, err := s.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -118,12 +119,12 @@ func (s *Source) AsDockerComposeObject(additionalEnvs map[string]string) (*trigg
 		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
 	}
 
-	return &triggermesh.DockerComposeService{
+	return &compose.DockerComposeService{
 		ContainerName: s.Name,
 		Image:         image,
 		Environment:   pkg.EnvsToString(envs),
 		Ports:         []string{"8080"},
-		Volumes:       []triggermesh.DockerComposeVolume{},
+		Volumes:       []compose.DockerComposeVolume{},
 	}, nil
 }
 
@@ -158,12 +159,16 @@ func (s *Source) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServ
 		envs = append(envs, &godo.AppVariableDefinition{Key: k, Value: v})
 	}
 
+	// Get the image and tag
+	imageSplit := strings.Split(adapter.Image(o, s.Version), "/")[2]
+	image := strings.Split(imageSplit, ":")
+
 	service := &godo.AppServiceSpec{
 		Name: s.Name,
 		Image: &godo.ImageSourceSpec{
 			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
-			Repository:   adapter.Image(o, s.Version),
-			Tag:          "latest",
+			Repository:   image[0],
+			Tag:          image[1],
 		},
 		HTTPPort: 8080,
 		Routes: []*godo.AppRouteSpec{

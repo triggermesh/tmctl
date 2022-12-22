@@ -31,13 +31,14 @@ import (
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
 var (
-	_ triggermesh.Component = (*Broker)(nil)
-	_ triggermesh.Runnable  = (*Broker)(nil)
-	_ triggermesh.Consumer  = (*Broker)(nil)
-	_ triggermesh.Platform  = (*Broker)(nil)
+	_ triggermesh.Component  = (*Broker)(nil)
+	_ triggermesh.Runnable   = (*Broker)(nil)
+	_ triggermesh.Consumer   = (*Broker)(nil)
+	_ triggermesh.Exportable = (*Broker)(nil)
 )
 
 const (
@@ -78,7 +79,7 @@ func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
 	}, nil
 }
 
-func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (*triggermesh.DockerComposeService, error) {
+func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error) {
 	entrypoint := []string{
 		"start",
 		"--memory.buffer-size",
@@ -95,7 +96,7 @@ func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (*trigg
 
 	command := strings.Join(entrypoint, " ")
 
-	volume := triggermesh.DockerComposeVolume{
+	volume := compose.DockerComposeVolume{
 		Type:   "bind",
 		Source: b.ConfigFile,
 		Target: "/etc/triggermesh/broker.conf",
@@ -106,11 +107,11 @@ func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (*trigg
 		return nil, err
 	}
 
-	composeService := triggermesh.DockerComposeService{
+	composeService := compose.DockerComposeService{
 		ContainerName: b.Name,
 		Image:         viper.GetString("triggermesh.broker.image"),
 		Command:       command,
-		Volumes:       []triggermesh.DockerComposeVolume{volume},
+		Volumes:       []compose.DockerComposeVolume{volume},
 		Ports:         []string{port + ":8080"},
 		Environment:   []string{},
 	}
@@ -135,12 +136,16 @@ func (b *Broker) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServ
 	}
 	command := strings.Join(entrypoint, " ")
 
+	// Get the image and tag
+	imageSplit := strings.Split(viper.GetString("triggermesh.broker.image"), "/")[2]
+	image := strings.Split(imageSplit, ":")
+
 	service := &godo.AppServiceSpec{
 		Name: b.Name,
 		Image: &godo.ImageSourceSpec{
 			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
-			Repository:   "memory-broker",
-			Tag:          "latest",
+			Repository:   image[0],
+			Tag:          image[1],
 		},
 		RunCommand: command,
 		HTTPPort:   8080,
