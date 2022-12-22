@@ -35,6 +35,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/digitalocean"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
@@ -128,7 +129,7 @@ func (s *Source) AsDockerComposeObject(additionalEnvs map[string]string) (*compo
 	}, nil
 }
 
-func (s *Source) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServiceSpec, error) {
+func (s *Source) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean.DigitalOceanApp, error) {
 	o, err := s.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -138,10 +139,6 @@ func (s *Source) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServ
 	if err != nil {
 		return nil, fmt.Errorf("adapter environment: %w", err)
 	}
-
-	sinkURI := fmt.Sprintf("${%s.PRIVATE_URL}/%s", s.Broker, s.Broker)
-
-	adapterEnv = append(adapterEnv, corev1.EnvVar{Name: "K_SINK", Value: sinkURI})
 
 	envs := []*godo.AppVariableDefinition{}
 	for _, v := range adapterEnv {
@@ -159,28 +156,33 @@ func (s *Source) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServ
 		envs = append(envs, &godo.AppVariableDefinition{Key: k, Value: v})
 	}
 
+	sinkURI := fmt.Sprintf("${%s.PRIVATE_URL}/%s", s.Broker, s.Broker)
+	envs = append(envs, &godo.AppVariableDefinition{Key: "K_SINK", Value: sinkURI, Scope: "RUN_AND_BUILD_TIME"})
+
 	// Get the image and tag
 	imageSplit := strings.Split(adapter.Image(o, s.Version), "/")[2]
 	image := strings.Split(imageSplit, ":")
 
-	service := &godo.AppServiceSpec{
+	worker := &godo.AppWorkerSpec{
 		Name: s.Name,
 		Image: &godo.ImageSourceSpec{
+			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
+				Enabled: true,
+			},
 			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
 			Repository:   image[0],
 			Tag:          image[1],
-		},
-		HTTPPort: 8080,
-		Routes: []*godo.AppRouteSpec{
-			{
-				Path: "/",
-			},
 		},
 		Envs:             envs,
 		InstanceCount:    1,
 		InstanceSizeSlug: "professional-xs",
 	}
-	return service, nil
+
+	doApp := &digitalocean.DigitalOceanApp{
+		Worker: worker,
+	}
+
+	return doApp, nil
 }
 
 func (s *Source) getMeta() kubernetes.Metadata {

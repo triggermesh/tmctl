@@ -29,18 +29,18 @@ import (
 )
 
 type Configuration struct {
-	Triggers map[string]LocalTriggerSpec `yaml:"triggers"`
+	Triggers map[string]LocalTriggerSpec `yaml:"triggers" json:"triggers"`
 }
 
 type LocalTriggerSpec struct {
-	Filters []eventingbroker.Filter `yaml:"filters,omitempty"`
-	Target  LocalTarget             `yaml:"target"`
+	Filters []eventingbroker.Filter `yaml:"filters,omitempty" json:"filters,omitempty"`
+	Target  LocalTarget             `yaml:"target" json:"target"`
 }
 
 type LocalTarget struct {
-	URL             string                          `yaml:"url,omitempty"`
-	Component       string                          `yaml:"component,omitempty"`
-	DeliveryOptions *eventingbroker.DeliveryOptions `yaml:"deliveryOptions,omitempty"`
+	URL             string                          `yaml:"url,omitempty" json:"url,omitempty"`
+	Component       string                          `yaml:"component,omitempty" json:"component,omitempty"`
+	DeliveryOptions *eventingbroker.DeliveryOptions `yaml:"deliveryOptions,omitempty" json:"deliveryOptions,omitempty"`
 }
 
 func readBrokerConfig(path string) (Configuration, error) {

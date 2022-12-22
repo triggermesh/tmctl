@@ -31,6 +31,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/digitalocean"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
@@ -119,7 +120,7 @@ func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (*compo
 	return &composeService, nil
 }
 
-func (b *Broker) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServiceSpec, error) {
+func (b *Broker) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean.DigitalOceanApp, error) {
 	entrypoint := []string{
 		"/memory-broker",
 		"start",
@@ -127,8 +128,6 @@ func (b *Broker) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServ
 		viper.GetString("triggermesh.broker.memory.buffer-size"),
 		"--memory.produce-timeout",
 		viper.GetString("triggermesh.broker.memory.produce-timeout"),
-		"--broker-config-path",
-		"/etc/triggermesh/broker.conf",
 	}
 	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
 	if pollingPeriod != "" {
@@ -151,7 +150,7 @@ func (b *Broker) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServ
 		HTTPPort:   8080,
 		Routes: []*godo.AppRouteSpec{
 			{
-				Path: "/",
+				Path: "/" + b.Name,
 			},
 		},
 		Envs:             []*godo.AppVariableDefinition{},
@@ -159,7 +158,11 @@ func (b *Broker) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServ
 		InstanceSizeSlug: "professional-xs",
 	}
 
-	return service, nil
+	doApp := &digitalocean.DigitalOceanApp{
+		Service: service,
+	}
+
+	return doApp, nil
 }
 
 func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {

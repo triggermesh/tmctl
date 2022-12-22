@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +30,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/digitalocean"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
@@ -129,16 +129,7 @@ func (s *Service) AsDockerComposeObject(additionalEnvs map[string]string) (*comp
 	}, nil
 }
 
-func (s *Service) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServiceSpec, error) {
-	port, err := s.GetPort(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	intPort, err := strconv.ParseInt(port, 0, 0)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Service) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean.DigitalOceanApp, error) {
 	envs := []*godo.AppVariableDefinition{}
 
 	for k, v := range additionalEnvs {
@@ -149,14 +140,17 @@ func (s *Service) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppSer
 	imageSplit := strings.Split(s.Image, "/")[2]
 	image := strings.Split(imageSplit, ":")
 
-	return &godo.AppServiceSpec{
+	service := &godo.AppServiceSpec{
 		Name: s.Name,
 		Image: &godo.ImageSourceSpec{
+			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
+				Enabled: true,
+			},
 			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
 			Repository:   image[0],
 			Tag:          image[1],
 		},
-		HTTPPort: intPort,
+		HTTPPort: 8080,
 		Routes: []*godo.AppRouteSpec{
 			{
 				Path: "/",
@@ -165,7 +159,13 @@ func (s *Service) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppSer
 		Envs:             envs,
 		InstanceCount:    1,
 		InstanceSizeSlug: "professional-xs",
-	}, nil
+	}
+
+	doApp := &digitalocean.DigitalOceanApp{
+		Service: service,
+	}
+
+	return doApp, nil
 }
 
 func (s *Service) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {

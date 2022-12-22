@@ -32,6 +32,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/env"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/digitalocean"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
@@ -122,7 +123,7 @@ func (t *Target) AsDockerComposeObject(additionalEnvs map[string]string) (*compo
 	}, nil
 }
 
-func (t *Target) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServiceSpec, error) {
+func (t *Target) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean.DigitalOceanApp, error) {
 	o, err := t.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -156,6 +157,9 @@ func (t *Target) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServ
 	service := &godo.AppServiceSpec{
 		Name: t.Name,
 		Image: &godo.ImageSourceSpec{
+			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
+				Enabled: true,
+			},
 			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
 			Repository:   image[0],
 			Tag:          image[1],
@@ -170,7 +174,12 @@ func (t *Target) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServ
 		InstanceCount:    1,
 		InstanceSizeSlug: "professional-xs",
 	}
-	return service, nil
+
+	doApp := &digitalocean.DigitalOceanApp{
+		Service: service,
+	}
+
+	return doApp, nil
 }
 
 func (t *Target) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {

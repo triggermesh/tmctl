@@ -31,6 +31,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/env"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/digitalocean"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
@@ -119,7 +120,7 @@ func (t *Transformation) AsDockerComposeObject(additionalEnvs map[string]string)
 	}, nil
 }
 
-func (t *Transformation) AsDigitalOcean(additionalEnvs map[string]string) (*godo.AppServiceSpec, error) {
+func (t *Transformation) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean.DigitalOceanApp, error) {
 	o, err := t.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -150,24 +151,26 @@ func (t *Transformation) AsDigitalOcean(additionalEnvs map[string]string) (*godo
 	imageSplit := strings.Split(adapter.Image(o, t.Version), "/")[2]
 	image := strings.Split(imageSplit, ":")
 
-	service := &godo.AppServiceSpec{
+	worker := &godo.AppWorkerSpec{
 		Name: t.Name,
 		Image: &godo.ImageSourceSpec{
+			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
+				Enabled: true,
+			},
 			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
 			Repository:   image[0],
 			Tag:          image[1],
-		},
-		HTTPPort: 8080,
-		Routes: []*godo.AppRouteSpec{
-			{
-				Path: "/",
-			},
 		},
 		Envs:             envs,
 		InstanceCount:    1,
 		InstanceSizeSlug: "professional-xs",
 	}
-	return service, nil
+
+	doApp := &digitalocean.DigitalOceanApp{
+		Worker: worker,
+	}
+
+	return doApp, nil
 }
 
 func (t *Transformation) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {

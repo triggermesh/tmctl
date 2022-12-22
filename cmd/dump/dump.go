@@ -84,6 +84,7 @@ func NewCmd() *cobra.Command {
 func (o *dumpOptions) dump() error {
 	var externalReconcilable []string
 	var doServices []*godo.AppServiceSpec
+	var doWorkers []*godo.AppWorkerSpec
 	composeObjects := make(map[string]compose.DockerComposeService)
 	brokerConfig := tmbroker.Configuration{
 		Triggers: make(map[string]tmbroker.LocalTriggerSpec),
@@ -103,12 +104,21 @@ func (o *dumpOptions) dump() error {
 						}
 						switch o.Platform {
 						case platformDigitalOcean:
-							doService, err := platform.AsDigitalOcean(secretsEnv)
-							if err != nil {
-								return fmt.Errorf("processing DigitalOcean: %v", err)
+							if object.APIVersion == "sources.triggermesh.io/v1alpha1" || object.Kind == "Transformation" {
+								doApp, err := platform.AsDigitalOcean(secretsEnv)
+								if err != nil {
+									return fmt.Errorf("processing DigitalOcean: %v", err)
+								}
+								worker := godo.AppWorkerSpec(*doApp.Worker)
+								doWorkers = append(doWorkers, &worker)
+							} else {
+								doApp, err := platform.AsDigitalOcean(secretsEnv)
+								if err != nil {
+									return fmt.Errorf("processing DigitalOcean: %v", err)
+								}
+								service := godo.AppServiceSpec(*doApp.Service)
+								doServices = append(doServices, &service)
 							}
-							doServices = append(doServices, doService)
-
 						case platformDockerCompose:
 							composeService, err := platform.AsDockerComposeObject(secretsEnv)
 							if err != nil {
@@ -185,6 +195,8 @@ func (o *dumpOptions) dump() error {
 		doObject := godo.AppSpec{
 			Name:     "triggermesh",
 			Services: doServices,
+			Workers:  doWorkers,
+			Region:   "fra",
 		}
 
 		err := o.formatAndPrint(doObject)
