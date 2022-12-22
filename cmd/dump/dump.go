@@ -107,7 +107,7 @@ func (o *dumpOptions) dump() error {
 							if err != nil {
 								return fmt.Errorf("processing DigitalOcean: %v", err)
 							}
-							doServices = append([]*godo.AppServiceSpec{}, doService)
+							doServices = append(doServices, doService)
 
 						case platformDockerCompose:
 							composeService, err := platform.AsDockerComposeObject(secretsEnv)
