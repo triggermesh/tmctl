@@ -91,18 +91,7 @@ func (s *Source) AsDockerComposeObject(additionalEnvs map[string]string) (*compo
 		return nil, fmt.Errorf("adapter environment: %w", err)
 	}
 
-	broker, err := tmbroker.New(s.Broker, triggermesh.ManifestFile)
-	if err != nil {
-		return nil, err
-	}
-
-	brokerPort, err := broker.(triggermesh.Consumer).GetPort(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	sinkURI := "http://host.docker.internal:" + brokerPort
-
-	adapterEnv = append(adapterEnv, corev1.EnvVar{Name: "K_SINK", Value: sinkURI})
+	adapterEnv = append(adapterEnv, corev1.EnvVar{Name: "K_SINK", Value: fmt.Sprintf("http://%s:8080", s.Broker)})
 
 	envs := []corev1.EnvVar{}
 	for _, v := range adapterEnv {

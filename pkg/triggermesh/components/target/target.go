@@ -85,14 +85,6 @@ func (t *Target) AsDockerComposeObject(additionalEnvs map[string]string) (*compo
 		return nil, fmt.Errorf("adapter environment: %w", err)
 	}
 
-	sinkURI, set, err := unstructured.NestedString(o.Object, "spec", "sink", "uri")
-	if err != nil {
-		return nil, fmt.Errorf("sink URI type: %w", err)
-	}
-	if set {
-		adapterEnv = append(adapterEnv, corev1.EnvVar{Name: "K_SINK", Value: sinkURI})
-	}
-
 	envs := []corev1.EnvVar{}
 	for _, v := range adapterEnv {
 		if v.ValueFrom != nil && additionalEnvs != nil {
@@ -109,10 +101,7 @@ func (t *Target) AsDockerComposeObject(additionalEnvs map[string]string) (*compo
 		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
 	}
 
-	port, err := t.GetPort(context.Background())
-	if err != nil {
-		return nil, err
-	}
+	port := compose.RandomPort()
 
 	return &compose.DockerComposeService{
 		ContainerName: t.Name,

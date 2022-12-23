@@ -97,24 +97,8 @@ func (s *Service) AsK8sObject() (kubernetes.Object, error) {
 }
 
 func (s *Service) AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error) {
-	u, err := s.asUnstructured()
-	if err != nil {
-		return nil, fmt.Errorf("creating object: %w", err)
-	}
-
-	port, err := s.GetPort(context.Background())
-	if err != nil {
-		return nil, err
-	}
-
+	port := compose.RandomPort()
 	envs := []corev1.EnvVar{}
-	sinkURI, set, err := unstructured.NestedString(u.Object, "spec", "sink", "uri")
-	if err != nil {
-		return nil, fmt.Errorf("sink URI type: %w", err)
-	}
-	if set {
-		envs = append(envs, corev1.EnvVar{Name: "K_SINK", Value: sinkURI})
-	}
 
 	for k, v := range additionalEnvs {
 		envs = append(envs, corev1.EnvVar{Name: k, Value: v})

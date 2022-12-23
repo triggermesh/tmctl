@@ -95,36 +95,12 @@ func (o *dumpOptions) dump() error {
 		if component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest); err == nil {
 			if container, ok := component.(triggermesh.Runnable); ok {
 				if _, err := container.Info(context.Background()); err == nil {
-					if platform, ok := component.(triggermesh.Exportable); ok {
+					if _, ok := component.(triggermesh.Exportable); ok {
 						if _, ok := component.(triggermesh.Parent); ok {
 							_, secretsEnv, err = components.ProcessSecrets(component.(triggermesh.Parent), o.Manifest)
 							if err != nil {
 								return fmt.Errorf("processing secrets: %v", err)
 							}
-						}
-						switch o.Platform {
-						case platformDigitalOcean:
-							if object.APIVersion == "sources.triggermesh.io/v1alpha1" || object.Kind == "Transformation" {
-								doApp, err := platform.AsDigitalOcean(secretsEnv)
-								if err != nil {
-									return fmt.Errorf("processing DigitalOcean: %v", err)
-								}
-								worker := godo.AppWorkerSpec(*doApp.Worker)
-								doWorkers = append(doWorkers, &worker)
-							} else {
-								doApp, err := platform.AsDigitalOcean(secretsEnv)
-								if err != nil {
-									return fmt.Errorf("processing DigitalOcean: %v", err)
-								}
-								service := godo.AppServiceSpec(*doApp.Service)
-								doServices = append(doServices, &service)
-							}
-						case platformDockerCompose:
-							composeService, err := platform.AsDockerComposeObject(secretsEnv)
-							if err != nil {
-								return fmt.Errorf("processing Docker-Compose: %v", err)
-							}
-							composeObjects[object.Metadata.Name] = *composeService
 						}
 					}
 					if reconcilable, ok := component.(triggermesh.Reconcilable); ok {
@@ -138,21 +114,57 @@ func (o *dumpOptions) dump() error {
 					}
 				}
 			}
-			if o.Platform == platformDigitalOcean && object.Kind == tmbroker.TriggerKind {
-				trigger := tmbroker.LocalTriggerSpec{}
-				filter := eventingbroker.Filter{}
 
-				target := component.(*tmbroker.Trigger).Target
-				targetURL := fmt.Sprintf("${%s.PRIVATE_URL}", target.Ref.Name)
-				if component.(*tmbroker.Trigger).Filters != nil {
-					filter = component.(*tmbroker.Trigger).Filters[0]
+			if platform, ok := component.(triggermesh.Exportable); ok {
+				if o.Platform == platformDigitalOcean {
+					if object.APIVersion == "sources.triggermesh.io/v1alpha1" || object.Kind == "Transformation" {
+						doApp, err := platform.AsDigitalOcean(secretsEnv)
+						if err != nil {
+							return fmt.Errorf("processing DigitalOcean workers: %v", err)
+						}
+						worker := godo.AppWorkerSpec(*doApp.Worker)
+						doWorkers = append(doWorkers, &worker)
+					} else {
+						doApp, err := platform.AsDigitalOcean(secretsEnv)
+						if err != nil {
+							return fmt.Errorf("processing DigitalOcean services: %v", err)
+						}
+						service := godo.AppServiceSpec(*doApp.Service)
+						doServices = append(doServices, &service)
+					}
 				}
+				if o.Platform == platformDockerCompose {
+					composeService, err := platform.AsDockerComposeObject(secretsEnv)
+					if err != nil {
+						return fmt.Errorf("processing Docker-Compose: %v", err)
+					}
+					composeObjects[object.Metadata.Name] = *composeService
+				}
+			}
 
-				trigger.Filters = append(trigger.Filters, filter)
-				trigger.Target = tmbroker.LocalTarget{
-					URL: targetURL,
+			if o.Platform == platformDigitalOcean || o.Platform == platformDockerCompose {
+				if object.Kind == tmbroker.TriggerKind {
+					target := component.(*tmbroker.Trigger).Target
+					var targetURL string
+					if o.Platform == platformDockerCompose {
+						targetURL = fmt.Sprintf("http://%s:8080", target.Ref.Name)
+					}
+					if o.Platform == platformDigitalOcean {
+						targetURL = fmt.Sprintf("${%s.PRIVATE_URL}", target.Ref.Name)
+					}
+					trigger := tmbroker.LocalTriggerSpec{}
+					filter := eventingbroker.Filter{}
+
+					if component.(*tmbroker.Trigger).Filters != nil {
+						filter = component.(*tmbroker.Trigger).Filters[0]
+					}
+
+					trigger.Filters = append(trigger.Filters, filter)
+					trigger.Target = tmbroker.LocalTarget{
+						URL: targetURL,
+					}
+					brokerConfig.Triggers[object.Metadata.Name] = trigger
 				}
-				brokerConfig.Triggers[object.Metadata.Name] = trigger
 			}
 		}
 		switch o.Platform {
@@ -173,6 +185,18 @@ func (o *dumpOptions) dump() error {
 
 	switch o.Platform {
 	case platformDockerCompose:
+		for _, service := range composeObjects {
+			if service.ContainerName == o.Context {
+				jsonBrokerConfig, err := json.Marshal(brokerConfig)
+				if err != nil {
+					return fmt.Errorf("processing broker config: %v", err)
+				}
+				envString := fmt.Sprintf("%s=%s", "BROKER_CONFIG", string(jsonBrokerConfig))
+				service.Environment = append(service.Environment, envString)
+
+				composeObjects[service.ContainerName] = service
+			}
+		}
 		composeObject := compose.DockerCompose{
 			Services: composeObjects,
 		}

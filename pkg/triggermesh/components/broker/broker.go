@@ -87,8 +87,6 @@ func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (*compo
 		viper.GetString("triggermesh.broker.memory.buffer-size"),
 		"--memory.produce-timeout",
 		viper.GetString("triggermesh.broker.memory.produce-timeout"),
-		"--broker-config-path",
-		"/etc/triggermesh/broker.conf",
 	}
 	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
 	if pollingPeriod != "" {
@@ -96,23 +94,13 @@ func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (*compo
 	}
 
 	command := strings.Join(entrypoint, " ")
-
-	volume := compose.DockerComposeVolume{
-		Type:   "bind",
-		Source: b.ConfigFile,
-		Target: "/etc/triggermesh/broker.conf",
-	}
-
-	port, err := b.GetPort(context.Background())
-	if err != nil {
-		return nil, err
-	}
+	port := compose.RandomPort()
 
 	composeService := compose.DockerComposeService{
 		ContainerName: b.Name,
 		Image:         viper.GetString("triggermesh.broker.image"),
 		Command:       command,
-		Volumes:       []compose.DockerComposeVolume{volume},
+		Volumes:       []compose.DockerComposeVolume{},
 		Ports:         []string{port + ":8080"},
 		Environment:   []string{},
 	}

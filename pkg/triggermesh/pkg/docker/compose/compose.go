@@ -16,6 +16,12 @@ limitations under the License.
 
 package compose
 
+import (
+	"math/rand"
+	"strconv"
+	"time"
+)
+
 type DockerCompose struct {
 	Services Services `json:"services"`
 }
@@ -35,4 +41,15 @@ type DockerComposeVolume struct {
 	Type   string `json:"type"`
 	Source string `json:"source"`
 	Target string `json:"target"`
+}
+
+func RandomPort() string {
+	rand.Seed(time.Now().UnixNano())
+
+	min := 49152
+	max := 65535
+
+	number := rand.Intn(max-min) + min
+
+	return strconv.Itoa(number)
 }
