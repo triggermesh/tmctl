@@ -93,9 +93,9 @@ func (o *dumpOptions) dump() error {
 	for _, object := range o.Manifest.Objects {
 		var secretsEnv map[string]string
 		if component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest); err == nil {
-			if container, ok := component.(triggermesh.Runnable); ok {
-				if _, err := container.Info(context.Background()); err == nil {
-					if reconcilable, ok := component.(triggermesh.Reconcilable); ok {
+			if reconcilable, ok := component.(triggermesh.Reconcilable); ok {
+				if container, ok := component.(triggermesh.Runnable); ok {
+					if _, err := container.Info(context.Background()); err == nil {
 						var resources []string
 						for _, r := range reconcilable.GetExternalResources() {
 							resources = append(resources, r.(string))
