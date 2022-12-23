@@ -95,14 +95,6 @@ func (o *dumpOptions) dump() error {
 		if component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest); err == nil {
 			if container, ok := component.(triggermesh.Runnable); ok {
 				if _, err := container.Info(context.Background()); err == nil {
-					if _, ok := component.(triggermesh.Exportable); ok {
-						if _, ok := component.(triggermesh.Parent); ok {
-							_, secretsEnv, err = components.ProcessSecrets(component.(triggermesh.Parent), o.Manifest)
-							if err != nil {
-								return fmt.Errorf("processing secrets: %v", err)
-							}
-						}
-					}
 					if reconcilable, ok := component.(triggermesh.Reconcilable); ok {
 						var resources []string
 						for _, r := range reconcilable.GetExternalResources() {
@@ -114,7 +106,12 @@ func (o *dumpOptions) dump() error {
 					}
 				}
 			}
-
+			if _, ok := component.(triggermesh.Parent); ok {
+				_, secretsEnv, err = components.ProcessSecrets(component.(triggermesh.Parent), o.Manifest)
+				if err != nil {
+					return fmt.Errorf("processing secrets: %v", err)
+				}
+			}
 			if platform, ok := component.(triggermesh.Exportable); ok {
 				if o.Platform == platformDigitalOcean {
 					if object.APIVersion == "sources.triggermesh.io/v1alpha1" || object.Kind == "Transformation" {
