@@ -21,8 +21,6 @@ import (
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/digitalocean"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
 // Component is the common interface for all TriggerMesh components.
@@ -72,6 +70,6 @@ type Reconcilable interface {
 }
 
 type Exportable interface {
-	AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error)
-	AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean.DigitalOceanApp, error)
+	AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error)
+	AsDigitalOceanObject(additionalEnvs map[string]string) (interface{}, error)
 }

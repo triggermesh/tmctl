@@ -201,15 +201,6 @@ func (c *Container) Start(ctx context.Context, client *client.Client, restart bo
 	}
 }
 
-func openPort() int {
-	listener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		panic(err)
-	}
-	listener.Close()
-	return listener.Addr().(*net.TCPAddr).Port
-}
-
 func nameToID(ctx context.Context, name string, client *client.Client) (string, error) {
 	containers, err := client.ContainerList(ctx, types.ContainerListOptions{
 		All: true,

@@ -19,12 +19,14 @@ package target
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/digitalocean/godo"
+
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
@@ -32,8 +34,6 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/env"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/digitalocean"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
 var (
@@ -73,7 +73,7 @@ func (t *Target) getMeta() kubernetes.Metadata {
 	}
 }
 
-func (t *Target) AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error) {
+func (t *Target) AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error) {
 	o, err := t.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -101,18 +101,15 @@ func (t *Target) AsDockerComposeObject(additionalEnvs map[string]string) (*compo
 		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
 	}
 
-	port := compose.RandomPort()
-
-	return &compose.DockerComposeService{
+	return &docker.ComposeService{
 		ContainerName: t.Name,
 		Image:         image,
 		Environment:   pkg.EnvsToString(envs),
-		Ports:         []string{port + ":8080"},
-		Volumes:       []compose.DockerComposeVolume{},
+		Ports:         []string{strconv.Itoa(pkg.OpenPort()) + ":8080"},
 	}, nil
 }
 
-func (t *Target) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean.DigitalOceanApp, error) {
+func (t *Target) AsDigitalOceanObject(additionalEnvs map[string]string) (interface{}, error) {
 	o, err := t.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -140,18 +137,18 @@ func (t *Target) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean
 	}
 
 	// Get the image and tag
-	imageSplit := strings.Split(adapter.Image(o, t.Version), "/")[2]
-	image := strings.Split(imageSplit, ":")
+	imageURI := strings.Split(adapter.Image(o, ""), "/")
+	adapterName := strings.TrimRight(imageURI[len(imageURI)-1], ":")
 
-	service := &godo.AppServiceSpec{
+	return godo.AppServiceSpec{
 		Name: t.Name,
 		Image: &godo.ImageSourceSpec{
 			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
 				Enabled: true,
 			},
 			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
-			Repository:   image[0],
-			Tag:          image[1],
+			Repository:   adapterName,
+			Tag:          t.Version,
 		},
 		HTTPPort: 8080,
 		Routes: []*godo.AppRouteSpec{
@@ -162,13 +159,7 @@ func (t *Target) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean
 		Envs:             envs,
 		InstanceCount:    1,
 		InstanceSizeSlug: "professional-xs",
-	}
-
-	doApp := &digitalocean.DigitalOceanApp{
-		Service: service,
-	}
-
-	return doApp, nil
+	}, nil
 }
 
 func (t *Target) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {

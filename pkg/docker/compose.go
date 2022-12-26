@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package digitalocean
+package docker
 
-import "github.com/digitalocean/godo"
-
-type DigitalOceanApp struct {
-	Service *godo.AppServiceSpec
-	Worker  *godo.AppWorkerSpec
+type ComposeService struct {
+	ContainerName string   `json:"container_name"`
+	Command       string   `json:"command,omitempty"`
+	Image         string   `json:"image"`
+	Ports         []string `json:"ports"`
+	Environment   []string `json:"environment"`
 }

@@ -18,6 +18,7 @@ package pkg
 
 import (
 	"fmt"
+	"net"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -68,4 +69,13 @@ func EnvsToString(envs []corev1.EnvVar) []string {
 		result = append(result, fmt.Sprintf("%s=%s", env.Name, env.Value))
 	}
 	return result
+}
+
+func OpenPort() int {
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		panic(err)
+	}
+	listener.Close()
+	return listener.Addr().(*net.TCPAddr).Port
 }

@@ -19,20 +19,20 @@ package transformation
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/digitalocean/godo"
+
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/env"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/digitalocean"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
 var (
@@ -70,7 +70,7 @@ func (t *Transformation) getMeta() kubernetes.Metadata {
 	}
 }
 
-func (t *Transformation) AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error) {
+func (t *Transformation) AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error) {
 	o, err := t.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -98,18 +98,15 @@ func (t *Transformation) AsDockerComposeObject(additionalEnvs map[string]string)
 		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
 	}
 
-	port := compose.RandomPort()
-
-	return &compose.DockerComposeService{
+	return &docker.ComposeService{
 		ContainerName: t.Name,
 		Image:         image,
 		Environment:   pkg.EnvsToString(envs),
-		Ports:         []string{port + ":8080"},
-		Volumes:       []compose.DockerComposeVolume{},
+		Ports:         []string{strconv.Itoa(pkg.OpenPort()) + ":8080"},
 	}, nil
 }
 
-func (t *Transformation) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean.DigitalOceanApp, error) {
+func (t *Transformation) AsDigitalOceanObject(additionalEnvs map[string]string) (interface{}, error) {
 	o, err := t.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -140,7 +137,7 @@ func (t *Transformation) AsDigitalOcean(additionalEnvs map[string]string) (*digi
 	imageSplit := strings.Split(adapter.Image(o, t.Version), "/")[2]
 	image := strings.Split(imageSplit, ":")
 
-	worker := &godo.AppWorkerSpec{
+	return godo.AppWorkerSpec{
 		Name: t.Name,
 		Image: &godo.ImageSourceSpec{
 			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
@@ -153,13 +150,7 @@ func (t *Transformation) AsDigitalOcean(additionalEnvs map[string]string) (*digi
 		Envs:             envs,
 		InstanceCount:    1,
 		InstanceSizeSlug: "professional-xs",
-	}
-
-	doApp := &digitalocean.DigitalOceanApp{
-		Worker: worker,
-	}
-
-	return doApp, nil
+	}, nil
 }
 
 func (t *Transformation) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {

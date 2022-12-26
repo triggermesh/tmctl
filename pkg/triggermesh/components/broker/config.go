@@ -72,7 +72,7 @@ func (t *Trigger) WriteLocalConfig() error {
 		trigger.Filters = t.Filters
 		trigger.Target = LocalTarget{
 			URL:       t.LocalURL.String(),
-			Component: t.ComponentName,
+			Component: t.Target.Ref.Name,
 		}
 		configuration.Triggers[t.Name] = trigger
 	} else {
@@ -83,7 +83,7 @@ func (t *Trigger) WriteLocalConfig() error {
 			Filters: t.Filters,
 			Target: LocalTarget{
 				URL:       t.LocalURL.String(),
-				Component: t.ComponentName,
+				Component: t.Target.Ref.Name,
 			},
 		}
 	}
