@@ -21,6 +21,8 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
+
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 )
 
 const errorLoggingLevel = `K_LOGGING_CONFIG={"zap-logger-config":"{\"level\": \"error\"}"}`
@@ -66,7 +68,7 @@ func WithHostPortBinding(containerPort nat.Port) HostOption {
 			containerPort: []nat.PortBinding{
 				{
 					HostIP:   "0.0.0.0",
-					HostPort: strconv.Itoa(openPort()),
+					HostPort: strconv.Itoa(pkg.OpenPort()),
 				},
 			},
 		}

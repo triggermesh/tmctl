@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,13 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/digitalocean/godo"
+
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/digitalocean"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
 const (
@@ -98,24 +98,21 @@ func (s *Service) AsK8sObject() (kubernetes.Object, error) {
 	}, nil
 }
 
-func (s *Service) AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error) {
-	port := compose.RandomPort()
+func (s *Service) AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error) {
 	envs := []corev1.EnvVar{}
-
 	for k, v := range additionalEnvs {
 		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
 	}
 
-	return &compose.DockerComposeService{
+	return &docker.ComposeService{
 		ContainerName: s.Name,
 		Image:         s.Image,
 		Environment:   pkg.EnvsToString(envs),
-		Ports:         []string{port + ":8080"},
-		Volumes:       []compose.DockerComposeVolume{},
+		Ports:         []string{strconv.Itoa(pkg.OpenPort()) + ":8080"},
 	}, nil
 }
 
-func (s *Service) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean.DigitalOceanApp, error) {
+func (s *Service) AsDigitalOceanObject(additionalEnvs map[string]string) (interface{}, error) {
 	envs := []*godo.AppVariableDefinition{}
 
 	for k, v := range additionalEnvs {
@@ -126,7 +123,7 @@ func (s *Service) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocea
 	imageSplit := strings.Split(s.Image, "/")[2]
 	image := strings.Split(imageSplit, ":")
 
-	service := &godo.AppServiceSpec{
+	return godo.AppServiceSpec{
 		Name: s.Name,
 		Image: &godo.ImageSourceSpec{
 			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
@@ -140,13 +137,7 @@ func (s *Service) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocea
 		Envs:             envs,
 		InstanceCount:    1,
 		InstanceSizeSlug: "professional-xs",
-	}
-
-	doApp := &digitalocean.DigitalOceanApp{
-		Service: service,
-	}
-
-	return doApp, nil
+	}, nil
 }
 
 func (s *Service) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {

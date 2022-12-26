@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/digitalocean/godo"
+
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
@@ -37,8 +38,6 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/digitalocean"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
 var (
@@ -81,7 +80,7 @@ func (s *Source) AsK8sObject() (kubernetes.Object, error) {
 	return kubernetes.CreateObject(s.GetKind(), s.CRDFile, s.getMeta(), spec)
 }
 
-func (s *Source) AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error) {
+func (s *Source) AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error) {
 	o, err := s.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -111,16 +110,15 @@ func (s *Source) AsDockerComposeObject(additionalEnvs map[string]string) (*compo
 		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
 	}
 
-	return &compose.DockerComposeService{
+	return &docker.ComposeService{
 		ContainerName: s.Name,
 		Image:         image,
 		Environment:   pkg.EnvsToString(envs),
 		Ports:         []string{"8080"},
-		Volumes:       []compose.DockerComposeVolume{},
 	}, nil
 }
 
-func (s *Source) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean.DigitalOceanApp, error) {
+func (s *Source) AsDigitalOceanObject(additionalEnvs map[string]string) (interface{}, error) {
 	o, err := s.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -154,7 +152,7 @@ func (s *Source) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean
 	imageSplit := strings.Split(adapter.Image(o, s.Version), "/")[2]
 	image := strings.Split(imageSplit, ":")
 
-	worker := &godo.AppWorkerSpec{
+	return godo.AppWorkerSpec{
 		Name: s.Name,
 		Image: &godo.ImageSourceSpec{
 			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
@@ -167,13 +165,7 @@ func (s *Source) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean
 		Envs:             envs,
 		InstanceCount:    1,
 		InstanceSizeSlug: "professional-xs",
-	}
-
-	doApp := &digitalocean.DigitalOceanApp{
-		Worker: worker,
-	}
-
-	return doApp, nil
+	}, nil
 }
 
 func (s *Source) getMeta() kubernetes.Metadata {

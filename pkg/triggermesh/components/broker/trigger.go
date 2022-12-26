@@ -113,7 +113,6 @@ func NewTrigger(name, broker, configBase string, target triggermesh.Component, f
 	}
 
 	if target != nil {
-		trigger.ComponentName = target.GetName()
 		targetPort, err := target.(triggermesh.Consumer).GetPort(context.Background())
 		if err != nil {
 			return nil, fmt.Errorf("target local port: %w", err)
@@ -138,7 +137,6 @@ func NewTrigger(name, broker, configBase string, target triggermesh.Component, f
 }
 
 func (t *Trigger) SetTarget(target triggermesh.Component) {
-	t.ComponentName = target.GetName()
 	t.Target = duckv1.Destination{
 		Ref: &duckv1.KReference{
 			Kind:       target.GetKind(),
@@ -170,7 +168,6 @@ func (t *Trigger) LookupTarget() {
 	if url, _ := apis.ParseURL(localTrigger.Target.URL); url != nil {
 		t.LocalURL = url
 	}
-	t.ComponentName = localTrigger.Target.Component
 	t.Filters = localTrigger.Filters
 	t.Target = duckv1.Destination{
 		Ref: &duckv1.KReference{

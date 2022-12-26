@@ -98,6 +98,10 @@ func GetObject(name, crdFile, version string, manifest *manifest.Manifest) (trig
 					}
 				}
 				return service.New(name, image, broker, service.Role(role), params), nil
+			case "v1":
+				if object.Kind == "Secret" {
+					return secret.New(object.Metadata.Name, broker, object.Data), nil
+				}
 			}
 		}
 	}
