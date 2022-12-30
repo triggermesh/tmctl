@@ -36,7 +36,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-type dumpOptions struct {
+type DumpOptions struct {
 	Format   string
 	Context  string
 	Version  string
@@ -45,7 +45,7 @@ type dumpOptions struct {
 }
 
 func NewCmd() *cobra.Command {
-	o := &dumpOptions{}
+	o := &DumpOptions{}
 	knativeEventing := false
 	dumpCmd := &cobra.Command{
 		Use:     "dump [broker]",
@@ -63,7 +63,7 @@ func NewCmd() *cobra.Command {
 			crds, err := crd.Fetch(filepath.Dir(viper.ConfigFileUsed()), o.Version)
 			cobra.CheckErr(err)
 			o.CRD = crds
-			return o.dump(knativeEventing)
+			return o.Dump(knativeEventing)
 		},
 	}
 	dumpCmd.Flags().StringVarP(&o.Format, "output", "o", "yaml", "Output format")
@@ -71,7 +71,7 @@ func NewCmd() *cobra.Command {
 	return dumpCmd
 }
 
-func (o *dumpOptions) dump(useKnativeEventing bool) error {
+func (o *DumpOptions) Dump(useKnativeEventing bool) error {
 	var externalReconcilable []string
 	for _, object := range o.Manifest.Objects {
 		if component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest); err == nil {
@@ -118,7 +118,59 @@ func (o *dumpOptions) dump(useKnativeEventing bool) error {
 	return nil
 }
 
-func (o *dumpOptions) knativeEventingTransformation(object kubernetes.Object) kubernetes.Object {
+func (o *DumpOptions) DumpWithResponse(useKnativeEventing bool) ([]string, error) {
+	var response []string
+	var externalReconcilable []string
+	for _, object := range o.Manifest.Objects {
+		if component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest); err == nil {
+			if reconcilable, ok := component.(triggermesh.Reconcilable); ok {
+				if container, ok := component.(triggermesh.Runnable); ok {
+					if _, err := container.Info(context.Background()); err == nil {
+						var resources []string
+						for _, r := range reconcilable.GetExternalResources() {
+							resources = append(resources, r.(string))
+						}
+						if len(resources) != 0 {
+							externalReconcilable = append(externalReconcilable, fmt.Sprintf("%s(%s)", component.GetName(), strings.Join(resources, ", ")))
+						}
+					}
+				}
+			}
+		}
+		if useKnativeEventing {
+			object = o.knativeEventingTransformation(object)
+		}
+		switch o.Format {
+		case "json":
+			jsn, err := json.MarshalIndent(object, "", "  ")
+			if err != nil {
+				return nil, err
+			}
+			response = append(response, string(jsn)+"\n")
+		case "yaml":
+			yml, err := yaml.Marshal(object)
+			if err != nil {
+				return nil, err
+			}
+			response = append(response, "---\n")
+			response = append(response, string(yml)+"\n")
+		default:
+			return nil, fmt.Errorf("format %q is not supported", o.Format)
+		}
+	}
+	if len(externalReconcilable) != 0 {
+		// fmt.Fprintf(os.Stderr, "\nWARNING: manifest contains running components that use external shared resources to produce events.\n"+
+		// 	"It is strongly recommended to stop the broker before deploying integration in the cluster to avoid events read race conditions.\n"+
+		// 	"External resources: %s\n", strings.Join(externalReconcilable, ", "))
+		response = append(response, "\nWARNING: manifest contains running components that use external shared resources to produce events.\n"+
+			"It is strongly recommended to stop the broker before deploying integration in the cluster to avoid events read race conditions.\n"+
+			"External resources: %s\n")
+		return response, nil
+	}
+	return response, nil
+}
+
+func (o *DumpOptions) knativeEventingTransformation(object kubernetes.Object) kubernetes.Object {
 	switch object.APIVersion {
 	case tmbroker.APIVersion:
 		switch object.Kind {
