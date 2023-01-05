@@ -278,9 +278,14 @@ func sources(object unstructured.Unstructured) (EventAttributes, error) {
 			ProducedEventSource: o.AsEventSource(),
 		}, nil
 	case "KafkaSource":
-		// var o *sourcesv1alpha1.KafkaSource
-		// 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-		// return o.GetEventTypes(), o.AsEventSource(), nil
+		var o *sourcesv1alpha1.KafkaSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return EventAttributes{}, err
+		}
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "OCIMetricsSource":
 		var o *sourcesv1alpha1.OCIMetricsSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
