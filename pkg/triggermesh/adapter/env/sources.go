@@ -121,13 +121,6 @@ func sources(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return awss3source.MakeAppEnv(o), nil
-		// Multitenant
-		// case "AWSSNSSource":
-		// 	var o *sourcesv1alpha1.AWSSNSSource
-		// 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-		// 		return nil, err
-		// 	}
-		// 	return awssnssource.MakeAppEnv(o), nil
 	case "AWSSQSSource":
 		var o *sourcesv1alpha1.AWSSQSSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -262,13 +255,9 @@ func sources(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return webhooksource.MakeAppEnv(o), nil
-		// Multitenant
-		// case "ZendeskSource":
-		// 	var o *sourcesv1alpha1.ZendeskSource
-		// 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-		// 		return nil, err
-		// 	}
-		// 	return zendesksource.MakeAppEnv(o), nil
+	// Multitenant
+	case "AWSSNSSource", "ZendeskSource":
+		return nil, fmt.Errorf("kind %q is multitenant and not suitable for local environment", object.GetKind())
 	}
 	return nil, fmt.Errorf("kind %q is not supported", object.GetKind())
 }
