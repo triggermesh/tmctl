@@ -137,7 +137,7 @@ func (s *Service) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocea
 		HTTPPort: 8080,
 		Routes: []*godo.AppRouteSpec{
 			{
-				Path: "/",
+				Path: fmt.Sprintf("/%s", s.Name),
 			},
 		},
 		Envs:             envs,

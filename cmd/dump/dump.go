@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/digitalocean/godo"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -114,7 +115,7 @@ func (o *dumpOptions) dump() error {
 			}
 			if platform, ok := component.(triggermesh.Exportable); ok {
 				if o.Platform == platformDigitalOcean {
-					if object.APIVersion == "sources.triggermesh.io/v1alpha1" || object.Kind == "Transformation" {
+					if object.APIVersion == "sources.triggermesh.io/v1alpha1" {
 						doApp, err := platform.AsDigitalOcean(secretsEnv)
 						if err != nil {
 							return fmt.Errorf("processing DigitalOcean workers: %v", err)
@@ -214,7 +215,7 @@ func (o *dumpOptions) dump() error {
 			}
 		}
 		doObject := godo.AppSpec{
-			Name:     "triggermesh",
+			Name:     fmt.Sprintf("triggermesh-%s", uuid.NewString()[:5]),
 			Services: doServices,
 			Workers:  doWorkers,
 			Region:   "fra",

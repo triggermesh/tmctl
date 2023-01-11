@@ -140,7 +140,7 @@ func (t *Transformation) AsDigitalOcean(additionalEnvs map[string]string) (*digi
 	imageSplit := strings.Split(adapter.Image(o, t.Version), "/")[2]
 	image := strings.Split(imageSplit, ":")
 
-	worker := &godo.AppWorkerSpec{
+	service := &godo.AppServiceSpec{
 		Name: t.Name,
 		Image: &godo.ImageSourceSpec{
 			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
@@ -150,13 +150,19 @@ func (t *Transformation) AsDigitalOcean(additionalEnvs map[string]string) (*digi
 			Repository:   image[0],
 			Tag:          image[1],
 		},
+		HTTPPort: 8080,
+		Routes: []*godo.AppRouteSpec{
+			{
+				Path: fmt.Sprintf("/%s", t.Name),
+			},
+		},
 		Envs:             envs,
 		InstanceCount:    1,
 		InstanceSizeSlug: "professional-xs",
 	}
 
 	doApp := &digitalocean.DigitalOceanApp{
-		Worker: worker,
+		Service: service,
 	}
 
 	return doApp, nil
