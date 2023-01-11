@@ -19,7 +19,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -202,6 +204,21 @@ func (s *Service) Info(ctx context.Context) (*docker.Container, error) {
 		return nil, fmt.Errorf("container object: %w", err)
 	}
 	return container.LookupHostConfig(ctx, client)
+}
+
+func (s *Service) Logs(ctx context.Context, since time.Time, follow bool) (io.ReadCloser, error) {
+	client, err := docker.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("docker client: %w", err)
+	}
+	container, err := s.asContainer(nil)
+	if err != nil {
+		return nil, fmt.Errorf("container object: %w", err)
+	}
+	if _, err := container.LookupHostConfig(ctx, client); err != nil {
+		return nil, fmt.Errorf("container config: %w", err)
+	}
+	return container.Logs(ctx, client, since, follow)
 }
 
 func New(name, image, broker string, role Role, params map[string]string) triggermesh.Component {

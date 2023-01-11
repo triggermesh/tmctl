@@ -133,7 +133,7 @@ func (o *startOptions) start(broker string) error {
 		}
 		log.Printf("Starting %s\n", object.Metadata.Name)
 		if _, err := c.(triggermesh.Runnable).Start(ctx, secrets, o.Restart); err != nil {
-			return fmt.Errorf("starting container: %w", err)
+			return fmt.Errorf("starting component %q: %w", c.GetName(), err)
 		}
 		if _, ok := c.(triggermesh.Consumer); ok {
 			triggers, err := tmbroker.GetTargetTriggers(c.GetName(), o.Context, o.ConfigBase)

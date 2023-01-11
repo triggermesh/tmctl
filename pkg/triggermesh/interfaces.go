@@ -18,6 +18,8 @@ package triggermesh
 
 import (
 	"context"
+	"io"
+	"time"
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
@@ -38,6 +40,7 @@ type Runnable interface {
 	Start(ctx context.Context, additionalEnv map[string]string, restart bool) (*docker.Container, error)
 	Stop(context.Context) error
 	Info(context.Context) (*docker.Container, error)
+	Logs(ctx context.Context, since time.Time, follow bool) (io.ReadCloser, error)
 }
 
 // Producer is implemeted by all components that produce events.
