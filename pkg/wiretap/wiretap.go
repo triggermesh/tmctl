@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"time"
 
 	"knative.dev/pkg/apis"
 	v1 "knative.dev/pkg/apis/duck/v1"
@@ -81,7 +82,7 @@ func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("container connect: %w", err)
 	}
 	w.Destination = fmt.Sprintf("http://host.docker.internal:%s", c.HostPort())
-	return c.Logs(ctx, w.client)
+	return c.Logs(ctx, w.client, time.Now().Add(2*time.Second), true)
 }
 
 func (w *Wiretap) CreateTrigger(eventTypes []string) error {
@@ -114,7 +115,7 @@ func (w *Wiretap) BrokerLogs(ctx context.Context) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	return broc.Logs(ctx, w.client)
+	return broc.Logs(ctx, w.client, time.Now().Add(2*time.Second), true)
 }
 
 func (w *Wiretap) Cleanup(ctx context.Context) error {

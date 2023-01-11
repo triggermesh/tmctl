@@ -41,7 +41,7 @@ import (
 const (
 	successColorCode = "\033[92m"
 	defaultColorCode = "\033[39m"
-	offlineColorCode = "\u001b[31m"
+	offlineColorCode = "\033[31m"
 )
 
 type describeOptions struct {
