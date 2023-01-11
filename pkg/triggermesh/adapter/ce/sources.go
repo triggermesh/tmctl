@@ -117,13 +117,6 @@ func sources(object unstructured.Unstructured) (EventAttributes, error) {
 			ProducedEventTypes:  o.GetEventTypes(),
 			ProducedEventSource: o.AsEventSource(),
 		}, nil
-		// Multitenant
-		// case "AWSSNSSource":
-		// 	var o *sourcesv1alpha1.AWSSNSSource
-		// 					if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-		// 		return nil, err
-		// 	}
-		// 	return awssnssource.MakeAppEnv(o), nil
 	case "AWSSQSSource":
 		var o *sourcesv1alpha1.AWSSQSSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -278,9 +271,14 @@ func sources(object unstructured.Unstructured) (EventAttributes, error) {
 			ProducedEventSource: o.AsEventSource(),
 		}, nil
 	case "KafkaSource":
-		// var o *sourcesv1alpha1.KafkaSource
-		// 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-		// return o.GetEventTypes(), o.AsEventSource(), nil
+		var o *sourcesv1alpha1.KafkaSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return EventAttributes{}, err
+		}
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "OCIMetricsSource":
 		var o *sourcesv1alpha1.OCIMetricsSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -326,13 +324,9 @@ func sources(object unstructured.Unstructured) (EventAttributes, error) {
 			ProducedEventTypes:  o.GetEventTypes(),
 			ProducedEventSource: o.AsEventSource(),
 		}, nil
-		// Multitenant
-		// case "ZendeskSource":
-		// 	var o *sourcesv1alpha1.ZendeskSource
-		// 					if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-		// 		return nil, err
-		// 	}
-		// 	return zendesksource.MakeAppEnv(o), nil
+	// Multitenant
+	case "AWSSNSSource", "ZendeskSource":
+		return EventAttributes{}, fmt.Errorf("kind %q is multitenant and not suitable for local environment", object.GetKind())
 	}
 
 	return EventAttributes{}, fmt.Errorf("kind %q is not supported", object.GetKind())

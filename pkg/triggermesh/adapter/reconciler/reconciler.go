@@ -29,8 +29,10 @@ import (
 	tmawseb "github.com/triggermesh/triggermesh/pkg/sources/reconciler/awseventbridgesource"
 	tmawss3 "github.com/triggermesh/triggermesh/pkg/sources/reconciler/awss3source"
 	tmazureblobstorage "github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureblobstoragesource"
+	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureeventgridsource"
 	tmazureservicebus "github.com/triggermesh/triggermesh/pkg/sources/reconciler/azureservicebustopicsource"
 	tmgcpauditlogs "github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudauditlogssource"
+	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudbillingsource"
 	tmgcppubsub "github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudpubsubsource"
 	tmgcprepo "github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudsourcerepositoriessource"
 	tmgcpstorage "github.com/triggermesh/triggermesh/pkg/sources/reconciler/googlecloudstoragesource"
@@ -82,20 +84,29 @@ func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructure
 			return nil, err
 		}
 		return map[string]interface{}{"queueARN": queue.ARN}, nil
-	case "GoogleCloudPubSubSource":
-		var o *sourcesv1alpha1.GoogleCloudPubSubSource
+	case "AzureEventGridSource":
+		var o *sourcesv1alpha1.AzureEventGridSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
 			return nil, err
 		}
 		ctx = commonv1alpha1.WithReconcilable(ctx, o)
-		client, err := gcp.PubSubClient(o, secrets)
+		authorizer, err := azure.Client(secrets)
 		if err != nil {
 			return nil, err
 		}
-		if err := tmgcppubsub.EnsureSubscription(ctx, client); err != nil {
+		sysTopicsCli, providersCli, resGroupsCli, eventSubsCli, eventHubsCli := azure.EventGridClient(o, authorizer)
+		sysTopicResID, err := azureeventgridsource.EnsureSystemTopic(ctx, sysTopicsCli, providersCli, resGroupsCli)
+		if err != nil {
 			return nil, err
 		}
-		return map[string]interface{}{"subscription": o.Status.Subscription.String()}, nil
+		eventHubResID, err := azureeventgridsource.EnsureEventHub(ctx, eventHubsCli)
+		if err != nil {
+			return nil, err
+		}
+		if err := azureeventgridsource.EnsureEventSubscription(ctx, eventSubsCli, sysTopicResID, eventHubResID); err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"subscriptionID": o.Status.EventSubscriptionID.String()}, nil
 	case "AzureServiceBusTopicSource":
 		var o *sourcesv1alpha1.AzureServiceBusTopicSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -130,6 +141,41 @@ func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructure
 			return nil, err
 		}
 		return map[string]interface{}{"eventHubID": eventHubID}, nil
+	case "GoogleCloudBillingSource":
+		var o *sourcesv1alpha1.GoogleCloudBillingSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return nil, err
+		}
+		ctx = commonv1alpha1.WithReconcilable(ctx, o)
+		psClient, billingClient, err := gcp.CloudBillingClient(o, secrets)
+		if err != nil {
+			return nil, err
+		}
+		topic, err := googlecloudbillingsource.EnsurePubSub(ctx, psClient)
+		if err != nil {
+			return nil, err
+		}
+		if err := googlecloudbillingsource.EnsureBudgetNotification(ctx, billingClient, topic); err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{
+			"topic":        o.Status.Topic,
+			"subscription": o.Status.Subscription,
+		}, nil
+	case "GoogleCloudPubSubSource":
+		var o *sourcesv1alpha1.GoogleCloudPubSubSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return nil, err
+		}
+		ctx = commonv1alpha1.WithReconcilable(ctx, o)
+		client, err := gcp.PubSubClient(o, secrets)
+		if err != nil {
+			return nil, err
+		}
+		if err := tmgcppubsub.EnsureSubscription(ctx, client); err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{"subscription": o.Status.Subscription.String()}, nil
 	case "GoogleCloudAuditLogsSource":
 		var o *sourcesv1alpha1.GoogleCloudAuditLogsSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -181,11 +227,10 @@ func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructure
 		}
 		return map[string]interface{}{"subscription": o.Status.Subscription.String()}, tmgcprepo.EnsureTopicAssociated(ctx, repoCli, topic, publishServiceAccount)
 
-	case "AzureActivityLogsSource",
-		"AzureEventGridSource",
-		"GoogleCloudBillingSource",
-		"ZendeskSource":
+	case "AzureActivityLogsSource":
 		return nil, fmt.Errorf("this component is not suitable for local env yet")
+	case "ZendeskSource":
+		return nil, fmt.Errorf("this component is multitenant and not suitable for local env")
 	}
 	return nil, nil
 }
@@ -226,20 +271,28 @@ func Finalize(ctx context.Context, object unstructured.Unstructured, secrets map
 		if err := tmawseb.EnsureNoQueue(ctx, sqsClient, queueName); err != nil {
 			return err
 		}
-	case "GoogleCloudPubSubSource":
-		var o *sourcesv1alpha1.GoogleCloudPubSubSource
+	case "AzureEventGridSource":
+		var o *sourcesv1alpha1.AzureEventGridSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
 			return err
 		}
 		ctx = commonv1alpha1.WithReconcilable(ctx, o)
-		client, err := gcp.PubSubClient(o, secrets)
+		authorizer, err := azure.Client(secrets)
 		if err != nil {
 			return err
 		}
-		err = tmgcppubsub.EnsureNoSubscription(ctx, client) // err is never nil
-		if err.Error() != fmt.Sprintf("Unsubscribed from topic %q", o.Spec.Topic) {
+		sysTopicsCli, _, _, eventSubsCli, eventHubsCli := azure.EventGridClient(o, authorizer)
+		systemTopic, err := azureeventgridsource.FindSystemTopic(ctx, sysTopicsCli, o)
+		if err != nil {
 			return err
 		}
+		if err := azureeventgridsource.EnsureNoEventSubscription(ctx, eventSubsCli, systemTopic); err != nil {
+			return err
+		}
+		if err := azureeventgridsource.EnsureNoEventHub(ctx, eventHubsCli); err != nil {
+			return err
+		}
+		return azureeventgridsource.EnsureNoSystemTopic(ctx, sysTopicsCli, eventSubsCli, systemTopic)
 	case "AzureServiceBusTopicSource":
 		var o *sourcesv1alpha1.AzureServiceBusTopicSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -267,6 +320,34 @@ func Finalize(ctx context.Context, object unstructured.Unstructured, secrets map
 			return err
 		}
 		return tmazureblobstorage.EnsureNoEventSubscription(ctx, subsAPI)
+	case "GoogleCloudBillingSource":
+		var o *sourcesv1alpha1.GoogleCloudBillingSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return err
+		}
+		ctx = commonv1alpha1.WithReconcilable(ctx, o)
+		psClient, billingClient, err := gcp.CloudBillingClient(o, secrets)
+		if err != nil {
+			return err
+		}
+		if err := googlecloudbillingsource.EnsureNoBudgetNotification(ctx, billingClient); err != nil {
+			return err
+		}
+		return googlecloudbillingsource.EnsureNoPubSub(ctx, psClient)
+	case "GoogleCloudPubSubSource":
+		var o *sourcesv1alpha1.GoogleCloudPubSubSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return err
+		}
+		ctx = commonv1alpha1.WithReconcilable(ctx, o)
+		client, err := gcp.PubSubClient(o, secrets)
+		if err != nil {
+			return err
+		}
+		err = tmgcppubsub.EnsureNoSubscription(ctx, client) // err is never nil
+		if err.Error() != fmt.Sprintf("Unsubscribed from topic %q", o.Spec.Topic) {
+			return err
+		}
 	case "GoogleCloudAuditLogsSource":
 		var o *sourcesv1alpha1.GoogleCloudAuditLogsSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -310,11 +391,10 @@ func Finalize(ctx context.Context, object unstructured.Unstructured, secrets map
 		}
 		return tmgcprepo.EnsureNoPubSub(ctx, psCli)
 
-	case "AzureActivityLogsSource",
-		"AzureEventGridSource",
-		"GoogleCloudBillingSource",
-		"ZendeskSource":
+	case "AzureActivityLogsSource":
 		return fmt.Errorf("this component is not suitable for local env yet")
+	case "ZendeskSource":
+		return fmt.Errorf("this component is multitenant and not suitable for local env")
 	}
 	return nil
 }
