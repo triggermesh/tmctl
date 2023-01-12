@@ -24,6 +24,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	kyaml "sigs.k8s.io/yaml"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -112,7 +114,7 @@ func (o *describeOptions) describe(b string) error {
 			case tmbroker.TriggerKind:
 				filterString := "*"
 				if len(c.(*tmbroker.Trigger).Filters) != 0 {
-					filterString = triggerFilterToString(c.(*tmbroker.Trigger).Filters[0])
+					filterString = triggerFilterToString(c.(*tmbroker.Trigger).Filters)
 				}
 				triggersPrint = true
 				fmt.Fprintf(triggers, "%s\t%s\t%s\n", c.GetName(), c.(*tmbroker.Trigger).Target.Ref.Name, filterString)
@@ -200,10 +202,35 @@ func status(component triggermesh.Component) string {
 	return offlineStatus
 }
 
-func triggerFilterToString(filter eventingbroker.Filter) string {
+func triggerFilterToString(filters []eventingbroker.Filter) string {
 	var result []string
-	for k, v := range filter.Exact {
-		result = append(result, fmt.Sprintf("%s is %s", k, v))
+	for _, filter := range filters {
+		output, err := kyaml.Marshal(filter)
+		if err != nil {
+			continue
+		}
+		components := strings.Split(string(output), ":")
+		prefixCondition := ""
+		if len(components) > 3 {
+			prefixCondition = strings.TrimRight(strings.TrimSpace(components[0]), ":")
+			components = components[1:]
+		}
+		if len(components) != 3 {
+			continue
+		}
+		condition := strings.TrimPrefix(components[0], ":\n")
+		attribute := strings.TrimRight(strings.TrimSpace(components[1]), ":")
+		value := strings.TrimRight(strings.TrimSpace(components[2]), ":")
+		switch condition {
+		case "exact":
+			result = append(result, fmt.Sprintf("%s is %s", attribute, value))
+		case "prefix":
+			result = append(result, fmt.Sprintf("%s is %s*", attribute, value))
+		case "suffix":
+			result = append(result, fmt.Sprintf("%s is *%s", attribute, value))
+		default:
+			result = append(result, fmt.Sprintf("%s is %s %s", attribute, prefixCondition, value))
+		}
 	}
 	return strings.Join(result, ", ")
 }

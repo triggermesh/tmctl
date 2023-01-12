@@ -149,7 +149,7 @@ func (o *createOptions) target(name, kind string, args map[string]string, eventS
 	}
 
 	for _, et := range eventTypesFilter {
-		if _, err := o.createTrigger("", t, tmbroker.FilterExactAttribute("type", et)); err != nil {
+		if _, err := o.createTrigger("", t, tmbroker.FilterAttribute("type", et)); err != nil {
 			return fmt.Errorf("creating trigger: %w", err)
 		}
 	}
@@ -213,7 +213,7 @@ func (o *createOptions) targetFromImage(name, image string, params map[string]st
 		}
 	}
 	for _, et := range eventTypesFilter {
-		if _, err := o.createTrigger("", s, tmbroker.FilterExactAttribute("type", et)); err != nil {
+		if _, err := o.createTrigger("", s, tmbroker.FilterAttribute("type", et)); err != nil {
 			return fmt.Errorf("creating trigger: %w", err)
 		}
 	}

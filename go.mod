@@ -3,6 +3,7 @@ module github.com/triggermesh/tmctl
 go 1.19
 
 require (
+	cloud.google.com/go/billing v1.7.0
 	cloud.google.com/go/logging v1.6.1
 	cloud.google.com/go/pubsub v1.28.0
 	cloud.google.com/go/storage v1.28.1
@@ -32,7 +33,6 @@ replace k8s.io/client-go => k8s.io/client-go v0.25.3
 
 require (
 	cloud.google.com/go v0.105.0 // indirect
-	cloud.google.com/go/billing v1.7.0 // indirect
 	cloud.google.com/go/compute v1.13.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.2 // indirect
 	cloud.google.com/go/iam v0.8.0 // indirect
