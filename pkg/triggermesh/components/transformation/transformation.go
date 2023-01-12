@@ -20,21 +20,29 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/digitalocean/godo"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/env"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/digitalocean"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
 var (
-	_ triggermesh.Component = (*Transformation)(nil)
-	_ triggermesh.Consumer  = (*Transformation)(nil)
-	_ triggermesh.Producer  = (*Transformation)(nil)
-	_ triggermesh.Runnable  = (*Transformation)(nil)
+	_ triggermesh.Component  = (*Transformation)(nil)
+	_ triggermesh.Consumer   = (*Transformation)(nil)
+	_ triggermesh.Producer   = (*Transformation)(nil)
+	_ triggermesh.Runnable   = (*Transformation)(nil)
+	_ triggermesh.Exportable = (*Transformation)(nil)
 )
 
 type Transformation struct {
@@ -62,6 +70,104 @@ func (t *Transformation) getMeta() kubernetes.Metadata {
 			triggermesh.ContextLabel: t.Broker,
 		},
 	}
+}
+
+func (t *Transformation) AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error) {
+	o, err := t.asUnstructured()
+	if err != nil {
+		return nil, fmt.Errorf("creating object: %w", err)
+	}
+	image := adapter.Image(o, t.Version)
+
+	adapterEnv, err := env.Build(o)
+	if err != nil {
+		return nil, fmt.Errorf("adapter environment: %w", err)
+	}
+
+	envs := []corev1.EnvVar{}
+	for _, v := range adapterEnv {
+		if v.ValueFrom != nil && additionalEnvs != nil {
+			if secret, ok := additionalEnvs[v.ValueFrom.SecretKeyRef.Key]; ok {
+				envs = append(envs, corev1.EnvVar{Name: v.Name, Value: string(secret)})
+				delete(additionalEnvs, v.ValueFrom.SecretKeyRef.Key)
+			}
+		} else {
+			envs = append(envs, v)
+		}
+	}
+
+	for k, v := range additionalEnvs {
+		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
+	}
+
+	port := compose.RandomPort()
+
+	return &compose.DockerComposeService{
+		ContainerName: t.Name,
+		Image:         image,
+		Environment:   pkg.EnvsToString(envs),
+		Ports:         []string{port + ":8080"},
+		Volumes:       []compose.DockerComposeVolume{},
+	}, nil
+}
+
+func (t *Transformation) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean.DigitalOceanApp, error) {
+	o, err := t.asUnstructured()
+	if err != nil {
+		return nil, fmt.Errorf("creating object: %w", err)
+	}
+
+	adapterEnv, err := env.Build(o)
+	if err != nil {
+		return nil, fmt.Errorf("adapter environment: %w", err)
+	}
+
+	envs := []*godo.AppVariableDefinition{}
+	for _, v := range adapterEnv {
+		if v.ValueFrom != nil && additionalEnvs != nil {
+			if secret, ok := additionalEnvs[v.ValueFrom.SecretKeyRef.Key]; ok {
+				envs = append(envs, &godo.AppVariableDefinition{Key: v.Name, Value: string(secret)})
+				delete(additionalEnvs, v.ValueFrom.SecretKeyRef.Key)
+			}
+		} else {
+			envs = append(envs, &godo.AppVariableDefinition{Key: v.Name, Value: v.Value})
+		}
+	}
+
+	for k, v := range additionalEnvs {
+		envs = append(envs, &godo.AppVariableDefinition{Key: k, Value: v})
+	}
+
+	// Get the image and tag
+	imageSplit := strings.Split(adapter.Image(o, t.Version), "/")[2]
+	image := strings.Split(imageSplit, ":")
+
+	service := &godo.AppServiceSpec{
+		Name: t.Name,
+		Image: &godo.ImageSourceSpec{
+			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
+				Enabled: true,
+			},
+			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
+			Repository:   image[0],
+			Tag:          image[1],
+		},
+		HTTPPort: 8080,
+		Routes: []*godo.AppRouteSpec{
+			{
+				Path: fmt.Sprintf("/%s", t.Name),
+			},
+		},
+		Envs:             envs,
+		InstanceCount:    1,
+		InstanceSizeSlug: "professional-xs",
+	}
+
+	doApp := &digitalocean.DigitalOceanApp{
+		Service: service,
+	}
+
+	return doApp, nil
 }
 
 func (t *Transformation) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {

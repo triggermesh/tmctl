@@ -24,16 +24,27 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/digitalocean/godo"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 
+	eventingbroker "github.com/triggermesh/brokers/pkg/config/broker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
+	kyaml "sigs.k8s.io/yaml"
+)
+
+const (
+	platformKubernetes    = "kubernetes"
+	platformKnative       = "knative"
+	platformDockerCompose = "docker-compose"
+	platformDigitalOcean  = "digitalocean"
 )
 
 type dumpOptions struct {
@@ -42,14 +53,14 @@ type dumpOptions struct {
 	Version  string
 	CRD      string
 	Manifest *manifest.Manifest
+	Platform string
 }
 
 func NewCmd() *cobra.Command {
 	o := &dumpOptions{}
-	knativeEventing := false
 	dumpCmd := &cobra.Command{
 		Use:     "dump [broker]",
-		Short:   "Generate Kubernetes manifest",
+		Short:   "Generate manifest",
 		Example: "tmctl dump",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Version = viper.GetString("triggermesh.version")
@@ -63,17 +74,25 @@ func NewCmd() *cobra.Command {
 			crds, err := crd.Fetch(filepath.Dir(viper.ConfigFileUsed()), o.Version)
 			cobra.CheckErr(err)
 			o.CRD = crds
-			return o.dump(knativeEventing)
+			return o.dump()
 		},
 	}
+	dumpCmd.Flags().StringVarP(&o.Platform, "platform", "p", "kubernetes", "kubernetes, knative, docker-compose, digitalocean")
 	dumpCmd.Flags().StringVarP(&o.Format, "output", "o", "yaml", "Output format")
-	dumpCmd.Flags().BoolVar(&knativeEventing, "knative", false, "Use Knative Eventing components")
 	return dumpCmd
 }
 
-func (o *dumpOptions) dump(useKnativeEventing bool) error {
+func (o *dumpOptions) dump() error {
 	var externalReconcilable []string
+	var doServices []*godo.AppServiceSpec
+	var doWorkers []*godo.AppWorkerSpec
+	composeObjects := make(map[string]compose.DockerComposeService)
+	brokerConfig := tmbroker.Configuration{
+		Triggers: make(map[string]tmbroker.LocalTriggerSpec),
+	}
+
 	for _, object := range o.Manifest.Objects {
+		var secretsEnv map[string]string
 		if component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest); err == nil {
 			if reconcilable, ok := component.(triggermesh.Reconcilable); ok {
 				if container, ok := component.(triggermesh.Runnable); ok {
@@ -88,28 +107,126 @@ func (o *dumpOptions) dump(useKnativeEventing bool) error {
 					}
 				}
 			}
-		}
-		if useKnativeEventing {
-			object = o.knativeEventingTransformation(object)
-		}
-		switch o.Format {
-		case "json":
-			jsn, err := json.MarshalIndent(object, "", "  ")
-			if err != nil {
-				return err
+			if _, ok := component.(triggermesh.Parent); ok {
+				_, secretsEnv, err = components.ProcessSecrets(component.(triggermesh.Parent), o.Manifest)
+				if err != nil {
+					return fmt.Errorf("processing secrets: %v", err)
+				}
 			}
-			fmt.Println(string(jsn))
-		case "yaml":
-			yml, err := yaml.Marshal(object)
-			if err != nil {
-				return err
+			if platform, ok := component.(triggermesh.Exportable); ok {
+				if o.Platform == platformDigitalOcean {
+					if object.APIVersion == "sources.triggermesh.io/v1alpha1" {
+						doApp, err := platform.AsDigitalOcean(secretsEnv)
+						if err != nil {
+							return fmt.Errorf("processing DigitalOcean workers: %v", err)
+						}
+						worker := godo.AppWorkerSpec(*doApp.Worker)
+						doWorkers = append(doWorkers, &worker)
+					} else {
+						doApp, err := platform.AsDigitalOcean(secretsEnv)
+						if err != nil {
+							return fmt.Errorf("processing DigitalOcean services: %v", err)
+						}
+						service := godo.AppServiceSpec(*doApp.Service)
+						doServices = append(doServices, &service)
+					}
+				}
+				if o.Platform == platformDockerCompose {
+					composeService, err := platform.AsDockerComposeObject(secretsEnv)
+					if err != nil {
+						return fmt.Errorf("processing Docker-Compose: %v", err)
+					}
+					composeObjects[object.Metadata.Name] = *composeService
+				}
 			}
+
+			if o.Platform == platformDigitalOcean || o.Platform == platformDockerCompose {
+				if object.Kind == tmbroker.TriggerKind {
+					target := component.(*tmbroker.Trigger).Target
+					var targetURL string
+					if o.Platform == platformDockerCompose {
+						targetURL = fmt.Sprintf("http://%s:8080", target.Ref.Name)
+					}
+					if o.Platform == platformDigitalOcean {
+						targetURL = fmt.Sprintf("${%s.PRIVATE_URL}", target.Ref.Name)
+					}
+					trigger := tmbroker.LocalTriggerSpec{}
+					filter := eventingbroker.Filter{}
+
+					if component.(*tmbroker.Trigger).Filters != nil {
+						filter = component.(*tmbroker.Trigger).Filters[0]
+					}
+
+					trigger.Filters = append(trigger.Filters, filter)
+					trigger.Target = tmbroker.LocalTarget{
+						URL: targetURL,
+					}
+					brokerConfig.Triggers[object.Metadata.Name] = trigger
+				}
+			}
+		}
+		switch o.Platform {
+		case platformKubernetes:
 			fmt.Println("---")
-			fmt.Println(string(yml))
-		default:
-			return fmt.Errorf("format %q is not supported", o.Format)
+			err := o.formatAndPrint(object)
+			if err != nil {
+				return err
+			}
+		case platformKnative:
+			fmt.Println("---")
+			err := o.formatAndPrint(o.knativeEventingTransformation(object))
+			if err != nil {
+				return err
+			}
 		}
 	}
+
+	switch o.Platform {
+	case platformDockerCompose:
+		for _, service := range composeObjects {
+			if service.ContainerName == o.Context {
+				jsonBrokerConfig, err := json.Marshal(brokerConfig)
+				if err != nil {
+					return fmt.Errorf("processing broker config: %v", err)
+				}
+				envString := fmt.Sprintf("%s=%s", "BROKER_CONFIG", string(jsonBrokerConfig))
+				service.Environment = append(service.Environment, envString)
+
+				composeObjects[service.ContainerName] = service
+			}
+		}
+		composeObject := compose.DockerCompose{
+			Services: composeObjects,
+		}
+		err := o.formatAndPrint(composeObject)
+		if err != nil {
+			return err
+		}
+	case platformDigitalOcean:
+		for _, service := range doServices {
+			if service.Name == o.Context {
+				jsonBrokerConfig, err := json.Marshal(brokerConfig)
+				if err != nil {
+					return fmt.Errorf("processing broker config: %v", err)
+				}
+				service.Envs = append(service.Envs, &godo.AppVariableDefinition{
+					Key: "BROKER_CONFIG", Value: string(jsonBrokerConfig),
+				})
+			}
+		}
+		doObject := godo.AppSpec{
+			Name:     fmt.Sprintf("triggermesh-%s", uuid.NewString()[:5]),
+			Services: doServices,
+			Workers:  doWorkers,
+			Region:   "fra",
+		}
+
+		err := o.formatAndPrint(doObject)
+		if err != nil {
+			return err
+		}
+	}
+
 	if len(externalReconcilable) != 0 {
 		fmt.Fprintf(os.Stderr, "\nWARNING: manifest contains running components that use external shared resources to produce events.\n"+
 			"It is strongly recommended to stop the broker before deploying integration in the cluster to avoid events read race conditions.\n"+
@@ -146,4 +263,24 @@ func (o *dumpOptions) knativeEventingTransformation(object kubernetes.Object) ku
 		}
 	}
 	return object
+}
+
+func (o *dumpOptions) formatAndPrint(object interface{}) error {
+	switch o.Format {
+	case "json":
+		jsn, err := json.MarshalIndent(object, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(jsn))
+	case "yaml":
+		yml, err := kyaml.Marshal(object)
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(yml))
+	default:
+		return fmt.Errorf("format %q is not supported", o.Format)
+	}
+	return nil
 }

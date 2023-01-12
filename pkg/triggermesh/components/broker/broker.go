@@ -27,17 +27,21 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/digitalocean/godo"
 	"github.com/spf13/viper"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/digitalocean"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg/docker/compose"
 )
 
 var (
-	_ triggermesh.Component = (*Broker)(nil)
-	_ triggermesh.Runnable  = (*Broker)(nil)
-	_ triggermesh.Consumer  = (*Broker)(nil)
+	_ triggermesh.Component  = (*Broker)(nil)
+	_ triggermesh.Runnable   = (*Broker)(nil)
+	_ triggermesh.Consumer   = (*Broker)(nil)
+	_ triggermesh.Exportable = (*Broker)(nil)
 )
 
 const (
@@ -76,6 +80,79 @@ func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
 			},
 		},
 	}, nil
+}
+
+func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error) {
+	entrypoint := []string{
+		"start",
+		"--memory.buffer-size",
+		viper.GetString("triggermesh.broker.memory.buffer-size"),
+		"--memory.produce-timeout",
+		viper.GetString("triggermesh.broker.memory.produce-timeout"),
+	}
+	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
+	if pollingPeriod != "" {
+		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
+	}
+
+	command := strings.Join(entrypoint, " ")
+	port := compose.RandomPort()
+
+	composeService := compose.DockerComposeService{
+		ContainerName: b.Name,
+		Image:         viper.GetString("triggermesh.broker.image"),
+		Command:       command,
+		Volumes:       []compose.DockerComposeVolume{},
+		Ports:         []string{port + ":8080"},
+		Environment:   []string{},
+	}
+
+	return &composeService, nil
+}
+
+func (b *Broker) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean.DigitalOceanApp, error) {
+	entrypoint := []string{
+		"/memory-broker",
+		"start",
+		"--memory.buffer-size",
+		viper.GetString("triggermesh.broker.memory.buffer-size"),
+		"--memory.produce-timeout",
+		viper.GetString("triggermesh.broker.memory.produce-timeout"),
+	}
+	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
+	if pollingPeriod != "" {
+		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
+	}
+	command := strings.Join(entrypoint, " ")
+
+	// Get the image and tag
+	imageSplit := strings.Split(viper.GetString("triggermesh.broker.image"), "/")[2]
+	image := strings.Split(imageSplit, ":")
+
+	service := &godo.AppServiceSpec{
+		Name: b.Name,
+		Image: &godo.ImageSourceSpec{
+			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
+			Repository:   image[0],
+			Tag:          image[1],
+		},
+		RunCommand: command,
+		HTTPPort:   8080,
+		Routes: []*godo.AppRouteSpec{
+			{
+				Path: "/" + b.Name,
+			},
+		},
+		Envs:             []*godo.AppVariableDefinition{},
+		InstanceCount:    1,
+		InstanceSizeSlug: "professional-xs",
+	}
+
+	doApp := &digitalocean.DigitalOceanApp{
+		Service: service,
+	}
+
+	return doApp, nil
 }
 
 func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {
