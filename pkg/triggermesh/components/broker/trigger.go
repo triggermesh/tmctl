@@ -179,7 +179,21 @@ func (t *Trigger) LookupTarget() {
 	}
 }
 
-func FilterExactAttribute(attribute, value string) *eventingbroker.Filter {
+func FilterAttribute(attribute, value string) *eventingbroker.Filter {
+	switch {
+	case strings.HasPrefix(value, "*"): // *-foo
+		return &eventingbroker.Filter{
+			Suffix: map[string]string{
+				attribute: strings.TrimSpace(strings.TrimLeft(value, "*")),
+			},
+		}
+	case strings.HasSuffix(value, "*"): // foo-*
+		return &eventingbroker.Filter{
+			Prefix: map[string]string{
+				attribute: strings.TrimSpace(strings.TrimRight(value, "*")),
+			},
+		}
+	}
 	return &eventingbroker.Filter{
 		Exact: map[string]string{attribute: strings.TrimSpace(value)},
 	}
