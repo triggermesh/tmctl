@@ -58,7 +58,7 @@ func RuntimeParams(object unstructured.Unstructured, image string, additionalEnv
 	co := []docker.ContainerOption{
 		docker.WithImage(image),
 		docker.WithPort(adapterPort),
-		docker.WithErrorLoggingLevel(),
+		// docker.WithErrorLoggingLevel(),
 	}
 	ho := []docker.HostOption{
 		docker.WithHostPortBinding(adapterPort),

@@ -54,6 +54,9 @@ func NewCmd() *cobra.Command {
 		Use:     "send-event [--eventType <type>][--target <name>] <data>",
 		Short:   "Send CloudEvent to the target",
 		Example: "tmctl send-event '{\"hello\":\"world\"}'",
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{"--target", "--eventType"}, cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if target == "" {
 				target = o.Context

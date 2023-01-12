@@ -41,7 +41,7 @@ import (
 const (
 	successColorCode = "\033[92m"
 	defaultColorCode = "\033[39m"
-	offlineColorCode = "\u001b[31m"
+	offlineColorCode = "\033[31m"
 )
 
 type describeOptions struct {
@@ -192,7 +192,7 @@ func status(component triggermesh.Component) string {
 	offlineStatus := fmt.Sprintf("%soffline%s", offlineColorCode, defaultColorCode)
 	if container, ok := component.(triggermesh.Runnable); ok {
 		c, err := container.Info(context.Background())
-		if err != nil {
+		if err != nil || !c.Online {
 			return offlineStatus
 		}
 		return fmt.Sprintf("%sonline(http://localhost:%s)%s", successColorCode, c.HostPort(), defaultColorCode)

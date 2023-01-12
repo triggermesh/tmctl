@@ -47,9 +47,10 @@ type imagePullEvent struct {
 }
 
 type Container struct {
-	ID    string
-	Name  string
-	Image string
+	ID     string
+	Name   string
+	Image  string
+	Online bool
 
 	CreateContainerOptions []ContainerOption
 	CreateHostOptions      []HostOption
@@ -71,13 +72,13 @@ func CheckDaemon() error {
 	return err
 }
 
-func (c *Container) Logs(ctx context.Context, client *client.Client) (io.ReadCloser, error) {
+func (c *Container) Logs(ctx context.Context, client *client.Client, since time.Time, follow bool) (io.ReadCloser, error) {
 	options := types.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
-		Follow:     true,
-		// start tailing new logs only
-		Since: (time.Now().Add(2 * time.Second).Format("2006-01-02T15:04:05.999999999Z07:00"))}
+		Follow:     follow,
+		// Since: (time.Now().Add(2 * time.Second).Format("2006-01-02T15:04:05.999999999Z07:00"))}
+		Since: since.Format("2006-01-02T15:04:05.999999999Z07:00")}
 	return client.ContainerLogs(ctx, c.ID, options)
 }
 
@@ -165,6 +166,7 @@ func (c *Container) Start(ctx context.Context, client *client.Client, restart bo
 	c.runtimeHostConfig = hc
 	c.runtimeContainerConfig = cc
 
+	since := time.Now()
 	if err := client.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		return nil, fmt.Errorf("docker start: %w", err)
 	}
@@ -173,32 +175,23 @@ func (c *Container) Start(ctx context.Context, client *client.Client, restart bo
 		return nil, fmt.Errorf("docker connect: %w", err)
 	}
 
-	logsReader, err := c.Logs(ctx, client)
+	time.Sleep(logsReadTimeout * time.Second)
+	logsReader, err := c.Logs(ctx, client, since, false)
 	if err != nil {
 		return nil, fmt.Errorf("docker read logs: %w", err)
 	}
 	defer logsReader.Close()
 
-	stopLogs := make(chan struct{}, 1)
-	logs := readLogs(logsReader, stopLogs)
-	defer close(stopLogs)
-	timer := time.NewTimer(time.Second * logsReadTimeout)
-	for {
-		select {
-		case <-timer.C:
-			stopLogs <- struct{}{}
-			return c, nil
-		case log := <-logs:
-			var l map[string]interface{}
-			if err := json.Unmarshal(log, &l); err != nil {
-				continue
-				// return nil, fmt.Errorf("docker unmarshal logs: %w", err)
-			}
-			if isError(l) {
-				return nil, fmt.Errorf(string(log))
-			}
+	for _, log := range readLogs(logsReader) {
+		var l map[string]interface{}
+		if err := json.Unmarshal([]byte(log), &l); err != nil {
+			continue
+		}
+		if isError(l) {
+			return nil, fmt.Errorf("container error: %s", string(log))
 		}
 	}
+	return c, nil
 }
 
 func openPort() int {
@@ -237,6 +230,9 @@ func (c *Container) LookupHostConfig(ctx context.Context, client *client.Client)
 		return nil, err
 	}
 	c.ID = id
+	if jsn.State.Running {
+		c.Online = true
+	}
 	c.runtimeHostConfig = *jsn.HostConfig
 	c.runtimeContainerConfig = *jsn.Config
 	return c, nil
@@ -285,32 +281,22 @@ func ForceStop(ctx context.Context, name string, client *client.Client) error {
 	})
 }
 
-func readLogs(output io.ReadCloser, done chan struct{}) chan []byte {
-	logs := make(chan []byte)
-	scanner := bufio.NewScanner(output)
-	go func() {
-		defer close(logs)
-		for scanner.Scan() {
-			select {
-			case <-done:
-				return
-			default:
-				if l := len(scanner.Bytes()); l > 8 {
-					logs <- scanner.Bytes()[8:]
-					// CLI sets adapter's log level to "error", so one log entry is usually enough.
-					// experimental, reduces container startup time.
-					return
-				}
-			}
+func readLogs(logs io.ReadCloser) []string {
+	var output []string
+	scanner := bufio.NewScanner(logs)
+	for scanner.Scan() {
+		if l := len(scanner.Bytes()); l > 8 {
+			output = append(output, string(scanner.Bytes()[8:]))
 		}
-	}()
-	return logs
+	}
+	return output
 }
 
 func isError(logEntry map[string]interface{}) bool {
 	for k, v := range logEntry {
 		if k == "level" || k == "severity" {
-			if strings.ToLower(v.(string)) == "error" {
+			switch strings.ToLower(v.(string)) {
+			case "error", "fatal", "alert", "panic":
 				return true
 			}
 		}
