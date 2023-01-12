@@ -16,6 +16,7 @@ tmctl create trigger --target sockeye --source foo-httppollersource
 
 ```
       --eventTypes strings   Event types filter
+      --filter string        Raw filter JSON
   -h, --help                 help for trigger
       --name string          Trigger name
       --source strings       Event sources filter

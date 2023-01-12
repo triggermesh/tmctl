@@ -17,9 +17,12 @@ limitations under the License.
 package create
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	eventingbroker "github.com/triggermesh/brokers/pkg/config/broker"
 
 	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/log"
@@ -29,7 +32,7 @@ import (
 )
 
 func (o *createOptions) newTriggerCmd() *cobra.Command {
-	var name, target string
+	var name, target, rawFilter string
 	var eventSourcesFilter, eventTypesFilter []string
 	triggerCmd := &cobra.Command{
 		Use:       "trigger --target <name> [--source <name>...][--eventTypes <type>...]",
@@ -38,11 +41,12 @@ func (o *createOptions) newTriggerCmd() *cobra.Command {
 		ValidArgs: []string{"--target", "--name", "--source", "--eventTypes"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cobra.CheckErr(o.Manifest.Read())
-			return o.trigger(name, eventSourcesFilter, eventTypesFilter, target)
+			return o.trigger(name, rawFilter, eventSourcesFilter, eventTypesFilter, target)
 		},
 	}
 	triggerCmd.Flags().StringVar(&name, "name", "", "Trigger name")
 	triggerCmd.Flags().StringVar(&target, "target", "", "Target name")
+	triggerCmd.Flags().StringVar(&rawFilter, "filter", "", "Raw filter JSON")
 	triggerCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Event sources filter")
 	triggerCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
 	cobra.CheckErr(triggerCmd.MarkFlagRequired("target"))
@@ -62,30 +66,40 @@ func (o *createOptions) newTriggerCmd() *cobra.Command {
 	return triggerCmd
 }
 
-func (o *createOptions) trigger(name string, eventSourcesFilter, eventTypesFilter []string, target string) error {
-	et, err := o.translateEventSource(eventSourcesFilter)
-	if err != nil {
-		return err
+func (o *createOptions) trigger(name string, rawFilter string, eventSourcesFilter, eventTypesFilter []string, target string) error {
+	var filters []*eventingbroker.Filter
+	if rawFilter != "" {
+		var filter eventingbroker.Filter
+		if err := json.Unmarshal([]byte(rawFilter), &filter); err != nil {
+			return fmt.Errorf("cannot decode filter JSON %q: %w", rawFilter, err)
+		}
+		filters = []*eventingbroker.Filter{&filter}
+	} else {
+		et, err := o.translateEventSource(eventSourcesFilter)
+		if err != nil {
+			return err
+		}
+		for _, eventTypes := range append(eventTypesFilter, et...) {
+			filters = append(filters, tmbroker.FilterAttribute("type", eventTypes))
+		}
 	}
-	eventTypesFilter = append(eventTypesFilter, et...)
 
 	component, err := components.GetObject(target, o.CRD, o.Version, o.Manifest)
 	if err != nil {
 		return fmt.Errorf("%q not found: %w", target, err)
 	}
-
 	if _, ok := component.(triggermesh.Consumer); !ok {
 		return fmt.Errorf("%q is not an event target", target)
 	}
 
 	log.Println("Creating trigger")
-	if len(eventTypesFilter) == 0 && len(eventSourcesFilter) == 0 {
+	if len(filters) == 0 {
 		if _, err = o.createTrigger(name, component, nil); err != nil {
 			return err
 		}
 	}
-	for _, et := range eventTypesFilter {
-		if _, err = o.createTrigger(name, component, tmbroker.FilterExactAttribute("type", et)); err != nil {
+	for _, filter := range filters {
+		if _, err = o.createTrigger(name, component, filter); err != nil {
 			return err
 		}
 	}
