@@ -47,9 +47,10 @@ type imagePullEvent struct {
 }
 
 type Container struct {
-	ID    string
-	Name  string
-	Image string
+	ID     string
+	Name   string
+	Image  string
+	Online bool
 
 	CreateContainerOptions []ContainerOption
 	CreateHostOptions      []HostOption
@@ -228,10 +229,10 @@ func (c *Container) LookupHostConfig(ctx context.Context, client *client.Client)
 	if err != nil {
 		return nil, err
 	}
-	if !jsn.State.Running {
-		return nil, fmt.Errorf("container is offline")
-	}
 	c.ID = id
+	if jsn.State.Running {
+		c.Online = true
+	}
 	c.runtimeHostConfig = *jsn.HostConfig
 	c.runtimeContainerConfig = *jsn.Config
 	return c, nil

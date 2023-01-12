@@ -38,15 +38,21 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-const defaultColorCode = "\033[39m"
+const defaultColorCode = "\033[0m"
 
 var colors = []string{
-	"\033[31m", // red
-	"\033[32m", // green
-	"\033[33m", // yellow
-	"\033[34m", // blue
-	"\033[35m", // magent
-	"\033[36m", // cyan
+	"\033[31m",   // red
+	"\033[32m",   // green
+	"\033[33m",   // yellow
+	"\033[34m",   // blue
+	"\033[35m",   // magent
+	"\033[36m",   // cyan
+	"\033[31;1m", // bright red
+	"\033[32;1m", // bright green
+	"\033[33;1m", // bright yellow
+	"\033[34;1m", // bright blue
+	"\033[35;1m", // bright magent
+	"\033[36;1m", // bright cyan
 }
 
 var defaultLogPeriod = 24 * time.Hour
@@ -94,13 +100,14 @@ func (o *logsOptions) initialize() {
 }
 
 func (o logsOptions) logs(filter []string, follow bool) error {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	defer close(c)
+	cancel := make(chan os.Signal, 1)
+	signal.Notify(cancel, os.Interrupt, syscall.SIGTERM)
+	defer close(cancel)
 
 	ctx := context.Background()
 
-	for i, object := range o.Manifest.Objects {
+	colorIndex := 0
+	for _, object := range o.Manifest.Objects {
 		component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest)
 		if err != nil {
 			return fmt.Errorf("creating component interface: %w", err)
@@ -128,40 +135,41 @@ func (o logsOptions) logs(filter []string, follow bool) error {
 		if !follow {
 			since = since.Add(-defaultLogPeriod * time.Hour)
 		}
-		reader, err := container.Logs(ctx, since, follow)
+		logs, err := container.Logs(ctx, since, follow)
 		if err != nil {
 			return fmt.Errorf("%q logs unavailable: %w", component.GetName(), err)
 		}
-		defer reader.Close()
+		defer logs.Close()
 		colorCode := func() string {
 			if len(filter) == 1 {
 				return defaultColorCode
 			}
-			if i >= len(colors) {
-				i -= len(colors)
+			if colorIndex >= len(colors) {
+				colorIndex -= len(colors)
 			}
-			return colors[i]
+			return colors[colorIndex]
 		}()
+		colorIndex++
 		if follow {
 			log.Printf("%sListening %s%s", colorCode, component.GetName(), defaultColorCode)
-			go readLogs(reader, c, colorCode)
+			go readLogs(logs, cancel, colorCode)
 		} else {
 			fmt.Printf("---------------\n%s\n---------------\n", component.GetName())
-			readLogs(reader, c, defaultColorCode)
+			readLogs(logs, cancel, defaultColorCode)
 		}
 	}
 	if follow {
-		<-c
+		<-cancel
 	}
 	return nil
 }
 
-func readLogs(logs io.ReadCloser, done chan os.Signal, colorCode string) {
+func readLogs(logs io.ReadCloser, calncel chan os.Signal, colorCode string) {
+	defer logs.Close()
 	scanner := bufio.NewScanner(logs)
 	for scanner.Scan() {
 		select {
-		case <-done:
-			logs.Close()
+		case <-calncel:
 			return
 		default:
 			log := scanner.Bytes()
