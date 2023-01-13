@@ -83,18 +83,7 @@ func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
 }
 
 func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error) {
-	entrypoint := []string{
-		"start",
-		"--memory.buffer-size",
-		viper.GetString("triggermesh.broker.memory.buffer-size"),
-		"--memory.produce-timeout",
-		viper.GetString("triggermesh.broker.memory.produce-timeout"),
-	}
-	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
-	if pollingPeriod != "" {
-		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
-	}
-
+	entrypoint := b.createBrokerEntrypoint()
 	command := strings.Join(entrypoint, " ")
 	port := compose.RandomPort()
 
@@ -111,18 +100,7 @@ func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (*compo
 }
 
 func (b *Broker) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean.DigitalOceanApp, error) {
-	entrypoint := []string{
-		"/memory-broker",
-		"start",
-		"--memory.buffer-size",
-		viper.GetString("triggermesh.broker.memory.buffer-size"),
-		"--memory.produce-timeout",
-		viper.GetString("triggermesh.broker.memory.produce-timeout"),
-	}
-	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
-	if pollingPeriod != "" {
-		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
-	}
+	entrypoint := b.createBrokerEntrypoint()
 	command := strings.Join(entrypoint, " ")
 
 	// Get the image and tag
@@ -165,20 +143,7 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
 
-	entrypoint := []string{
-		"/memory-broker",
-		"start",
-		"--memory.buffer-size",
-		viper.GetString("triggermesh.broker.memory.buffer-size"),
-		"--memory.produce-timeout",
-		viper.GetString("triggermesh.broker.memory.produce-timeout"),
-		"--broker-config-path",
-		"/etc/triggermesh/broker.conf",
-	}
-	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
-	if pollingPeriod != "" {
-		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
-	}
+	entrypoint := b.createBrokerEntrypoint()
 	co = append(co, docker.WithEntrypoint(entrypoint))
 
 	bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", b.ConfigFile)
@@ -302,4 +267,21 @@ func New(name, manifestPath string) (triggermesh.Component, error) {
 		ConfigFile: config,
 		Name:       name,
 	}, nil
+}
+
+func (b *Broker) createBrokerEntrypoint() []string {
+	entrypoint := []string{
+		"/memory-broker",
+		"start",
+		"--memory.buffer-size",
+		viper.GetString("triggermesh.broker.memory.buffer-size"),
+		"--memory.produce-timeout",
+		viper.GetString("triggermesh.broker.memory.produce-timeout"),
+	}
+	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
+	if pollingPeriod != "" {
+		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
+	}
+
+	return entrypoint
 }
