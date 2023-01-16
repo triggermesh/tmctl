@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
@@ -32,11 +33,14 @@ const version = "v1.21.1"
 func TestGetObject(t *testing.T) {
 	m := manifest.New(test.Manifest())
 	assert.NoError(t, m.Read())
+	c := &config.Config{
+		CRDPath:     test.CRD(),
+		Triggermesh: config.TmConfig{ComponentsVersion: version},
+	}
 	for _, object := range m.Objects {
-		component, err := GetObject(object.Metadata.Name, test.CRD(), version, m)
+		component, err := GetObject(object.Metadata.Name, c, m)
 		assert.NoError(t, err)
 		if component == nil {
-			// secret is not retrievable
 			continue
 		}
 		k8sObject, err := component.AsK8sObject()

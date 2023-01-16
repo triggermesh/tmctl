@@ -34,7 +34,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-func (o *createOptions) newSourceCmd() *cobra.Command {
+func (o *CliOptions) newSourceCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "source [kind]/[--from-image <image>][--name <name>]",
 		Short: "Create TriggerMesh source. More information at https://docs.triggermesh.io",
@@ -49,7 +49,7 @@ func (o *createOptions) newSourceCmd() *cobra.Command {
 		// CompletionOptions:  cobra.CompletionOptions{DisableDescriptions: false},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 || args[0] == "--help" {
-				sources, err := crd.ListSources(o.CRD)
+				sources, err := crd.ListSources(o.Config.CRDPath)
 				if err != nil {
 					return fmt.Errorf("list sources: %w", err)
 				}
@@ -58,9 +58,6 @@ func (o *createOptions) newSourceCmd() *cobra.Command {
 				fmt.Printf("\nAvailable source kinds:\n---\n%s\n", strings.Join(sources, "\n"))
 				return nil
 			}
-			if err := o.Manifest.Read(); err != nil {
-				return err
-			}
 			params := argsToMap(args)
 			var name string
 			if n, exists := params["name"]; exists {
@@ -68,9 +65,15 @@ func (o *createOptions) newSourceCmd() *cobra.Command {
 				delete(params, "name")
 			}
 			if v, exists := params["version"]; exists {
-				o.Version = v
+				o.Config.Triggermesh.ComponentsVersion = v
 				delete(params, "version")
 			}
+			crd, err := crd.Fetch(o.Config.ConfigHome, o.Config.Triggermesh.ComponentsVersion)
+			if err != nil {
+				return err
+			}
+			o.Config.CRDPath = crd
+
 			if _, readDisabled := params["disable-file-args"]; !readDisabled {
 				for key, value := range params {
 					data, err := os.ReadFile(value)
@@ -91,9 +94,9 @@ func (o *createOptions) newSourceCmd() *cobra.Command {
 	}
 }
 
-func (o *createOptions) source(name, kind string, params map[string]string) error {
+func (o *CliOptions) source(name, kind string, params map[string]string) error {
 	ctx := context.Background()
-	broker, err := tmbroker.New(o.Context, o.Manifest.Path)
+	broker, err := tmbroker.New(o.Config.Context, o.Manifest.Path, o.Config.Triggermesh.Broker)
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}
@@ -103,7 +106,7 @@ func (o *createOptions) source(name, kind string, params map[string]string) erro
 	}
 	params["sink.uri"] = "http://host.docker.internal:" + port
 
-	s := source.New(name, o.CRD, kind, o.Context, o.Version, params, nil)
+	s := source.New(name, o.Config.CRDPath, kind, o.Config.Context, o.Config.Triggermesh.ComponentsVersion, params, nil)
 
 	secrets, secretsEnv, err := components.ProcessSecrets(s.(triggermesh.Parent), o.Manifest)
 	if err != nil {
@@ -140,9 +143,9 @@ func (o *createOptions) source(name, kind string, params map[string]string) erro
 	return nil
 }
 
-func (o *createOptions) sourceFromImage(name, image string, params map[string]string) error {
+func (o *CliOptions) sourceFromImage(name, image string, params map[string]string) error {
 	ctx := context.Background()
-	broker, err := tmbroker.New(o.Context, o.Manifest.Path)
+	broker, err := tmbroker.New(o.Config.Context, o.Manifest.Path, o.Config.Triggermesh.Broker)
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}
@@ -152,7 +155,7 @@ func (o *createOptions) sourceFromImage(name, image string, params map[string]st
 	}
 	params["K_SINK"] = "http://host.docker.internal:" + port
 
-	s := service.New(name, image, o.Context, service.Producer, params)
+	s := service.New(name, image, o.Config.Context, service.Producer, params)
 
 	log.Println("Updating manifest")
 	restart, err := o.Manifest.Add(s)

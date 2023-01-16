@@ -29,8 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/digitalocean/godo"
-	"github.com/spf13/viper"
-
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
@@ -57,7 +56,9 @@ type Broker struct {
 	ConfigFile string
 	Name       string
 
-	spec map[string]interface{}
+	image      string
+	entrypoint []string
+	spec       map[string]interface{}
 }
 
 func (b *Broker) asUnstructured() (unstructured.Unstructured, error) {
@@ -84,33 +85,22 @@ func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
 }
 
 func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error) {
-	entrypoint := brokerEntrypoint()
-	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
-	if pollingPeriod != "" {
-		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
-	}
 	var env []string
 	for k, v := range additionalEnvs {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 	return &docker.ComposeService{
 		ContainerName: b.Name,
-		Image:         viper.GetString("triggermesh.broker.image"),
-		Command:       strings.Join(entrypoint, " "),
+		Image:         b.image,
+		Entrypoint:    b.entrypoint,
 		Ports:         []string{strconv.Itoa(pkg.OpenPort()) + ":8080"},
 		Environment:   env,
 	}, nil
 }
 
 func (b *Broker) AsDigitalOceanObject(additionalEnvs map[string]string) (interface{}, error) {
-	entrypoint := append([]string{"/memory-broker"}, brokerEntrypoint()...)
-	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
-	if pollingPeriod != "" {
-		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
-	}
-
 	// Get the image and tag
-	imageSplit := strings.Split(viper.GetString("triggermesh.broker.image"), "/")[2]
+	imageSplit := strings.Split(b.image, "/")[2]
 	image := strings.Split(imageSplit, ":")
 
 	var env []*godo.AppVariableDefinition
@@ -127,7 +117,7 @@ func (b *Broker) AsDigitalOceanObject(additionalEnvs map[string]string) (interfa
 			Repository:   image[0],
 			Tag:          image[1],
 		},
-		RunCommand:       strings.Join(entrypoint, " "),
+		RunCommand:       strings.Join(b.entrypoint, " "),
 		InternalPorts:    []int64{8080},
 		Envs:             env,
 		InstanceCount:    1,
@@ -140,21 +130,12 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
-	co, ho, err := adapter.RuntimeParams(o, viper.GetString("triggermesh.broker.image"), additionalEnvs)
+	co, ho, err := adapter.RuntimeParams(o, b.image, additionalEnvs)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
-	entrypoint := append([]string{"/memory-broker"}, brokerEntrypoint()...)
-	entrypoint = append(entrypoint, []string{
-		"--broker-config-path",
-		"/etc/triggermesh/broker.conf",
-	}...)
 
-	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
-	if pollingPeriod != "" {
-		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
-	}
-	co = append(co, docker.WithEntrypoint(entrypoint))
+	co = append(co, docker.WithEntrypoint(b.entrypoint))
 
 	bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", b.ConfigFile)
 	ho = append(ho, docker.WithVolumeBind(bind))
@@ -165,20 +146,10 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 	}
 	return &docker.Container{
 		Name:                   name,
-		Image:                  viper.GetString("triggermesh.broker.image"),
+		Image:                  b.image,
 		CreateHostOptions:      ho,
 		CreateContainerOptions: co,
 	}, nil
-}
-
-func brokerEntrypoint() []string {
-	return []string{
-		"start",
-		"--memory.buffer-size",
-		viper.GetString("triggermesh.broker.memory.buffer-size"),
-		"--memory.produce-timeout",
-		viper.GetString("triggermesh.broker.memory.produce-timeout"),
-	}
 }
 
 func (b *Broker) GetKind() string {
@@ -260,7 +231,7 @@ func (b *Broker) Logs(ctx context.Context, since time.Time, follow bool) (io.Rea
 	return container.Logs(ctx, client, since, follow)
 }
 
-func New(name, manifestPath string) (triggermesh.Component, error) {
+func New(name, manifestPath string, brokerConfig config.BrokerConfig) (triggermesh.Component, error) {
 	// create config folder
 	if err := os.MkdirAll(filepath.Dir(manifestPath), os.ModePerm); err != nil {
 		return nil, fmt.Errorf("broker dir creation: %w", err)
@@ -286,5 +257,54 @@ func New(name, manifestPath string) (triggermesh.Component, error) {
 	return &Broker{
 		ConfigFile: config,
 		Name:       name,
+
+		image:      image(brokerConfig),
+		entrypoint: brokerEntrypoint(brokerConfig),
 	}, nil
+}
+
+func image(c config.BrokerConfig) string {
+	switch {
+	case c.Memory != nil:
+		return config.MemoryBrokerImage + ":" + c.Version
+	case c.Redis != nil:
+		return config.RedisBrokerImage + ":" + c.Version
+	}
+	return ""
+}
+
+func brokerEntrypoint(c config.BrokerConfig) []string {
+	var entrypoint []string
+	switch {
+	case c.Memory != nil:
+		entrypoint = []string{
+			"/memory-broker",
+			"start",
+			"--memory.buffer-size",
+			c.Memory.BufferSize,
+			"--memory.produce-timeout",
+			c.Memory.ProduceTimeout,
+		}
+	case c.Redis != nil:
+		entrypoint = []string{
+			"/redis-broker",
+			"start",
+			"--redis.username",
+			c.Redis.Username,
+			"--redis.password",
+			c.Redis.Password,
+			"--redis.address",
+			c.Redis.Address,
+		}
+		if c.Redis.TLSEnabled {
+			entrypoint = append(entrypoint, "--redis.tls-enabled")
+		}
+		if c.Redis.SkipVerify {
+			entrypoint = append(entrypoint, "--redis.tls-skip-verify")
+		}
+		if c.ConfigPollingPeriod != "" {
+			entrypoint = append(entrypoint, []string{"--config-polling-period", c.ConfigPollingPeriod}...)
+		}
+	}
+	return append(entrypoint, []string{"--broker-config-path", "/etc/triggermesh/broker.conf"}...)
 }

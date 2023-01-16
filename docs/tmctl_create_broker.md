@@ -15,14 +15,8 @@ tmctl create broker foo
 ### Options
 
 ```
-  -h, --help   help for broker
-```
-
-### Options inherited from parent commands
-
-```
-      --broker string    Optional broker name.
-      --version string   TriggerMesh components version.
+  -h, --help             help for broker
+      --version string   TriggerMesh broker version. (default "v1.1.0")
 ```
 
 ### SEE ALSO

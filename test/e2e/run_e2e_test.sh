@@ -26,10 +26,15 @@ create_integration() {
         --source e2e-source
     $TMCTL create transformation \
         --target e2e-sockeye <<EOF
+context:
+- operation: add
+  paths:
+  - key: source
+    value: bumblebee
 data:
 - operation: parse
   paths:
-  - key: .
+  - key: page
     value: JSON
 - operation: store
   paths:
@@ -46,7 +51,7 @@ EOF
 }
 
 send_event() {
-    $TMCTL send-event '{"page": {"url":"https://www.githubstatus.com","source":"cli send-event"}}' --eventType e2e-test-event
+    $TMCTL send-event '{"page":"{\"url\":\"https://www.githubstatus.com\",\"source\":\"cli send-event\"}"}' --eventType e2e-test-event
 }
 
 validate_describe_output() {
@@ -80,9 +85,10 @@ validate_describe_output() {
 validate_watch_log() {
     CONTROL_LINES=(
         '  source: local.e2e-source'
+        '  source: bumblebee'
+        '  source: triggermesh-cli'
         '  type: e2e-test-transformation.output'
         '      "name": "GitHub",'
-        '      "source": "cli send-event"'
         '    "URL": "https://www.githubstatus.com"'
     )
 
@@ -134,7 +140,7 @@ TMCTL=$TESTDIR/tmctl_test
 WATCH_LOG=$TESTDIR/watch-output.log
 mkdir -p $TESTDIR
 
-go build -o $TMCTL main.go
+go build -ldflags="-X 'main.Commit=`git rev-parse HEAD`'" -o $TMCTL main.go
 
 HOME=$TESTDIR
 
@@ -151,6 +157,8 @@ if [ $? -ne 0 ]; then
     printf "\"tmctl create\" validation failed\n"
     exit 1
 fi
+
+sleep 2 # for a slow-start components
 
 send_event
 if [ $? -ne 0 ]; then 

@@ -24,18 +24,16 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/triggermesh/tmctl/pkg/completion"
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const defaultColorCode = "\033[0m"
@@ -57,16 +55,16 @@ var colors = []string{
 
 var defaultLogPeriod = 24 * time.Hour
 
-type logsOptions struct {
-	ConfigBase string
-	Context    string
-	CRD        string
-	Version    string
-	Manifest   *manifest.Manifest
+type CliOptions struct {
+	Config   *config.Config
+	Manifest *manifest.Manifest
 }
 
-func NewCmd() *cobra.Command {
-	o := &logsOptions{}
+func NewCmd(config *config.Config, manifest *manifest.Manifest) *cobra.Command {
+	o := &CliOptions{
+		Config:   config,
+		Manifest: manifest,
+	}
 	var follow bool
 	logsCmd := &cobra.Command{
 		Use:     "logs [name]",
@@ -79,27 +77,11 @@ func NewCmd() *cobra.Command {
 			return o.logs(args, follow)
 		},
 	}
-	cobra.OnInitialize(o.initialize)
-
 	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Follow logs output")
 	return logsCmd
 }
 
-func (o *logsOptions) initialize() {
-	o.ConfigBase = filepath.Dir(viper.ConfigFileUsed())
-	o.Context = viper.GetString("context")
-	o.Version = viper.GetString("triggermesh.version")
-	o.Manifest = manifest.New(filepath.Join(o.ConfigBase, o.Context, triggermesh.ManifestFile))
-	crds, err := crd.Fetch(o.ConfigBase, o.Version)
-	cobra.CheckErr(err)
-	o.CRD = crds
-
-	// try to read manifest even if it does not exists.
-	// required for autocompletion.
-	_ = o.Manifest.Read()
-}
-
-func (o logsOptions) logs(filter []string, follow bool) error {
+func (o *CliOptions) logs(filter []string, follow bool) error {
 	cancel := make(chan os.Signal, 1)
 	signal.Notify(cancel, os.Interrupt, syscall.SIGTERM)
 	defer close(cancel)
@@ -108,7 +90,7 @@ func (o logsOptions) logs(filter []string, follow bool) error {
 
 	colorIndex := 0
 	for _, object := range o.Manifest.Objects {
-		component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest)
+		component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
 		if err != nil {
 			return fmt.Errorf("creating component interface: %w", err)
 		}

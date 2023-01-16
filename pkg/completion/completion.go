@@ -17,6 +17,7 @@ limitations under the License.
 package completion
 
 import (
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
@@ -68,10 +69,10 @@ func ListAll(m *manifest.Manifest) []string {
 	return list
 }
 
-func ListEventTypes(m *manifest.Manifest, crdFile, version string) []string {
+func ListEventTypes(m *manifest.Manifest, c *config.Config) []string {
 	var eventTypes []string
 	for _, object := range m.Objects {
-		c, err := components.GetObject(object.Metadata.Name, crdFile, version, m)
+		c, err := components.GetObject(object.Metadata.Name, c, m)
 		if err == nil {
 			if producer, ok := c.(triggermesh.Producer); ok {
 				et, _ := producer.GetEventTypes()

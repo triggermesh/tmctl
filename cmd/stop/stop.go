@@ -22,8 +22,8 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/manifest"
@@ -31,33 +31,38 @@ import (
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
-type stopOptions struct {
-	ConfigBase string
-	Manifest   *manifest.Manifest
+type CliOptions struct {
+	Config   *config.Config
+	Manifest *manifest.Manifest
 }
 
-func NewCmd() *cobra.Command {
-	o := &stopOptions{}
-	stopCmd := &cobra.Command{
-		Use:       "stop [broker]",
-		Short:     "Stops TriggerMesh components, removes docker containers",
-		Example:   "tmctl stop",
-		ValidArgs: []string{},
+func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
+	o := &CliOptions{
+		Config:   config,
+		Manifest: m,
+	}
+	return &cobra.Command{
+		Use:     "stop [broker]",
+		Short:   "Stops TriggerMesh components, removes docker containers",
+		Example: "tmctl stop",
+		Args:    cobra.RangeArgs(0, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			broker := viper.GetString("context")
-			if len(args) == 1 {
-				broker = args[0]
+			if len(args) != 0 {
+				o.Config.Context = args[0]
+				o.Manifest = manifest.New(filepath.Join(
+					o.Config.ConfigHome,
+					o.Config.Context,
+					triggermesh.ManifestFile))
+				if err := o.Manifest.Read(); err != nil {
+					return err
+				}
 			}
-			o.ConfigBase = filepath.Dir(viper.ConfigFileUsed())
-			o.Manifest = manifest.New(filepath.Join(o.ConfigBase, broker, triggermesh.ManifestFile))
-			cobra.CheckErr(o.Manifest.Read())
-			return o.stop(broker)
+			return o.stop()
 		},
 	}
-	return stopCmd
 }
 
-func (o *stopOptions) stop(broker string) error {
+func (o *CliOptions) stop() error {
 	ctx := context.Background()
 	client, err := docker.NewClient()
 	if err != nil {

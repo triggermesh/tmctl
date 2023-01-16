@@ -21,8 +21,7 @@ tmctl stop
 ### Options inherited from parent commands
 
 ```
-      --broker string    Optional broker name.
-      --version string   TriggerMesh components version.
+      --version string   TriggerMesh components version. (default "v1.23.0")
 ```
 
 ### SEE ALSO

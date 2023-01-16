@@ -36,7 +36,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-func (o *createOptions) newTargetCmd() *cobra.Command {
+func (o *CliOptions) newTargetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "target [kind]/[--from-image <image>][--name <name>][--source <name>...][--eventTypes <type>...]",
 		Short: "Create TriggerMesh target. More information at https://docs.triggermesh.io",
@@ -49,7 +49,7 @@ func (o *createOptions) newTargetCmd() *cobra.Command {
 		ValidArgsFunction:  o.targetsCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 || args[0] == "--help" {
-				targets, err := crd.ListTargets(o.CRD)
+				targets, err := crd.ListTargets(o.Config.CRDPath)
 				if err != nil {
 					return fmt.Errorf("list sources: %w", err)
 				}
@@ -58,7 +58,6 @@ func (o *createOptions) newTargetCmd() *cobra.Command {
 				fmt.Printf("\nAvailable target kinds:\n---\n%s\n", strings.Join(targets, "\n"))
 				return nil
 			}
-			cobra.CheckErr(o.Manifest.Read())
 			params := argsToMap(args[0:])
 			var name string
 			if n, exists := params["name"]; exists {
@@ -66,9 +65,15 @@ func (o *createOptions) newTargetCmd() *cobra.Command {
 				delete(params, "name")
 			}
 			if v, exists := params["version"]; exists {
-				o.Version = v
+				o.Config.Triggermesh.ComponentsVersion = v
 				delete(params, "version")
 			}
+			crd, err := crd.Fetch(o.Config.ConfigHome, o.Config.Triggermesh.ComponentsVersion)
+			if err != nil {
+				return err
+			}
+			o.Config.CRDPath = crd
+
 			var eventSourcesFilter, eventTypesFilter []string
 			if sf, exists := params["source"]; exists {
 				eventSourcesFilter = strings.Split(sf, ",")
@@ -104,7 +109,7 @@ func (o *createOptions) newTargetCmd() *cobra.Command {
 	}
 }
 
-func (o *createOptions) target(name, kind string, args map[string]string, eventSourcesFilter, eventTypesFilter []string) error {
+func (o *CliOptions) target(name, kind string, args map[string]string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
 
 	et, err := o.translateEventSource(eventSourcesFilter)
@@ -113,7 +118,7 @@ func (o *createOptions) target(name, kind string, args map[string]string, eventS
 	}
 	eventTypesFilter = append(eventTypesFilter, et...)
 
-	t := target.New(name, o.CRD, kind, o.Context, o.Version, args)
+	t := target.New(name, o.Config.CRDPath, kind, o.Config.Context, o.Config.Triggermesh.ComponentsVersion, args)
 
 	secrets, secretsEnv, err := components.ProcessSecrets(t.(triggermesh.Parent), o.Manifest)
 	if err != nil {
@@ -158,8 +163,8 @@ func (o *createOptions) target(name, kind string, args map[string]string, eventS
 	return nil
 }
 
-func (o *createOptions) createTrigger(name string, target triggermesh.Component, filter *eventingbroker.Filter) (triggermesh.Component, error) {
-	trigger, err := tmbroker.NewTrigger(name, o.Context, o.ConfigBase, target, filter)
+func (o *CliOptions) createTrigger(name string, target triggermesh.Component, filter *eventingbroker.Filter) (triggermesh.Component, error) {
+	trigger, err := tmbroker.NewTrigger(name, o.Config.Context, o.Config.ConfigHome, target, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -172,8 +177,8 @@ func (o *createOptions) createTrigger(name string, target triggermesh.Component,
 	return trigger, nil
 }
 
-func (o *createOptions) updateTriggers(target triggermesh.Component) error {
-	triggers, err := tmbroker.GetTargetTriggers(target.GetName(), o.Context, o.ConfigBase)
+func (o *CliOptions) updateTriggers(target triggermesh.Component) error {
+	triggers, err := tmbroker.GetTargetTriggers(target.GetName(), o.Config.Context, o.Config.ConfigHome)
 	if err != nil {
 		return fmt.Errorf("target triggers: %w", err)
 	}
@@ -186,7 +191,7 @@ func (o *createOptions) updateTriggers(target triggermesh.Component) error {
 	return nil
 }
 
-func (o *createOptions) targetFromImage(name, image string, params map[string]string, eventSourcesFilter, eventTypesFilter []string) error {
+func (o *CliOptions) targetFromImage(name, image string, params map[string]string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
 
 	et, err := o.translateEventSource(eventSourcesFilter)
@@ -195,7 +200,7 @@ func (o *createOptions) targetFromImage(name, image string, params map[string]st
 	}
 	eventTypesFilter = append(eventTypesFilter, et...)
 
-	s := service.New(name, image, o.Context, service.Consumer, params)
+	s := service.New(name, image, o.Config.Context, service.Consumer, params)
 
 	log.Println("Updating manifest")
 	restart, err := o.Manifest.Add(s)

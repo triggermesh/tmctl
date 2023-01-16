@@ -24,19 +24,19 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/wiretap"
 )
 
-type watchOptions struct {
-	ConfigDir  string
+type CliOptions struct {
+	Config *config.Config
+
 	EventTypes string
 	Source     string
 }
@@ -48,34 +48,34 @@ type brokerLog struct {
 	Name   string `json:"name"`
 }
 
-func NewCmd() *cobra.Command {
-	o := watchOptions{}
+func NewCmd(config *config.Config) *cobra.Command {
+	o := &CliOptions{Config: config}
 	watchCmd := &cobra.Command{
 		Use:     "watch [broker]",
 		Short:   "Watch events flowing through the broker",
 		Example: "tmctl watch",
+		Args:    cobra.RangeArgs(0, 1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.ConfigDir = filepath.Dir(viper.ConfigFileUsed())
-			if len(args) == 1 {
-				return o.watch(args[0])
+			if len(args) != 0 {
+				o.Config.Context = args[0]
 			}
-			return o.watch(viper.GetString("context"))
+			return o.watch()
 		},
 	}
 	watchCmd.Flags().StringVarP(&o.EventTypes, "eventTypes", "e", "", "Filter events based on type attribute")
 	return watchCmd
 }
 
-func (o *watchOptions) watch(broker string) error {
+func (o *CliOptions) watch() error {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
 	ctx := context.Background()
 
-	w, err := wiretap.New(broker, o.ConfigDir)
+	w, err := wiretap.New(o.Config.Context, o.Config.ConfigHome)
 	if err != nil {
 		return fmt.Errorf("wiretap: %w", err)
 	}
@@ -92,7 +92,7 @@ func (o *watchOptions) watch(broker string) error {
 	if err := w.CreateTrigger(strings.Split(o.EventTypes, ",")); err != nil {
 		return fmt.Errorf("create trigger: %w", err)
 	}
-	brokerLogs, err := w.BrokerLogs(ctx)
+	brokerLogs, err := w.BrokerLogs(ctx, o.Config.Triggermesh.Broker)
 	if err != nil {
 		return fmt.Errorf("broker logs: %w", err)
 	}

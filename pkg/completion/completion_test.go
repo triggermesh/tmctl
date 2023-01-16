@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmctl/test"
@@ -58,7 +59,11 @@ func TestListEventTypes(t *testing.T) {
 		"com.amazon.s3.testevent",
 		"foo-transformation.output",
 	}
-	assert.Equal(t, expectedEventTypes, ListEventTypes(m, test.CRD(), version))
+	c := &config.Config{
+		CRDPath:     test.CRD(),
+		Triggermesh: config.TmConfig{ComponentsVersion: version},
+	}
+	assert.Equal(t, expectedEventTypes, ListEventTypes(m, c))
 }
 
 func TestFilteredEventTypes(t *testing.T) {
