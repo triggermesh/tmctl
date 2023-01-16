@@ -114,13 +114,8 @@ func (b *Broker) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocean
 			Repository:   image[0],
 			Tag:          image[1],
 		},
-		RunCommand: command,
-		HTTPPort:   8080,
-		Routes: []*godo.AppRouteSpec{
-			{
-				Path: "/" + b.Name,
-			},
-		},
+		RunCommand:       command,
+		InternalPorts:    []int64{8080},
 		Envs:             []*godo.AppVariableDefinition{},
 		InstanceCount:    1,
 		InstanceSizeSlug: "professional-xs",

@@ -136,12 +136,7 @@ func (s *Service) AsDigitalOcean(additionalEnvs map[string]string) (*digitalocea
 			Repository:   image[0],
 			Tag:          image[1],
 		},
-		HTTPPort: 8080,
-		Routes: []*godo.AppRouteSpec{
-			{
-				Path: fmt.Sprintf("/%s", s.Name),
-			},
-		},
+		InternalPorts:    []int64{8080},
 		Envs:             envs,
 		InstanceCount:    1,
 		InstanceSizeSlug: "professional-xs",
