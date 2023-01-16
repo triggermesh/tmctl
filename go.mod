@@ -3,7 +3,7 @@ module github.com/triggermesh/tmctl
 go 1.19
 
 require (
-	cloud.google.com/go/billing v1.7.0
+	cloud.google.com/go/billing v1.9.0
 	cloud.google.com/go/logging v1.6.1
 	cloud.google.com/go/pubsub v1.28.0
 	cloud.google.com/go/storage v1.28.1
