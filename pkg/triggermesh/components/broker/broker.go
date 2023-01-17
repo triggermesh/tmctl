@@ -83,7 +83,17 @@ func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
 }
 
 func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (*compose.DockerComposeService, error) {
-	entrypoint := b.createBrokerEntrypoint()
+	entrypoint := []string{
+		"start",
+		"--memory.buffer-size",
+		viper.GetString("triggermesh.broker.memory.buffer-size"),
+		"--memory.produce-timeout",
+		viper.GetString("triggermesh.broker.memory.produce-timeout"),
+	}
+	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
+	if pollingPeriod != "" {
+		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
+	}
 	command := strings.Join(entrypoint, " ")
 	port := compose.RandomPort()
 
