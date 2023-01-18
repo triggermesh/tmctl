@@ -144,8 +144,8 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
-
-	entrypoint := append(brokerEntrypoint(), []string{
+	entrypoint := append([]string{"/memory-broker"}, brokerEntrypoint()...)
+	entrypoint = append(entrypoint, []string{
 		"--broker-config-path",
 		"/etc/triggermesh/broker.conf",
 	}...)
@@ -173,7 +173,6 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 
 func brokerEntrypoint() []string {
 	return []string{
-		"/memory-broker",
 		"start",
 		"--memory.buffer-size",
 		viper.GetString("triggermesh.broker.memory.buffer-size"),
@@ -288,20 +287,4 @@ func New(name, manifestPath string) (triggermesh.Component, error) {
 		ConfigFile: config,
 		Name:       name,
 	}, nil
-}
-
-func (b *Broker) createBrokerEntrypoint() []string {
-	entrypoint := []string{
-		"start",
-		"--memory.buffer-size",
-		viper.GetString("triggermesh.broker.memory.buffer-size"),
-		"--memory.produce-timeout",
-		viper.GetString("triggermesh.broker.memory.produce-timeout"),
-	}
-	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
-	if pollingPeriod != "" {
-		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
-	}
-
-	return entrypoint
 }
