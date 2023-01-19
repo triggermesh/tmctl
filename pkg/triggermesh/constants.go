@@ -57,6 +57,9 @@ const (
 
 	// Broker config polling period. On Windows only.
 	MemoryBrokerConfigPollingPeriod = "PT2S"
+
+	// DockerHub Registry
+	DockerRegistry = "triggermesh"
 )
 
 type release struct {

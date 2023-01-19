@@ -126,10 +126,8 @@ func (s *Service) AsDigitalOceanObject(additionalEnvs map[string]string) (interf
 	return godo.AppServiceSpec{
 		Name: s.Name,
 		Image: &godo.ImageSourceSpec{
-			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
-				Enabled: true,
-			},
-			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
+			RegistryType: godo.ImageSourceSpecRegistryType_DockerHub,
+			Registry:     triggermesh.DockerRegistry,
 			Repository:   image[0],
 			Tag:          image[1],
 		},

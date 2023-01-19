@@ -123,10 +123,12 @@ func (b *Broker) AsDigitalOceanObject(additionalEnvs map[string]string) (interfa
 	return godo.AppServiceSpec{
 		Name: b.Name,
 		Image: &godo.ImageSourceSpec{
-			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
+			RegistryType: godo.ImageSourceSpecRegistryType_DockerHub,
+			Registry:     triggermesh.DockerRegistry,
 			Repository:   image[0],
 			Tag:          image[1],
 		},
+
 		RunCommand:       strings.Join(entrypoint, " "),
 		InternalPorts:    []int64{8080},
 		Envs:             env,

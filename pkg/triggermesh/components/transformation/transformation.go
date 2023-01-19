@@ -136,18 +136,16 @@ func (t *Transformation) AsDigitalOceanObject(additionalEnvs map[string]string) 
 	}
 
 	// Get the image and tag
-	imageSplit := strings.Split(adapter.Image(o, t.Version), "/")[2]
-	image := strings.Split(imageSplit, ":")
+	imageURI := strings.Split(adapter.Image(o, ""), "/")
+	adapterName := strings.TrimRight(imageURI[len(imageURI)-1], ":")
 
 	return godo.AppServiceSpec{
 		Name: t.Name,
 		Image: &godo.ImageSourceSpec{
-			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
-				Enabled: true,
-			},
-			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
-			Repository:   image[0],
-			Tag:          image[1],
+			RegistryType: godo.ImageSourceSpecRegistryType_DockerHub,
+			Registry:     triggermesh.DockerRegistry,
+			Repository:   adapterName,
+			Tag:          t.Version,
 		},
 		InternalPorts:    []int64{8080},
 		Envs:             envs,

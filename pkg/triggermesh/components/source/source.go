@@ -149,18 +149,16 @@ func (s *Source) AsDigitalOceanObject(additionalEnvs map[string]string) (interfa
 	envs = append(envs, &godo.AppVariableDefinition{Key: "K_SINK", Value: sinkURI, Scope: "RUN_AND_BUILD_TIME"})
 
 	// Get the image and tag
-	imageSplit := strings.Split(adapter.Image(o, s.Version), "/")[2]
-	image := strings.Split(imageSplit, ":")
+	imageURI := strings.Split(adapter.Image(o, ""), "/")
+	adapterName := strings.TrimRight(imageURI[len(imageURI)-1], ":")
 
 	return godo.AppWorkerSpec{
 		Name: s.Name,
 		Image: &godo.ImageSourceSpec{
-			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
-				Enabled: true,
-			},
-			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
-			Repository:   image[0],
-			Tag:          image[1],
+			RegistryType: godo.ImageSourceSpecRegistryType_DockerHub,
+			Registry:     triggermesh.DockerRegistry,
+			Repository:   adapterName,
+			Tag:          s.Version,
 		},
 		Envs:             envs,
 		InstanceCount:    1,
