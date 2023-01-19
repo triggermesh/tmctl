@@ -43,10 +43,9 @@ const (
 var _ triggermesh.Component = (*Trigger)(nil)
 
 type Trigger struct {
-	Name          string
-	ConfigBase    string
-	ComponentName string
-	LocalURL      *apis.URL
+	Name       string
+	ConfigBase string
+	LocalURL   *apis.URL
 
 	eventingv1alpha1.TriggerSpec `yaml:"spec,omitempty"`
 }

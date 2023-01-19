@@ -95,6 +95,11 @@ func (w *Wiretap) CreateTrigger(eventTypes []string) error {
 		ConfigBase: w.ConfigBase,
 		LocalURL:   url,
 		TriggerSpec: v1alpha1.TriggerSpec{
+			Target: v1.Destination{
+				Ref: &v1.KReference{
+					Name: "wiretap",
+				},
+			},
 			Broker: v1.KReference{
 				Name: w.Broker,
 			},
