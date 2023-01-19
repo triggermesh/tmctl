@@ -71,3 +71,8 @@ type Reconcilable interface {
 	UpdateStatus(map[string]interface{})
 	GetExternalResources() map[string]interface{}
 }
+
+type Exportable interface {
+	AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error)
+	AsDigitalOceanObject(additionalEnvs map[string]string) (interface{}, error)
+}

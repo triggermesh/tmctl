@@ -1,9 +1,9 @@
 ## tmctl dump
 
-Generate Kubernetes manifest
+Generate TriggerMesh manifests
 
 ```
-tmctl dump [broker] [flags]
+tmctl dump [broker] -p <kubernetes|knative|docker-compose|digitalocean> [-o json] [flags]
 ```
 
 ### Examples
@@ -15,9 +15,11 @@ tmctl dump
 ### Options
 
 ```
-  -h, --help            help for dump
-      --knative         Use Knative Eventing components
-  -o, --output string   Output format (default "yaml")
+  -i, --do-instance string   DigitalOcean instance size (default "professional-xs")
+  -r, --do-region string     DigitalOcean region (default "fra")
+  -h, --help                 help for dump
+  -o, --output string        Output format (default "yaml")
+  -p, --platform string      Target platform. One of kubernetes, knative, docker-compose, digitalocean (default "kubernetes")
 ```
 
 ### Options inherited from parent commands

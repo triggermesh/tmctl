@@ -104,6 +104,9 @@ func (o *startOptions) start(broker string) error {
 		if c == nil {
 			continue
 		}
+		if _, ok := c.(triggermesh.Runnable); !ok {
+			continue
+		}
 		if _, ok := c.(triggermesh.Producer); ok {
 			sink := "http://host.docker.internal:" + brokerPort
 			spec := c.GetSpec()

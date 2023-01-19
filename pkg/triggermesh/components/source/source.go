@@ -24,12 +24,16 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/digitalocean/godo"
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/env"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
@@ -42,6 +46,7 @@ var (
 	_ triggermesh.Producer     = (*Source)(nil)
 	_ triggermesh.Runnable     = (*Source)(nil)
 	_ triggermesh.Parent       = (*Source)(nil)
+	_ triggermesh.Exportable   = (*Source)(nil)
 )
 
 type Source struct {
@@ -73,6 +78,94 @@ func (s *Source) AsK8sObject() (kubernetes.Object, error) {
 		},
 	}
 	return kubernetes.CreateObject(s.GetKind(), s.CRDFile, s.getMeta(), spec)
+}
+
+func (s *Source) AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error) {
+	o, err := s.asUnstructured()
+	if err != nil {
+		return nil, fmt.Errorf("creating object: %w", err)
+	}
+	image := adapter.Image(o, s.Version)
+
+	adapterEnv, err := env.Build(o)
+	if err != nil {
+		return nil, fmt.Errorf("adapter environment: %w", err)
+	}
+
+	adapterEnv = append(adapterEnv, corev1.EnvVar{Name: "K_SINK", Value: fmt.Sprintf("http://%s:8080", s.Broker)})
+
+	envs := []corev1.EnvVar{}
+	for _, v := range adapterEnv {
+		if v.ValueFrom != nil && additionalEnvs != nil {
+			if secret, ok := additionalEnvs[v.ValueFrom.SecretKeyRef.Key]; ok {
+				envs = append(envs, corev1.EnvVar{Name: v.Name, Value: string(secret)})
+				delete(additionalEnvs, v.ValueFrom.SecretKeyRef.Key)
+			}
+		} else {
+			envs = append(envs, v)
+		}
+	}
+
+	for k, v := range additionalEnvs {
+		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
+	}
+
+	return &docker.ComposeService{
+		ContainerName: s.Name,
+		Image:         image,
+		Environment:   pkg.EnvsToString(envs),
+		Ports:         []string{"8080"},
+	}, nil
+}
+
+func (s *Source) AsDigitalOceanObject(additionalEnvs map[string]string) (interface{}, error) {
+	o, err := s.asUnstructured()
+	if err != nil {
+		return nil, fmt.Errorf("creating object: %w", err)
+	}
+
+	adapterEnv, err := env.Build(o)
+	if err != nil {
+		return nil, fmt.Errorf("adapter environment: %w", err)
+	}
+
+	envs := []*godo.AppVariableDefinition{}
+	for _, v := range adapterEnv {
+		if v.ValueFrom != nil && additionalEnvs != nil {
+			if secret, ok := additionalEnvs[v.ValueFrom.SecretKeyRef.Key]; ok {
+				envs = append(envs, &godo.AppVariableDefinition{Key: v.Name, Value: string(secret)})
+				delete(additionalEnvs, v.ValueFrom.SecretKeyRef.Key)
+			}
+		} else {
+			envs = append(envs, &godo.AppVariableDefinition{Key: v.Name, Value: v.Value})
+		}
+	}
+
+	for k, v := range additionalEnvs {
+		envs = append(envs, &godo.AppVariableDefinition{Key: k, Value: v})
+	}
+
+	sinkURI := fmt.Sprintf("${%s.PRIVATE_URL}/%s", s.Broker, s.Broker)
+	envs = append(envs, &godo.AppVariableDefinition{Key: "K_SINK", Value: sinkURI, Scope: "RUN_AND_BUILD_TIME"})
+
+	// Get the image and tag
+	imageSplit := strings.Split(adapter.Image(o, s.Version), "/")[2]
+	image := strings.Split(imageSplit, ":")
+
+	return godo.AppWorkerSpec{
+		Name: s.Name,
+		Image: &godo.ImageSourceSpec{
+			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
+				Enabled: true,
+			},
+			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
+			Repository:   image[0],
+			Tag:          image[1],
+		},
+		Envs:             envs,
+		InstanceCount:    1,
+		InstanceSizeSlug: "professional-xs",
+	}, nil
 }
 
 func (s *Source) getMeta() kubernetes.Metadata {

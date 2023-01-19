@@ -23,7 +23,7 @@ Find more information at: https://docs.triggermesh.io
 * [tmctl create](tmctl_create.md)	 - Create TriggerMesh component
 * [tmctl delete](tmctl_delete.md)	 - Delete components by names
 * [tmctl describe](tmctl_describe.md)	 - List broker components and their statuses
-* [tmctl dump](tmctl_dump.md)	 - Generate Kubernetes manifest
+* [tmctl dump](tmctl_dump.md)	 - Generate TriggerMesh manifests
 * [tmctl logs](tmctl_logs.md)	 - Display components logs
 * [tmctl send-event](tmctl_send-event.md)	 - Send CloudEvent to the target
 * [tmctl start](tmctl_start.md)	 - Starts TriggerMesh components

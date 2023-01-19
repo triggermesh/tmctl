@@ -20,15 +20,20 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/digitalocean/godo"
 
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 )
 
 const (
@@ -43,10 +48,11 @@ var (
 	Producer Role = "source"
 	Consumer Role = "target"
 
-	_ triggermesh.Component = (*Service)(nil)
-	_ triggermesh.Consumer  = (*Service)(nil)
-	_ triggermesh.Producer  = (*Service)(nil)
-	_ triggermesh.Runnable  = (*Service)(nil)
+	_ triggermesh.Component  = (*Service)(nil)
+	_ triggermesh.Consumer   = (*Service)(nil)
+	_ triggermesh.Producer   = (*Service)(nil)
+	_ triggermesh.Runnable   = (*Service)(nil)
+	_ triggermesh.Exportable = (*Service)(nil)
 )
 
 type Role string
@@ -89,6 +95,48 @@ func (s *Service) AsK8sObject() (kubernetes.Object, error) {
 			},
 		},
 		Spec: kserviceSpec(s.Image, manifestParams),
+	}, nil
+}
+
+func (s *Service) AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error) {
+	envs := []corev1.EnvVar{}
+	for k, v := range additionalEnvs {
+		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
+	}
+
+	return &docker.ComposeService{
+		ContainerName: s.Name,
+		Image:         s.Image,
+		Environment:   pkg.EnvsToString(envs),
+		Ports:         []string{strconv.Itoa(pkg.OpenPort()) + ":8080"},
+	}, nil
+}
+
+func (s *Service) AsDigitalOceanObject(additionalEnvs map[string]string) (interface{}, error) {
+	envs := []*godo.AppVariableDefinition{}
+
+	for k, v := range additionalEnvs {
+		envs = append(envs, &godo.AppVariableDefinition{Key: k, Value: v})
+	}
+
+	// Get the image and tag
+	imageSplit := strings.Split(s.Image, "/")[2]
+	image := strings.Split(imageSplit, ":")
+
+	return godo.AppServiceSpec{
+		Name: s.Name,
+		Image: &godo.ImageSourceSpec{
+			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
+				Enabled: true,
+			},
+			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
+			Repository:   image[0],
+			Tag:          image[1],
+		},
+		InternalPorts:    []int64{8080},
+		Envs:             envs,
+		InstanceCount:    1,
+		InstanceSizeSlug: "professional-xs",
 	}, nil
 }
 

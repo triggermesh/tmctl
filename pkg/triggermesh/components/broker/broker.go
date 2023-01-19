@@ -22,22 +22,27 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/digitalocean/godo"
 	"github.com/spf13/viper"
+
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 )
 
 var (
-	_ triggermesh.Component = (*Broker)(nil)
-	_ triggermesh.Runnable  = (*Broker)(nil)
-	_ triggermesh.Consumer  = (*Broker)(nil)
+	_ triggermesh.Component  = (*Broker)(nil)
+	_ triggermesh.Runnable   = (*Broker)(nil)
+	_ triggermesh.Consumer   = (*Broker)(nil)
+	_ triggermesh.Exportable = (*Broker)(nil)
 )
 
 const (
@@ -78,6 +83,58 @@ func (b *Broker) AsK8sObject() (kubernetes.Object, error) {
 	}, nil
 }
 
+func (b *Broker) AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error) {
+	entrypoint := brokerEntrypoint()
+	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
+	if pollingPeriod != "" {
+		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
+	}
+	var env []string
+	for k, v := range additionalEnvs {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+	return &docker.ComposeService{
+		ContainerName: b.Name,
+		Image:         viper.GetString("triggermesh.broker.image"),
+		Command:       strings.Join(entrypoint, " "),
+		Ports:         []string{strconv.Itoa(pkg.OpenPort()) + ":8080"},
+		Environment:   env,
+	}, nil
+}
+
+func (b *Broker) AsDigitalOceanObject(additionalEnvs map[string]string) (interface{}, error) {
+	entrypoint := append([]string{"/memory-broker"}, brokerEntrypoint()...)
+	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
+	if pollingPeriod != "" {
+		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
+	}
+
+	// Get the image and tag
+	imageSplit := strings.Split(viper.GetString("triggermesh.broker.image"), "/")[2]
+	image := strings.Split(imageSplit, ":")
+
+	var env []*godo.AppVariableDefinition
+	for k, v := range additionalEnvs {
+		env = append(env, &godo.AppVariableDefinition{
+			Key:   k,
+			Value: v,
+		})
+	}
+	return godo.AppServiceSpec{
+		Name: b.Name,
+		Image: &godo.ImageSourceSpec{
+			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
+			Repository:   image[0],
+			Tag:          image[1],
+		},
+		RunCommand:       strings.Join(entrypoint, " "),
+		InternalPorts:    []int64{8080},
+		Envs:             env,
+		InstanceCount:    1,
+		InstanceSizeSlug: "professional-xs",
+	}, nil
+}
+
 func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {
 	o, err := b.asUnstructured()
 	if err != nil {
@@ -87,17 +144,12 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
-
-	entrypoint := []string{
-		"/memory-broker",
-		"start",
-		"--memory.buffer-size",
-		viper.GetString("triggermesh.broker.memory.buffer-size"),
-		"--memory.produce-timeout",
-		viper.GetString("triggermesh.broker.memory.produce-timeout"),
+	entrypoint := append([]string{"/memory-broker"}, brokerEntrypoint()...)
+	entrypoint = append(entrypoint, []string{
 		"--broker-config-path",
 		"/etc/triggermesh/broker.conf",
-	}
+	}...)
+
 	pollingPeriod := viper.GetString("triggermesh.broker.memory.config-polling-period")
 	if pollingPeriod != "" {
 		entrypoint = append(entrypoint, []string{"--config-polling-period", pollingPeriod}...)
@@ -117,6 +169,16 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 		CreateHostOptions:      ho,
 		CreateContainerOptions: co,
 	}, nil
+}
+
+func brokerEntrypoint() []string {
+	return []string{
+		"start",
+		"--memory.buffer-size",
+		viper.GetString("triggermesh.broker.memory.buffer-size"),
+		"--memory.produce-timeout",
+		viper.GetString("triggermesh.broker.memory.produce-timeout"),
+	}
 }
 
 func (b *Broker) GetKind() string {
