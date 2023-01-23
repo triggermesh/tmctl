@@ -23,12 +23,12 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 )
 
-func NewCmd() *cobra.Command {
+func NewCmd(config *config.Config) *cobra.Command {
 	var broker string
 	brokersCmd := &cobra.Command{
 		Use:       "brokers [--set <broker>]",
@@ -36,12 +36,12 @@ func NewCmd() *cobra.Command {
 		ValidArgs: []string{"--set"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if broker != "" {
-				viper.Set("context", broker)
-				if err := viper.WriteConfig(); err != nil {
+				config.Context = broker
+				if err := config.Save(); err != nil {
 					return err
 				}
 			}
-			list, err := List(filepath.Dir(viper.ConfigFileUsed()), viper.GetString("context"))
+			list, err := List(config.ConfigHome, config.Context)
 			if err != nil {
 				return err
 			}
@@ -54,7 +54,7 @@ func NewCmd() *cobra.Command {
 	}
 	brokersCmd.Flags().StringVar(&broker, "set", "", "Change the current broker")
 	cobra.CheckErr(brokersCmd.RegisterFlagCompletionFunc("set", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		list, err := List(filepath.Dir(viper.ConfigFileUsed()), "")
+		list, err := List(config.ConfigHome, "")
 		if err != nil {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		}

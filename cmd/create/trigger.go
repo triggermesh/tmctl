@@ -31,7 +31,7 @@ import (
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
-func (o *createOptions) newTriggerCmd() *cobra.Command {
+func (o *CliOptions) newTriggerCmd() *cobra.Command {
 	var name, target, rawFilter string
 	var eventSourcesFilter, eventTypesFilter []string
 	triggerCmd := &cobra.Command{
@@ -40,7 +40,6 @@ func (o *createOptions) newTriggerCmd() *cobra.Command {
 		Example:   "tmctl create trigger --target sockeye --source foo-httppollersource",
 		ValidArgs: []string{"--target", "--name", "--source", "--eventTypes"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cobra.CheckErr(o.Manifest.Read())
 			return o.trigger(name, rawFilter, eventSourcesFilter, eventTypesFilter, target)
 		},
 	}
@@ -51,14 +50,12 @@ func (o *createOptions) newTriggerCmd() *cobra.Command {
 	triggerCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
 	cobra.CheckErr(triggerCmd.MarkFlagRequired("target"))
 
-	cobra.CheckErr(triggerCmd.RegisterFlagCompletionFunc("name", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return []string{}, cobra.ShellCompDirectiveNoFileComp
-	}))
+	cobra.CheckErr(triggerCmd.RegisterFlagCompletionFunc("name", cobra.NoFileCompletions))
 	cobra.CheckErr(triggerCmd.RegisterFlagCompletionFunc("source", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(triggerCmd.RegisterFlagCompletionFunc("eventTypes", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListEventTypes(o.Manifest, o.Config), cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(triggerCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListTargets(o.Manifest), cobra.ShellCompDirectiveNoFileComp
@@ -66,7 +63,7 @@ func (o *createOptions) newTriggerCmd() *cobra.Command {
 	return triggerCmd
 }
 
-func (o *createOptions) trigger(name string, rawFilter string, eventSourcesFilter, eventTypesFilter []string, target string) error {
+func (o *CliOptions) trigger(name string, rawFilter string, eventSourcesFilter, eventTypesFilter []string, target string) error {
 	var filters []*eventingbroker.Filter
 	if rawFilter != "" {
 		var filter eventingbroker.Filter
@@ -84,7 +81,7 @@ func (o *createOptions) trigger(name string, rawFilter string, eventSourcesFilte
 		}
 	}
 
-	component, err := components.GetObject(target, o.CRD, o.Version, o.Manifest)
+	component, err := components.GetObject(target, o.Config, o.Manifest)
 	if err != nil {
 		return fmt.Errorf("%q not found: %w", target, err)
 	}

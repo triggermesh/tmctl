@@ -19,24 +19,26 @@ package log
 import (
 	glog "log"
 
-	"github.com/spf13/viper"
+	"github.com/triggermesh/tmctl/pkg/config"
 )
 
-var broker = func() string {
-	if broker := viper.GetString("context"); broker != "" {
-		return broker
+var broker = "-"
+
+func init() {
+	c, _ := config.New()
+	if c != nil && c.Context != "" {
+		broker = c.Context
 	}
-	return "-"
 }
 
 // Println is standard's log output supplied with the broker name.
 func Println(message string) {
-	glog.Printf("%s | %s", broker(), message)
+	glog.Printf("%s | %s", broker, message)
 }
 
 // Printf is standard's log formattable output supplied with the broker name.
 func Printf(format string, v ...any) {
-	glog.Printf(broker()+" | "+format, v...)
+	glog.Printf(broker+" | "+format, v...)
 }
 
 // Fatal is the local fatal function.

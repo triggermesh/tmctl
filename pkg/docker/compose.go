@@ -18,7 +18,7 @@ package docker
 
 type ComposeService struct {
 	ContainerName string   `json:"container_name"`
-	Command       string   `json:"command,omitempty"`
+	Entrypoint    []string `json:"entrypoint,omitempty"`
 	Image         string   `json:"image"`
 	Ports         []string `json:"ports"`
 	Environment   []string `json:"environment"`

@@ -25,10 +25,10 @@ import (
 
 	"github.com/docker/docker/client"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/triggermesh/tmctl/cmd/brokers"
 	"github.com/triggermesh/tmctl/pkg/completion"
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/log"
@@ -36,19 +36,18 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-type deleteOptions struct {
-	ConfigBase string
-	Context    string
-	Version    string
-	CRD        string
-	Manifest   *manifest.Manifest
+type CliOptions struct {
+	Config   *config.Config
+	Manifest *manifest.Manifest
 }
 
-func NewCmd() *cobra.Command {
-	o := &deleteOptions{}
+func NewCmd(config *config.Config, manifest *manifest.Manifest) *cobra.Command {
+	o := &CliOptions{
+		Config:   config,
+		Manifest: manifest,
+	}
 	var broker string
 	deleteCmd := &cobra.Command{
 		Use:   "delete <component_name_1, component_name_2...> [--broker <name>]",
@@ -66,10 +65,9 @@ tmctl delete --broker foo`,
 			return o.deleteComponents(args, false)
 		},
 	}
-	cobra.OnInitialize(o.initialize)
 	deleteCmd.Flags().StringVar(&broker, "broker", "", "Delete the broker")
 	cobra.CheckErr(deleteCmd.RegisterFlagCompletionFunc("broker", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		list, err := brokers.List(filepath.Dir(viper.ConfigFileUsed()), "")
+		list, err := brokers.List(o.Config.ConfigHome, "")
 		if err != nil {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -78,39 +76,25 @@ tmctl delete --broker foo`,
 	return deleteCmd
 }
 
-func (o *deleteOptions) initialize() {
-	o.ConfigBase = filepath.Dir(viper.ConfigFileUsed())
-	o.Context = viper.GetString("context")
-	o.Version = viper.GetString("triggermesh.version")
-	o.Manifest = manifest.New(filepath.Join(o.ConfigBase, o.Context, triggermesh.ManifestFile))
-	crds, err := crd.Fetch(o.ConfigBase, o.Version)
-	cobra.CheckErr(err)
-	o.CRD = crds
-
-	// try to read manifest even if it does not exists.
-	// required for autocompletion.
-	_ = o.Manifest.Read()
-}
-
-func (o *deleteOptions) deleteBroker(broker string) error {
+func (o *CliOptions) deleteBroker(broker string) error {
 	oo := *o
-	oo.Context = broker
-	oo.Manifest = manifest.New(filepath.Join(oo.ConfigBase, broker, triggermesh.ManifestFile))
+	oo.Config.Context = broker
+	oo.Manifest = manifest.New(filepath.Join(oo.Config.ConfigHome, broker, triggermesh.ManifestFile))
 	cobra.CheckErr(oo.Manifest.Read())
 
 	if err := oo.deleteComponents([]string{}, true); err != nil {
 		return fmt.Errorf("deleting component: %w", err)
 	}
-	if err := os.RemoveAll(filepath.Join(oo.ConfigBase, broker)); err != nil {
+	if err := os.RemoveAll(filepath.Join(oo.Config.ConfigHome, broker)); err != nil {
 		return fmt.Errorf("delete broker %q: %v", broker, err)
 	}
-	if broker == o.Context {
+	if broker == o.Config.Context {
 		return o.switchContext()
 	}
 	return nil
 }
 
-func (o *deleteOptions) deleteComponents(names []string, deleteBroker bool) error {
+func (o *CliOptions) deleteComponents(names []string, deleteBroker bool) error {
 	ctx := context.Background()
 	client, err := docker.NewClient()
 	if err != nil {
@@ -145,7 +129,7 @@ func (o *deleteOptions) deleteComponents(names []string, deleteBroker bool) erro
 	return nil
 }
 
-func (o *deleteOptions) deleteEverything(ctx context.Context, object kubernetes.Object, client *client.Client) {
+func (o *CliOptions) deleteEverything(ctx context.Context, object kubernetes.Object, client *client.Client) {
 	log.Printf("Deleting %q %s", object.Metadata.Name, strings.ToLower(object.Kind))
 	if object.Kind == tmbroker.BrokerKind {
 		object.Metadata.Name = object.Metadata.Name + "-broker"
@@ -160,13 +144,13 @@ func (o *deleteOptions) deleteEverything(ctx context.Context, object kubernetes.
 	o.cleanupSecrets(object.Metadata.Name)
 }
 
-func (o *deleteOptions) removeObject(component string) {
+func (o *CliOptions) removeObject(component string) {
 	for _, object := range o.Manifest.Objects {
 		if component != object.Metadata.Name {
 			continue
 		}
 		if object.Kind == tmbroker.TriggerKind {
-			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, o.Context, o.ConfigBase, nil, nil)
+			trigger, err := tmbroker.NewTrigger(object.Metadata.Name, o.Config.Context, o.Config.ConfigHome, nil, nil)
 			if err != nil {
 				log.Printf("Creating trigger object %q: %v", object.Metadata.Name, err)
 				continue
@@ -181,12 +165,12 @@ func (o *deleteOptions) removeObject(component string) {
 	}
 }
 
-func (o *deleteOptions) removeContainer(ctx context.Context, name string, client *client.Client) error {
+func (o *CliOptions) removeContainer(ctx context.Context, name string, client *client.Client) error {
 	return docker.ForceStop(ctx, name, client)
 }
 
-func (o *deleteOptions) cleanupTriggers(target string) {
-	triggers, err := tmbroker.GetTargetTriggers(target, o.Context, o.ConfigBase)
+func (o *CliOptions) cleanupTriggers(target string) {
+	triggers, err := tmbroker.GetTargetTriggers(target, o.Config.Context, o.Config.ConfigHome)
 	if err != nil {
 		return
 	}
@@ -201,7 +185,7 @@ func (o *deleteOptions) cleanupTriggers(target string) {
 	}
 }
 
-func (o *deleteOptions) cleanupSecrets(component string) {
+func (o *CliOptions) cleanupSecrets(component string) {
 	for _, object := range o.Manifest.Objects {
 		if object.Metadata.Name == component+"-secret" && object.Kind == "Secret" {
 			if err := o.Manifest.Remove(object.Metadata.Name, object.Kind); err != nil {
@@ -211,8 +195,8 @@ func (o *deleteOptions) cleanupSecrets(component string) {
 	}
 }
 
-func (o *deleteOptions) removeExternalServices(ctx context.Context, object kubernetes.Object) error {
-	component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest)
+func (o *CliOptions) removeExternalServices(ctx context.Context, object kubernetes.Object) error {
+	component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
 	if err != nil {
 		return err
 	}
@@ -231,8 +215,8 @@ func (o *deleteOptions) removeExternalServices(ctx context.Context, object kuber
 	return r.Finalize(ctx, secretsEnv)
 }
 
-func (o *deleteOptions) switchContext() error {
-	list, err := brokers.List(o.ConfigBase, o.Context)
+func (o *CliOptions) switchContext() error {
+	list, err := brokers.List(o.Config.ConfigHome, o.Config.Context)
 	if err != nil {
 		return fmt.Errorf("list brokers: %w", err)
 	}
@@ -241,11 +225,11 @@ func (o *deleteOptions) switchContext() error {
 		context = list[0]
 		log.Printf("Active broker is %q", context)
 	}
-	viper.Set("context", context)
-	return viper.WriteConfig()
+	o.Config.Context = context
+	return o.Config.Save()
 }
 
-func (o *deleteOptions) deleteCompletion(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+func (o *CliOptions) deleteCompletion(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
 		return append(completion.ListAll(o.Manifest), "--broker"),
 			cobra.ShellCompDirectiveNoFileComp

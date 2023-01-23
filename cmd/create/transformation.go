@@ -33,6 +33,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const (
@@ -61,7 +62,7 @@ For more samples please visit:
 https://github.com/triggermesh/triggermesh/tree/main/config/samples/bumblebee`
 )
 
-func (o *createOptions) newTransformationCmd() *cobra.Command {
+func (o *CliOptions) newTransformationCmd() *cobra.Command {
 	var name, target, file string
 	var eventSourcesFilter, eventTypesFilter []string
 	transformationCmd := &cobra.Command{
@@ -76,24 +77,26 @@ func (o *createOptions) newTransformationCmd() *cobra.Command {
 EOF`,
 		ValidArgs: []string{"--name", "--target", "--source", "--eventTypes", "--from"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cobra.CheckErr(o.Manifest.Read())
 			return o.transformation(name, target, file, eventSourcesFilter, eventTypesFilter)
 		},
 	}
+
+	crd, err := crd.Fetch(o.Config.ConfigHome, o.Config.Triggermesh.ComponentsVersion)
+	cobra.CheckErr(err)
+	o.Config.CRDPath = crd
+
 	transformationCmd.Flags().StringVar(&name, "name", "", "Transformation name")
 	transformationCmd.Flags().StringVarP(&file, "from", "f", "", "Transformation specification file")
 	transformationCmd.Flags().StringVar(&target, "target", "", "Target name")
 	transformationCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Sources component names")
 	transformationCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
 
-	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("name", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return []string{}, cobra.ShellCompDirectiveNoFileComp
-	}))
+	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("name", cobra.NoFileCompletions))
 	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("source", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("eventTypes", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListEventTypes(o.Manifest, o.Config), cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListTargets(o.Manifest), cobra.ShellCompDirectiveNoFileComp
@@ -101,7 +104,7 @@ EOF`,
 	return transformationCmd
 }
 
-func (o *createOptions) transformation(name, target, file string, eventSourcesFilter, eventTypesFilter []string) error {
+func (o *CliOptions) transformation(name, target, file string, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
 	var targetComponent triggermesh.Component
 	if target != "" {
@@ -140,7 +143,7 @@ func (o *createOptions) transformation(name, target, file string, eventSourcesFi
 		return fmt.Errorf("decode spec: %w", err)
 	}
 
-	t := transformation.New(name, o.CRD, "transformation", o.Context, o.Version, spec)
+	t := transformation.New(name, o.Config.CRDPath, "transformation", o.Config.Context, o.Config.Triggermesh.ComponentsVersion, spec)
 
 	transformationEventType := fmt.Sprintf("%s.output", t.GetName())
 	if et, _ := t.(triggermesh.Producer).GetEventTypes(); len(et) == 0 {
@@ -173,7 +176,7 @@ func (o *createOptions) transformation(name, target, file string, eventSourcesFi
 	var targetTriggers []triggermesh.Component
 	// creating new trigger from transformation to target
 	if targetComponent != nil {
-		if targetTriggers, err = tmbroker.GetTargetTriggers(targetComponent.GetName(), o.Context, o.ConfigBase); err != nil {
+		if targetTriggers, err = tmbroker.GetTargetTriggers(targetComponent.GetName(), o.Config.Context, o.Config.ConfigHome); err != nil {
 			return fmt.Errorf("target triggers: %w", err)
 		}
 		if _, err := o.createTrigger("", targetComponent, tmbroker.FilterAttribute("type", transformationEventType)); err != nil {
@@ -246,8 +249,8 @@ func readInput() (string, error) {
 	return lines, scn.Err()
 }
 
-func (o *createOptions) lookupTarget(ctx context.Context, target string) (triggermesh.Component, error) {
-	targetObject, err := components.GetObject(target, o.CRD, o.Version, o.Manifest)
+func (o *CliOptions) lookupTarget(ctx context.Context, target string) (triggermesh.Component, error) {
+	targetObject, err := components.GetObject(target, o.Config, o.Manifest)
 	if err != nil {
 		return nil, fmt.Errorf("transformation target: %w", err)
 	}

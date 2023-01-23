@@ -77,12 +77,12 @@ type EventTypes []struct {
 // Fetch downloads the release version of TriggerMesh CRDs for specified version.
 func Fetch(configDir, version string) (string, error) {
 	crdDir := filepath.Join(configDir, "crd", version)
-	if err := os.MkdirAll(crdDir, os.ModePerm); err != nil {
-		return "", err
-	}
 	crdFile := filepath.Join(crdDir, "crd.yaml")
 	if _, err := os.Stat(crdFile); err == nil {
 		return crdFile, nil
+	}
+	if err := os.MkdirAll(crdDir, os.ModePerm); err != nil {
+		return "", err
 	}
 	log.Printf("Fetching %s CRD", version)
 	out, err := os.Create(crdFile)

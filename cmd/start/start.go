@@ -22,68 +22,61 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-type startOptions struct {
-	ConfigBase string
-	Context    string
-	Version    string
-	Restart    bool
-	CRD        string
-	Manifest   *manifest.Manifest
+type CliOptions struct {
+	Restart bool
+
+	Config   *config.Config
+	Manifest *manifest.Manifest
 }
 
-func NewCmd() *cobra.Command {
-	o := &startOptions{}
+func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
+	o := &CliOptions{
+		Config:   config,
+		Manifest: m,
+	}
 	createCmd := &cobra.Command{
 		Use:     "start [broker]",
 		Short:   "Starts TriggerMesh components",
 		Example: "tmctl start",
+		Args:    cobra.RangeArgs(0, 1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-			return []string{"--broker", "--restart", "--version"}, cobra.ShellCompDirectiveNoFileComp
+			return []string{"--restart", "--version"}, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := o.Manifest.Read(); err != nil {
-				return fmt.Errorf("cannot read manifest. Does the broker exist?")
+			if len(args) != 0 {
+				o.Config.Context = args[0]
+				o.Manifest = manifest.New(filepath.Join(
+					o.Config.ConfigHome,
+					o.Config.Context,
+					triggermesh.ManifestFile))
+				if err := o.Manifest.Read(); err != nil {
+					return err
+				}
 			}
-			if len(args) == 1 {
-				return o.start(args[0])
-			}
-			return o.start(viper.GetString("context"))
+			return o.start()
 		},
 	}
-	cobra.OnInitialize(o.initialize)
 	createCmd.Flags().BoolVar(&o.Restart, "restart", false, "Restart components")
-
 	return createCmd
 }
 
-func (o *startOptions) initialize() {
-	o.ConfigBase = filepath.Dir(viper.ConfigFileUsed())
-	o.Context = viper.GetString("context")
-	o.Version = viper.GetString("triggermesh.version")
-	o.Manifest = manifest.New(filepath.Join(o.ConfigBase, o.Context, triggermesh.ManifestFile))
-	crds, err := crd.Fetch(o.ConfigBase, o.Version)
-	cobra.CheckErr(err)
-	o.CRD = crds
-}
-
-func (o *startOptions) start(broker string) error {
+func (o *CliOptions) start() error {
 	ctx := context.Background()
 	var brokerPort string
 	// start eventing first
 	for _, object := range o.Manifest.Objects {
 		if object.Kind == tmbroker.BrokerKind {
-			b, err := tmbroker.New(object.Metadata.Name, o.Manifest.Path)
+			b, err := tmbroker.New(object.Metadata.Name, o.Manifest.Path, o.Config.Triggermesh.Broker)
 			if err != nil {
 				return fmt.Errorf("creating broker object: %w", err)
 			}
@@ -100,7 +93,7 @@ func (o *startOptions) start(broker string) error {
 		if object.APIVersion == tmbroker.APIVersion {
 			continue
 		}
-		c, _ := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest)
+		c, _ := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
 		if c == nil {
 			continue
 		}
@@ -139,7 +132,7 @@ func (o *startOptions) start(broker string) error {
 			return fmt.Errorf("starting component %q: %w", c.GetName(), err)
 		}
 		if _, ok := c.(triggermesh.Consumer); ok {
-			triggers, err := tmbroker.GetTargetTriggers(c.GetName(), o.Context, o.ConfigBase)
+			triggers, err := tmbroker.GetTargetTriggers(c.GetName(), o.Config.Context, o.Config.ConfigHome)
 			if err != nil {
 				return fmt.Errorf("%q target triggers: %w", c.GetName(), err)
 			}
