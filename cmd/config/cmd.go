@@ -24,7 +24,7 @@ import (
 	cliconfig "github.com/triggermesh/tmctl/pkg/config"
 )
 
-func NewCmd(c *cliconfig.Config) *cobra.Command {
+func NewCmd() *cobra.Command {
 	configCmd := &cobra.Command{
 		Use:   "config [set|get]",
 		Short: "Read and write config values",
@@ -32,33 +32,38 @@ func NewCmd(c *cliconfig.Config) *cobra.Command {
 			cmd.HelpFunc()(cmd, args)
 		},
 	}
-	configCmd.AddCommand(getCmd(c))
-	configCmd.AddCommand(newSetCmd(c))
+	configCmd.AddCommand(getCmd())
+	configCmd.AddCommand(setCmd())
 	return configCmd
 }
 
-func getCmd(c *cliconfig.Config) *cobra.Command {
+func getCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get [key]",
 		Short: "Read config value",
 		Args:  cobra.RangeArgs(0, 1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			key := ""
 			if len(args) == 1 {
 				key = args[0]
 			}
-			fmt.Println(c.Get(key))
+			value, err := cliconfig.Get(key)
+			if err != nil {
+				return err
+			}
+			fmt.Println(value)
+			return nil
 		},
 	}
 }
 
-func newSetCmd(c *cliconfig.Config) *cobra.Command {
+func setCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set <key> <value>",
 		Short: "Write config value",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return c.Set(args[0], args[1])
+			return cliconfig.Set(args[0], args[1])
 		},
 	}
 }

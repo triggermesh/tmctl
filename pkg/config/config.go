@@ -18,6 +18,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -35,6 +36,8 @@ const (
 
 	defaultTmVersion     = "v1.23.0"
 	defaultBrokerVersion = "v1.1.0"
+
+	defaultDockerTimeout = "5s"
 
 	MemoryBrokerImage = "gcr.io/triggermesh/memory-broker"
 	RedisBrokerImage  = "gcr.io/triggermesh/redis-broker"
@@ -54,6 +57,11 @@ type Config struct {
 	// Persisted attributes
 	Context     string   `yaml:"context"`
 	Triggermesh TmConfig `yaml:"triggermesh"`
+	Docker      Docker   `yaml:"docker"`
+}
+
+type Docker struct {
+	StartTimeout string `yaml:"timeout"`
 }
 
 type TmConfig struct {
@@ -84,18 +92,8 @@ type RedisBrokerConfig struct {
 }
 
 func New() (*Config, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-	absHome, err := filepath.Abs(home)
-	if err != nil {
-		return nil, err
-	}
-	c := &Config{
-		ConfigHome: filepath.Join(absHome, defaultConfigPath),
-	}
-	if err = c.load(); os.IsNotExist(err) {
+	c, err := loadDefaultConfig()
+	if os.IsNotExist(err) {
 		if err := c.createDefault(); err != nil {
 			return nil, err
 		}
@@ -114,6 +112,7 @@ func (c *Config) createDefault() error {
 		return err
 	}
 	c.Context = defaultContext
+	c.Docker.StartTimeout = defaultDockerTimeout
 	c.Triggermesh.ComponentsVersion = latestOrDefaultTag("triggermesh", defaultTmVersion)
 	c.Triggermesh.Broker.Version = latestOrDefaultTag("brokers", defaultBrokerVersion)
 	c.Triggermesh.Broker.Memory = &InMemoryBrokerConfig{
@@ -124,14 +123,6 @@ func (c *Config) createDefault() error {
 		c.Triggermesh.Broker.ConfigPollingPeriod = defaultConfigPollingPeriod
 	}
 	return c.Save()
-}
-
-func (c *Config) load() error {
-	configFile, err := os.ReadFile(filepath.Join(c.ConfigHome, defaultConfigFile))
-	if err != nil {
-		return err
-	}
-	return yaml.Unmarshal(configFile, c)
 }
 
 func latestOrDefaultTag(project, defaultVersion string) string {
@@ -160,18 +151,26 @@ func (c *Config) Save() error {
 	return os.WriteFile(filepath.Join(c.ConfigHome, defaultConfigFile), data, 0644)
 }
 
-func (c *Config) Get(key string) string {
+func Get(key string) (string, error) {
+	c, err := loadDefaultConfig()
+	if err != nil {
+		return "", fmt.Errorf("unable to load config: %w", err)
+	}
 	if key == "" {
 		out, err := yaml.Marshal(c)
 		if err != nil {
 			panic(err)
 		}
-		return string(out)
+		return string(out), nil
 	}
-	return readValue(strings.Split(key, "."), reflect.TypeOf(*c), reflect.ValueOf(*c))
+	return readValue(strings.Split(key, "."), reflect.TypeOf(*c), reflect.ValueOf(*c)), nil
 }
 
-func (c *Config) Set(key, value string) error {
+func Set(key, value string) error {
+	c, err := loadDefaultConfig()
+	if err != nil {
+		return fmt.Errorf("unable to load config: %w", err)
+	}
 	setValue(strings.Split(key, "."), value, reflect.TypeOf(*c), reflect.ValueOf(c))
 	return c.Save()
 }
@@ -228,4 +227,23 @@ func readValue(keys []string, t reflect.Type, v reflect.Value) string {
 		}
 	}
 	return ""
+}
+
+func loadDefaultConfig() (*Config, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	absHome, err := filepath.Abs(home)
+	if err != nil {
+		return nil, err
+	}
+	c := &Config{
+		ConfigHome: filepath.Join(absHome, defaultConfigPath),
+	}
+	configFile, err := os.ReadFile(filepath.Join(c.ConfigHome, defaultConfigFile))
+	if err != nil {
+		return c, err
+	}
+	return c, yaml.Unmarshal(configFile, c)
 }
