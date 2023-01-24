@@ -22,19 +22,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/triggermesh/tmctl/pkg/config"
 )
 
-const (
-	connRetries     = 5
-	logsReadTimeout = 2 // timeout to wait for logs, in seconds
-)
+// time to wait for adapter init logs to show up.
+var initLogsWaitPeriod time.Duration = 2 * time.Second
 
 type imagePullEvent struct {
 	Status         string `json:"status"`
@@ -77,15 +75,11 @@ func (c *Container) Logs(ctx context.Context, client *client.Client, since time.
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     follow,
-		// Since: (time.Now().Add(2 * time.Second).Format("2006-01-02T15:04:05.999999999Z07:00"))}
-		Since: since.Format("2006-01-02T15:04:05.999999999Z07:00")}
+		Since:      since.Format("2006-01-02T15:04:05.999999999Z07:00")}
 	return client.ContainerLogs(ctx, c.ID, options)
 }
 
 func (c *Container) Remove(ctx context.Context, client *client.Client) error {
-	// c.ID = ""
-	// c.runtimeContainerConfig = container.Config{}
-	// c.runtimeHostConfig = container.HostConfig{}
 	id, err := nameToID(ctx, c.Name, client)
 	if err != nil {
 		return err
@@ -145,7 +139,7 @@ func (c *Container) Start(ctx context.Context, client *client.Client, restart bo
 		if c.Image != existingContainer.Image {
 			restart = true
 		}
-		if err := existingContainer.Connect(ctx); err == nil {
+		if existingContainer.Online {
 			containerIsRunning = true
 		}
 	}
@@ -166,17 +160,23 @@ func (c *Container) Start(ctx context.Context, client *client.Client, restart bo
 	c.runtimeHostConfig = hc
 	c.runtimeContainerConfig = cc
 
-	since := time.Now()
-	if err := client.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	sinceStart := time.Now()
+	if err := client.ContainerStart(ctx, c.ID, types.ContainerStartOptions{}); err != nil {
 		return nil, fmt.Errorf("docker start: %w", err)
 	}
-
-	if err := c.Connect(ctx); err != nil {
+	configTimeout, err := config.Get("docker.timeout")
+	if err != nil {
+		return nil, fmt.Errorf("config read: %w", err)
+	}
+	timeout, err := time.ParseDuration(configTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("config timeout value: %w", err)
+	}
+	if err := c.isRunning(ctx, client, timeout); err != nil {
 		return nil, fmt.Errorf("docker connect: %w", err)
 	}
-
-	time.Sleep(logsReadTimeout * time.Second)
-	logsReader, err := c.Logs(ctx, client, since, false)
+	time.Sleep(initLogsWaitPeriod)
+	logsReader, err := c.Logs(ctx, client, sinceStart, false)
 	if err != nil {
 		return nil, fmt.Errorf("docker read logs: %w", err)
 	}
@@ -185,10 +185,14 @@ func (c *Container) Start(ctx context.Context, client *client.Client, restart bo
 	for _, log := range readLogs(logsReader) {
 		var l map[string]interface{}
 		if err := json.Unmarshal([]byte(log), &l); err != nil {
+			// unstructured log output, e.g. go's panic dump
+			if strings.Contains(log, "panic: ") {
+				return nil, fmt.Errorf("container log: %s", log)
+			}
 			continue
 		}
 		if isError(l) {
-			return nil, fmt.Errorf("container error: %s", string(log))
+			return nil, fmt.Errorf("container log: %s", log)
 		}
 	}
 	return c, nil
@@ -238,23 +242,20 @@ func (c *Container) HostPort() string {
 	return ""
 }
 
-func (c *Container) Connect(ctx context.Context) error {
-	timer := time.NewTicker(time.Second)
-	till := time.Now().Add(connRetries * time.Second)
+func (c *Container) isRunning(ctx context.Context, client *client.Client, timeout time.Duration) error {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	cancel := time.After(timeout)
 	for {
+		container, err := client.ContainerInspect(ctx, c.ID)
+		if err != nil {
+			return err
+		}
 		select {
-		case <-ctx.Done():
-			return nil
-		case now := <-timer.C:
-			if now.After(till) {
-				return fmt.Errorf("service wait timeout")
-			}
-			conn, err := net.DialTimeout("tcp", fmt.Sprintf("0.0.0.0:%s", c.HostPort()), time.Second)
-			if err != nil {
-				continue
-			}
-			if conn != nil {
-				conn.Close()
+		case <-cancel:
+			return fmt.Errorf("container init timeout, state: %s", container.State.Status)
+		case <-ticker.C:
+			if container.State.Running {
 				return nil
 			}
 		}

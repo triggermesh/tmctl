@@ -22,6 +22,7 @@ type configOverride func(*Config) bool
 
 var overrides = []configOverride{
 	brokerImageReplacement(),
+	dockerTimeoutAppend(),
 }
 
 func (c *Config) applyOverrides() error {
@@ -55,6 +56,16 @@ func brokerImageReplacement() configOverride {
 			c.Triggermesh.Broker.Version = latestOrDefaultTag("brokers", defaultBrokerVersion)
 		}
 		c.Triggermesh.Broker.Image = ""
+		return true
+	}
+}
+
+func dockerTimeoutAppend() configOverride {
+	return func(c *Config) bool {
+		if c.Docker.StartTimeout != "" {
+			return false
+		}
+		c.Docker.StartTimeout = defaultDockerTimeout
 		return true
 	}
 }

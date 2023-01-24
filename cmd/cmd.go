@@ -69,7 +69,7 @@ Find more information at: https://docs.triggermesh.io`,
 
 	rootCmd.AddCommand(brokers.NewCmd(c))
 	rootCmd.AddCommand(create.NewCmd(c, manifest))
-	rootCmd.AddCommand(config.NewCmd(c))
+	rootCmd.AddCommand(config.NewCmd())
 	rootCmd.AddCommand(delete.NewCmd(c, manifest))
 	rootCmd.AddCommand(describe.NewCmd(c, manifest))
 	rootCmd.AddCommand(dump.NewCmd(c, manifest))
