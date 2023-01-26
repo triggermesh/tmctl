@@ -96,7 +96,7 @@ func (o *CliOptions) newSourceCmd() *cobra.Command {
 
 func (o *CliOptions) source(name, kind string, params map[string]string) error {
 	ctx := context.Background()
-	broker, err := tmbroker.New(o.Config.Context, o.Manifest.Path, o.Config.Triggermesh.Broker)
+	broker, err := tmbroker.New(o.Config.Context, o.Config.Triggermesh.Broker)
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}
@@ -145,7 +145,7 @@ func (o *CliOptions) source(name, kind string, params map[string]string) error {
 
 func (o *CliOptions) sourceFromImage(name, image string, params map[string]string) error {
 	ctx := context.Background()
-	broker, err := tmbroker.New(o.Config.Context, o.Manifest.Path, o.Config.Triggermesh.Broker)
+	broker, err := tmbroker.New(o.Config.Context, o.Config.Triggermesh.Broker)
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}

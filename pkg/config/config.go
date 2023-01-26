@@ -76,6 +76,9 @@ type BrokerConfig struct {
 	Redis   *RedisBrokerConfig    `yaml:"redis,omitempty"`
 	// for Windows only
 	ConfigPollingPeriod string `yaml:"config-polling-period,omitempty"`
+
+	//for internal use
+	ConfigFile string `yaml:"-"`
 }
 
 type InMemoryBrokerConfig struct {

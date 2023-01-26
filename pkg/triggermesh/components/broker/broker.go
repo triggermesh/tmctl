@@ -48,14 +48,12 @@ const (
 	BrokerKind  = "RedisBroker"
 	TriggerKind = "Trigger"
 	APIVersion  = "eventing.triggermesh.io/v1alpha1"
-
-	brokerConfigFile = "broker.conf"
 )
 
 type Broker struct {
-	ConfigFile string
-	Name       string
+	Name string
 
+	configFile string
 	image      string
 	entrypoint []string
 	spec       map[string]interface{}
@@ -137,7 +135,7 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 
 	co = append(co, docker.WithEntrypoint(b.entrypoint))
 
-	bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", b.ConfigFile)
+	bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", b.configFile)
 	ho = append(ho, docker.WithVolumeBind(bind))
 
 	name := o.GetName()
@@ -231,32 +229,37 @@ func (b *Broker) Logs(ctx context.Context, since time.Time, follow bool) (io.Rea
 	return container.Logs(ctx, client, since, follow)
 }
 
-func New(name, manifestPath string, brokerConfig config.BrokerConfig) (triggermesh.Component, error) {
+func CreateBrokerConfig(configHome, broker string) (string, error) {
+	brokerHome := filepath.Join(configHome, broker)
+	manifestFile := filepath.Join(brokerHome, triggermesh.ManifestFile)
 	// create config folder
-	if err := os.MkdirAll(filepath.Dir(manifestPath), os.ModePerm); err != nil {
-		return nil, fmt.Errorf("broker dir creation: %w", err)
+	if err := os.MkdirAll(brokerHome, os.ModePerm); err != nil {
+		return "", fmt.Errorf("broker dir creation: %w", err)
 	}
 	// create empty manifest
-	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
-		if _, err := os.Create(manifestPath); err != nil {
-			return nil, fmt.Errorf("manifest file creation: %w", err)
+	if _, err := os.Stat(manifestFile); os.IsNotExist(err) {
+		if _, err := os.Create(manifestFile); err != nil {
+			return "", fmt.Errorf("manifest file creation: %w", err)
 		}
 	} else if err != nil {
-		return nil, fmt.Errorf("manifest file access: %w", err)
+		return "", fmt.Errorf("manifest file access: %w", err)
 	}
-
-	config := filepath.Join(filepath.Dir(manifestPath), brokerConfigFile)
-	if _, err := os.Stat(config); os.IsNotExist(err) {
-		if _, err := os.Create(config); err != nil {
-			return nil, fmt.Errorf("creating broker config: %w", err)
+	brokerConfig := filepath.Join(brokerHome, triggermesh.BrokerConfigFile)
+	if _, err := os.Stat(brokerConfig); os.IsNotExist(err) {
+		if _, err := os.Create(brokerConfig); err != nil {
+			return "", fmt.Errorf("creating broker config: %w", err)
 		}
 	} else if err != nil {
-		return nil, fmt.Errorf("broker config read: %w", err)
+		return "", fmt.Errorf("broker config read: %w", err)
 	}
+	return brokerConfig, nil
+}
 
+func New(name string, brokerConfig config.BrokerConfig) (triggermesh.Component, error) {
 	return &Broker{
-		ConfigFile: config,
-		Name:       name,
+		Name: name,
+
+		configFile: brokerConfig.ConfigFile,
 
 		image:      image(brokerConfig),
 		entrypoint: brokerEntrypoint(brokerConfig),

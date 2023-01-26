@@ -76,7 +76,7 @@ func (o *CliOptions) start() error {
 	// start eventing first
 	for _, object := range o.Manifest.Objects {
 		if object.Kind == tmbroker.BrokerKind {
-			b, err := tmbroker.New(object.Metadata.Name, o.Manifest.Path, o.Config.Triggermesh.Broker)
+			b, err := tmbroker.New(object.Metadata.Name, o.Config.Triggermesh.Broker)
 			if err != nil {
 				return fmt.Errorf("creating broker object: %w", err)
 			}

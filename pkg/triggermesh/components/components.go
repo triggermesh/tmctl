@@ -60,7 +60,7 @@ func GetObject(name string, config *config.Config, manifest *manifest.Manifest) 
 			case "eventing.triggermesh.io/v1alpha1":
 				switch object.Kind {
 				case "RedisBroker":
-					return tmbroker.New(object.Metadata.Name, manifest.Path, config.Triggermesh.Broker)
+					return tmbroker.New(object.Metadata.Name, config.Triggermesh.Broker)
 				case "Trigger":
 					brokerConfigPath := filepath.Dir(manifest.Path)
 					baseConfigPath := filepath.Dir(brokerConfigPath)
