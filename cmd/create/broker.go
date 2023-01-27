@@ -53,14 +53,12 @@ func (o *CliOptions) broker(name, version string) error {
 		return fmt.Errorf("broker %q already exists", name)
 	}
 
-	configFile, err := tmbroker.CreateBrokerConfig(o.Config.ConfigHome, name)
-	if err != nil {
+	if _, err := tmbroker.CreateBrokerConfig(o.Config.ConfigHome, name); err != nil {
 		return fmt.Errorf("creating broker config: %w", err)
 	}
 
 	brokerConfig := o.Config.Triggermesh.Broker
 	brokerConfig.Version = version
-	brokerConfig.ConfigFile = configFile
 
 	broker, err := tmbroker.New(name, brokerConfig)
 	if err != nil {

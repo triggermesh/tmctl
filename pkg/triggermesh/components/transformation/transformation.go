@@ -34,6 +34,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/env"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 )
 
@@ -47,7 +48,7 @@ var (
 
 type Transformation struct {
 	Name    string
-	CRDFile string
+	CRD     crd.CRD
 	Broker  string
 	Version string
 
@@ -55,11 +56,11 @@ type Transformation struct {
 }
 
 func (t *Transformation) asUnstructured() (unstructured.Unstructured, error) {
-	return kubernetes.CreateUnstructured(t.GetKind(), t.CRDFile, t.getMeta(), t.spec, nil)
+	return kubernetes.CreateUnstructured(t.CRD, t.getMeta(), t.spec, nil)
 }
 
 func (t *Transformation) AsK8sObject() (kubernetes.Object, error) {
-	return kubernetes.CreateObject(t.GetKind(), t.CRDFile, t.getMeta(), t.spec)
+	return kubernetes.CreateObject(t.CRD, t.getMeta(), t.spec)
 }
 
 func (t *Transformation) getMeta() kubernetes.Metadata {
@@ -294,13 +295,13 @@ func (t *Transformation) Logs(ctx context.Context, since time.Time, follow bool)
 	return container.Logs(ctx, client, since, follow)
 }
 
-func New(name, crdFile, kind, broker, version string, spec map[string]interface{}) triggermesh.Component {
+func New(name, kind, broker, version string, crd crd.CRD, spec map[string]interface{}) triggermesh.Component {
 	if name == "" {
 		name = fmt.Sprintf("%s-transformation", broker)
 	}
 	return &Transformation{
 		Name:    name,
-		CRDFile: crdFile,
+		CRD:     crd,
 		Broker:  broker,
 		Version: version,
 

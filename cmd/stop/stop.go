@@ -36,10 +36,13 @@ type CliOptions struct {
 	Manifest *manifest.Manifest
 }
 
-func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
+func NewCmd(config *config.Config) *cobra.Command {
 	o := &CliOptions{
-		Config:   config,
-		Manifest: m,
+		Config: config,
+		Manifest: manifest.New(filepath.Join(
+			config.ConfigHome,
+			config.Context,
+			triggermesh.ManifestFile)),
 	}
 	return &cobra.Command{
 		Use:     "stop [broker]",
@@ -53,10 +56,8 @@ func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
 					o.Config.ConfigHome,
 					o.Config.Context,
 					triggermesh.ManifestFile))
-				if err := o.Manifest.Read(); err != nil {
-					return err
-				}
 			}
+			cobra.CheckErr(o.Manifest.Read())
 			return o.stop()
 		},
 	}

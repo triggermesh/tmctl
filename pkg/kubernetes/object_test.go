@@ -108,7 +108,7 @@ var specs = map[string]struct {
 func TestCreateObject(t *testing.T) {
 	for name, object := range specs {
 		t.Run(name, func(t *testing.T) {
-			_, err := CreateObject(object.kind, test.CRD(), Metadata{}, object.spec)
+			_, err := CreateObject(test.CRD()[object.kind], Metadata{}, object.spec)
 			if object.wantError {
 				assert.Error(t, err)
 			} else {
@@ -138,7 +138,7 @@ func TestCreateUnstructured(t *testing.T) {
 
 	for name, object := range specs {
 		t.Run(name, func(t *testing.T) {
-			u, err := CreateUnstructured(object.kind, test.CRD(), meta, object.spec, status)
+			u, err := CreateUnstructured(test.CRD()[object.kind], meta, object.spec, status)
 			if object.wantError {
 				assert.Error(t, err)
 				return
@@ -207,7 +207,7 @@ func TestExtractSecrets(t *testing.T) {
 
 	for name, object := range objects {
 		t.Run(name, func(t *testing.T) {
-			secrets, err := ExtractSecrets("foo", object.kind, test.CRD(), object.spec)
+			secrets, err := ExtractSecrets("foo", test.CRD()[object.kind], object.spec)
 			assert.NoError(t, err)
 			assert.Equal(t, object.expectedSecret, secrets)
 		})

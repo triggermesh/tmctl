@@ -53,7 +53,6 @@ const (
 type Broker struct {
 	Name string
 
-	configFile string
 	image      string
 	entrypoint []string
 	spec       map[string]interface{}
@@ -135,7 +134,8 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 
 	co = append(co, docker.WithEntrypoint(b.entrypoint))
 
-	bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf", b.configFile)
+	bind := fmt.Sprintf("%s:/etc/triggermesh/broker.conf",
+		filepath.Join(config.HomeAbsPath(), b.Name, triggermesh.BrokerConfigFile))
 	ho = append(ho, docker.WithVolumeBind(bind))
 
 	name := o.GetName()
@@ -258,8 +258,6 @@ func CreateBrokerConfig(configHome, broker string) (string, error) {
 func New(name string, brokerConfig config.BrokerConfig) (triggermesh.Component, error) {
 	return &Broker{
 		Name: name,
-
-		configFile: brokerConfig.ConfigFile,
 
 		image:      image(brokerConfig),
 		entrypoint: brokerEntrypoint(brokerConfig),

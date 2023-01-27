@@ -52,7 +52,6 @@ const (
 type Config struct {
 	// Calculated attributes
 	ConfigHome string `yaml:"-"`
-	CRDPath    string `yaml:"-"`
 
 	// Persisted attributes
 	Context     string   `yaml:"context"`
@@ -76,9 +75,6 @@ type BrokerConfig struct {
 	Redis   *RedisBrokerConfig    `yaml:"redis,omitempty"`
 	// for Windows only
 	ConfigPollingPeriod string `yaml:"config-polling-period,omitempty"`
-
-	//for internal use
-	ConfigFile string `yaml:"-"`
 }
 
 type InMemoryBrokerConfig struct {
@@ -103,7 +99,6 @@ func New() (*Config, error) {
 	} else if err != nil {
 		return nil, err
 	}
-
 	if err := c.applyOverrides(); err != nil {
 		return nil, err
 	}
@@ -178,6 +173,18 @@ func Set(key, value string) error {
 	return c.Save()
 }
 
+func HomeAbsPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	absHome, err := filepath.Abs(home)
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(absHome, defaultConfigPath)
+}
+
 func setValue(keys []string, value string, t reflect.Type, v reflect.Value) {
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
@@ -233,16 +240,8 @@ func readValue(keys []string, t reflect.Type, v reflect.Value) string {
 }
 
 func loadDefaultConfig() (*Config, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-	absHome, err := filepath.Abs(home)
-	if err != nil {
-		return nil, err
-	}
 	c := &Config{
-		ConfigHome: filepath.Join(absHome, defaultConfigPath),
+		ConfigHome: HomeAbsPath(),
 	}
 	configFile, err := os.ReadFile(filepath.Join(c.ConfigHome, defaultConfigFile))
 	if err != nil {

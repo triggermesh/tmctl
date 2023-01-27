@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
@@ -38,8 +37,6 @@ import (
 
 	cliconfig "github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/log"
-	"github.com/triggermesh/tmctl/pkg/manifest"
-	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
@@ -53,33 +50,25 @@ Find more information at: https://docs.triggermesh.io`,
 		// CompletionOptions: cobra.CompletionOptions{DisableDescriptions: true},
 	}
 
-	c, err := cliconfig.New()
+	conf, err := cliconfig.New()
 	cobra.CheckErr(err)
-	manifest := manifest.New(filepath.Join(
-		c.ConfigHome,
-		c.Context,
-		triggermesh.ManifestFile))
-	_ = manifest.Read()
-
-	rootCmd.PersistentFlags().StringVar(&c.Triggermesh.ComponentsVersion, "version", c.Triggermesh.ComponentsVersion, "TriggerMesh components version.")
-
-	crd, err := crd.Fetch(c.ConfigHome, c.Triggermesh.ComponentsVersion)
+	crds, err := crd.Fetch(conf.ConfigHome, conf.Triggermesh.ComponentsVersion)
 	cobra.CheckErr(err)
-	c.CRDPath = crd
 
-	rootCmd.AddCommand(brokers.NewCmd(c))
-	rootCmd.AddCommand(create.NewCmd(c, manifest))
+	rootCmd.AddCommand(brokers.NewCmd(conf))
+	rootCmd.AddCommand(create.NewCmd(conf, crds))
 	rootCmd.AddCommand(config.NewCmd())
-	rootCmd.AddCommand(delete.NewCmd(c, manifest))
-	rootCmd.AddCommand(describe.NewCmd(c, manifest))
-	rootCmd.AddCommand(dump.NewCmd(c, manifest))
-	rootCmd.AddCommand(logs.NewCmd(c, manifest))
-	rootCmd.AddCommand(sendevent.NewCmd(c, manifest))
-	rootCmd.AddCommand(start.NewCmd(c, manifest))
-	rootCmd.AddCommand(stop.NewCmd(c, manifest))
-	rootCmd.AddCommand(watch.NewCmd(c))
-	rootCmd.AddCommand(version.NewCmd(ver, commit, c))
+	rootCmd.AddCommand(delete.NewCmd(conf, crds))
+	rootCmd.AddCommand(describe.NewCmd(conf, crds))
+	rootCmd.AddCommand(dump.NewCmd(conf, crds))
+	rootCmd.AddCommand(logs.NewCmd(conf, crds))
+	rootCmd.AddCommand(sendevent.NewCmd(conf, crds))
+	rootCmd.AddCommand(start.NewCmd(conf, crds))
+	rootCmd.AddCommand(stop.NewCmd(conf))
+	rootCmd.AddCommand(watch.NewCmd(conf))
+	rootCmd.AddCommand(version.NewCmd(ver, commit, conf))
 
+	rootCmd.PersistentFlags().StringVar(&conf.Triggermesh.ComponentsVersion, "version", conf.Triggermesh.ComponentsVersion, "TriggerMesh components version.")
 	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("version", cobra.NoFileCompletions))
 
 	if os.Getenv("TMCTL_GENERATE_DOCS") == "true" {

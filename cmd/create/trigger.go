@@ -56,7 +56,7 @@ func (o *CliOptions) newTriggerCmd() *cobra.Command {
 		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(triggerCmd.RegisterFlagCompletionFunc("eventTypes", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return completion.ListEventTypes(o.Manifest, o.Config), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListEventTypes(o.Manifest, o.Config, o.CRD), cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(triggerCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListTargets(o.Manifest), cobra.ShellCompDirectiveNoFileComp
@@ -82,7 +82,7 @@ func (o *CliOptions) trigger(name string, rawFilter string, eventSourcesFilter, 
 		}
 	}
 
-	component, err := components.GetObject(target, o.Config, o.Manifest)
+	component, err := components.GetObject(target, o.Config, o.Manifest, o.CRD)
 	if err != nil {
 		return fmt.Errorf("%q not found: %w", target, err)
 	}
