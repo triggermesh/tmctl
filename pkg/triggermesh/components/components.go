@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
@@ -32,7 +33,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
 )
 
-func GetObject(name, crdFile, version string, manifest *manifest.Manifest) (triggermesh.Component, error) {
+func GetObject(name string, config *config.Config, manifest *manifest.Manifest) (triggermesh.Component, error) {
 	for _, object := range manifest.Objects {
 		if object.Metadata.Name == name {
 			broker, set := object.Metadata.Labels["triggermesh.io/context"]
@@ -51,15 +52,15 @@ func GetObject(name, crdFile, version string, manifest *manifest.Manifest) (trig
 						}
 					}
 				}
-				return source.New(object.Metadata.Name, crdFile, object.Kind, broker, version, object.Spec, status), nil
+				return source.New(object.Metadata.Name, config.CRDPath, object.Kind, broker, config.Triggermesh.ComponentsVersion, object.Spec, status), nil
 			case "targets.triggermesh.io/v1alpha1":
-				return target.New(object.Metadata.Name, crdFile, object.Kind, broker, version, object.Spec), nil
+				return target.New(object.Metadata.Name, config.CRDPath, object.Kind, broker, config.Triggermesh.ComponentsVersion, object.Spec), nil
 			case "flow.triggermesh.io/v1alpha1":
-				return transformation.New(object.Metadata.Name, crdFile, object.Kind, broker, version, object.Spec), nil
+				return transformation.New(object.Metadata.Name, config.CRDPath, object.Kind, broker, config.Triggermesh.ComponentsVersion, object.Spec), nil
 			case "eventing.triggermesh.io/v1alpha1":
 				switch object.Kind {
 				case "RedisBroker":
-					return tmbroker.New(object.Metadata.Name, manifest.Path)
+					return tmbroker.New(object.Metadata.Name, manifest.Path, config.Triggermesh.Broker)
 				case "Trigger":
 					brokerConfigPath := filepath.Dir(manifest.Path)
 					baseConfigPath := filepath.Dir(brokerConfigPath)

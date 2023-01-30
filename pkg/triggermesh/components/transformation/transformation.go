@@ -29,6 +29,7 @@ import (
 
 	"github.com/digitalocean/godo"
 
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
@@ -143,7 +144,7 @@ func (t *Transformation) AsDigitalOceanObject(additionalEnvs map[string]string) 
 		Name: t.Name,
 		Image: &godo.ImageSourceSpec{
 			RegistryType: godo.ImageSourceSpecRegistryType_DockerHub,
-			Registry:     triggermesh.DockerRegistry,
+			Registry:     config.DockerRegistry,
 			Repository:   adapterName,
 			Tag:          t.Version,
 		},

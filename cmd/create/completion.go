@@ -22,7 +22,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/triggermesh/tmctl/cmd/brokers"
 	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
@@ -30,20 +29,13 @@ import (
 // Completion functions are responsible for the logic
 // behind the CLI commands autocompletion.
 
-func (o *createOptions) sourcesCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func (o *CliOptions) sourcesCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
-		sources, err := crd.ListSources(o.CRD)
+		sources, err := crd.ListSources(o.Config.CRDPath)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 		return append(sources, "--from-image"), cobra.ShellCompDirectiveNoFileComp
-	}
-	if args[len(args)-1] == "--broker" {
-		list, err := brokers.List(o.ConfigBase, "")
-		if err != nil {
-			return []string{}, cobra.ShellCompDirectiveNoFileComp
-		}
-		return list, cobra.ShellCompDirectiveNoFileComp
 	}
 	if toComplete == "--name" ||
 		toComplete == "--from-image" {
@@ -57,7 +49,6 @@ func (o *createOptions) sourcesCompletion(cmd *cobra.Command, args []string, toC
 			return []string{
 				"--ce_type\tCE Type attribute override.",
 				"--name\tOptional component name.",
-				"--broker\tOptional broker name.",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}
 	}
@@ -67,7 +58,7 @@ func (o *createOptions) sourcesCompletion(cmd *cobra.Command, args []string, toC
 	var properties map[string]crd.Property
 
 	if !strings.Contains(toComplete, ".") {
-		_, properties = completion.SpecFromCRD(args[0]+"source", o.CRD)
+		_, properties = completion.SpecFromCRD(args[0]+"source", o.Config.CRDPath)
 		if property, exists := properties[toComplete]; exists {
 			if property.Typ == "object" {
 				return []string{"--" + toComplete + "."}, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
@@ -76,7 +67,7 @@ func (o *createOptions) sourcesCompletion(cmd *cobra.Command, args []string, toC
 		}
 	} else {
 		path := strings.Split(toComplete, ".")
-		exists, nestedProperties := completion.SpecFromCRD(args[0]+"source", o.CRD, path...)
+		exists, nestedProperties := completion.SpecFromCRD(args[0]+"source", o.Config.CRDPath, path...)
 		if len(nestedProperties) != 0 {
 			prefix = toComplete
 			if !strings.HasSuffix(prefix, ".") && prefix != "--" {
@@ -86,7 +77,7 @@ func (o *createOptions) sourcesCompletion(cmd *cobra.Command, args []string, toC
 		} else if exists {
 			return []string{"--" + toComplete}, cobra.ShellCompDirectiveNoFileComp
 		} else {
-			_, properties = completion.SpecFromCRD(args[0]+"source", o.CRD, path[:len(path)-1]...)
+			_, properties = completion.SpecFromCRD(args[0]+"source", o.Config.CRDPath, path[:len(path)-1]...)
 			prefix = strings.Join(path[:len(path)-1], ".") + "."
 		}
 	}
@@ -103,9 +94,9 @@ func (o *createOptions) sourcesCompletion(cmd *cobra.Command, args []string, toC
 	return append(spec, "--name\tOptional component name."), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 }
 
-func (o *createOptions) targetsCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func (o *CliOptions) targetsCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
-		targets, err := crd.ListTargets(o.CRD)
+		targets, err := crd.ListTargets(o.Config.CRDPath)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -117,7 +108,7 @@ func (o *createOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 	}
 
 	if lastParam(args) == "--eventTypes" && strings.HasSuffix(args[len(args)-1], ",") {
-		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version),
+		return completion.ListEventTypes(o.Manifest, o.Config),
 			cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 	}
 
@@ -131,14 +122,8 @@ func (o *createOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 	case "--source":
 		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 	case "--eventTypes":
-		return completion.ListEventTypes(o.Manifest, o.CRD, o.Version),
+		return completion.ListEventTypes(o.Manifest, o.Config),
 			cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
-	case "--broker":
-		list, err := brokers.List(o.ConfigBase, "")
-		if err != nil {
-			return []string{}, cobra.ShellCompDirectiveNoFileComp
-		}
-		return list, cobra.ShellCompDirectiveNoFileComp
 	}
 	if strings.HasPrefix(args[len(args)-1], "--") {
 		return []string{}, cobra.ShellCompDirectiveNoFileComp
@@ -149,7 +134,7 @@ func (o *createOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 	var properties map[string]crd.Property
 
 	if !strings.Contains(toComplete, ".") {
-		_, properties = completion.SpecFromCRD(args[0]+"target", o.CRD)
+		_, properties = completion.SpecFromCRD(args[0]+"target", o.Config.CRDPath)
 		if property, exists := properties[toComplete]; exists {
 			if property.Typ == "object" {
 				return []string{"--" + toComplete + "."}, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
@@ -158,7 +143,7 @@ func (o *createOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 		}
 	} else {
 		path := strings.Split(toComplete, ".")
-		exists, nestedProperties := completion.SpecFromCRD(args[0]+"target", o.CRD, path...)
+		exists, nestedProperties := completion.SpecFromCRD(args[0]+"target", o.Config.CRDPath, path...)
 		if len(nestedProperties) != 0 {
 			prefix = toComplete
 			if !strings.HasSuffix(prefix, ".") && prefix != "--" {
@@ -168,7 +153,7 @@ func (o *createOptions) targetsCompletion(cmd *cobra.Command, args []string, toC
 		} else if exists {
 			return []string{"--" + toComplete}, cobra.ShellCompDirectiveNoFileComp
 		} else {
-			_, properties = completion.SpecFromCRD(args[0]+"target", o.CRD, path[:len(path)-1]...)
+			_, properties = completion.SpecFromCRD(args[0]+"target", o.Config.CRDPath, path[:len(path)-1]...)
 			prefix = strings.Join(path[:len(path)-1], ".") + "."
 		}
 	}

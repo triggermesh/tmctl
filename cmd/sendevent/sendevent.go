@@ -20,18 +20,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/triggermesh/tmctl/pkg/completion"
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const (
@@ -39,16 +37,16 @@ const (
 	defaultEventSource = "triggermesh-cli"
 )
 
-type sendOptions struct {
-	Context   string
-	ConfigDir string
-	Version   string
-	CRD       string
-	Manifest  *manifest.Manifest
+type CliOptions struct {
+	Config   *config.Config
+	Manifest *manifest.Manifest
 }
 
-func NewCmd() *cobra.Command {
-	o := &sendOptions{}
+func NewCmd(config *config.Config, manifest *manifest.Manifest) *cobra.Command {
+	o := &CliOptions{
+		Config:   config,
+		Manifest: manifest,
+	}
 	var eventType, target string
 	sendCmd := &cobra.Command{
 		Use:     "send-event [--eventType <type>][--target <name>] <data>",
@@ -59,18 +57,16 @@ func NewCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if target == "" {
-				target = o.Context
+				target = o.Config.Context
 			}
 			return o.send(eventType, target, strings.Join(args, " "))
 		},
 	}
-	cobra.OnInitialize(o.initialize)
-
 	sendCmd.Flags().StringVar(&target, "target", "", "Component to send the event to. Default is the broker")
 	sendCmd.Flags().StringVar(&eventType, "eventType", defaultEventType, "CloudEvent Type attribute")
 
 	cobra.CheckErr(sendCmd.RegisterFlagCompletionFunc("eventType", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return completion.ListFilteredEventTypes(o.Context, o.ConfigDir, o.Manifest), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListFilteredEventTypes(o.Config.Context, o.Config.ConfigHome, o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(sendCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListTargets(o.Manifest), cobra.ShellCompDirectiveNoFileComp
@@ -78,23 +74,9 @@ func NewCmd() *cobra.Command {
 	return sendCmd
 }
 
-func (o *sendOptions) initialize() {
-	o.ConfigDir = filepath.Dir(viper.ConfigFileUsed())
-	o.Context = viper.GetString("context")
-	o.Version = viper.GetString("triggermesh.version")
-	o.Manifest = manifest.New(filepath.Join(o.ConfigDir, o.Context, triggermesh.ManifestFile))
-	crds, err := crd.Fetch(o.ConfigDir, o.Version)
-	cobra.CheckErr(err)
-	o.CRD = crds
-
-	// try to read manifest even if it does not exists.
-	// required for autocompletion.
-	_ = o.Manifest.Read()
-}
-
-func (o *sendOptions) send(eventType, target, data string) error {
+func (o *CliOptions) send(eventType, target, data string) error {
 	ctx := context.Background()
-	component, err := components.GetObject(target, o.CRD, o.Version, o.Manifest)
+	component, err := components.GetObject(target, o.Config, o.Manifest)
 	if err != nil {
 		return fmt.Errorf("destination target: %w", err)
 	}

@@ -19,11 +19,9 @@ package cmd
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
-	"github.com/spf13/viper"
 
 	"github.com/triggermesh/tmctl/cmd/brokers"
 	"github.com/triggermesh/tmctl/cmd/config"
@@ -38,8 +36,11 @@ import (
 	"github.com/triggermesh/tmctl/cmd/version"
 	"github.com/triggermesh/tmctl/cmd/watch"
 
+	cliconfig "github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/log"
+	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 func NewRootCommand(ver, commit string) *cobra.Command {
@@ -52,38 +53,34 @@ Find more information at: https://docs.triggermesh.io`,
 		// CompletionOptions: cobra.CompletionOptions{DisableDescriptions: true},
 	}
 
-	cobra.OnInitialize(initConfig)
+	c, err := cliconfig.New()
+	cobra.CheckErr(err)
+	manifest := manifest.New(filepath.Join(
+		c.ConfigHome,
+		c.Context,
+		triggermesh.ManifestFile))
+	_ = manifest.Read()
 
-	rootCmd.PersistentFlags().String("version", "", "TriggerMesh components version.")
-	rootCmd.PersistentFlags().String("broker", "", "Optional broker name.")
-	// rootCmd.PersistentFlags().MarkHidden("broker")
+	rootCmd.PersistentFlags().StringVar(&c.Triggermesh.ComponentsVersion, "version", c.Triggermesh.ComponentsVersion, "TriggerMesh components version.")
 
-	cobra.CheckErr(viper.BindPFlag("context", rootCmd.PersistentFlags().Lookup("broker")))
-	cobra.CheckErr(viper.BindPFlag("triggermesh.version", rootCmd.PersistentFlags().Lookup("version")))
+	crd, err := crd.Fetch(c.ConfigHome, c.Triggermesh.ComponentsVersion)
+	cobra.CheckErr(err)
+	c.CRDPath = crd
 
-	rootCmd.AddCommand(brokers.NewCmd())
-	rootCmd.AddCommand(create.NewCmd())
+	rootCmd.AddCommand(brokers.NewCmd(c))
+	rootCmd.AddCommand(create.NewCmd(c, manifest))
 	rootCmd.AddCommand(config.NewCmd())
-	rootCmd.AddCommand(delete.NewCmd())
-	rootCmd.AddCommand(describe.NewCmd())
-	rootCmd.AddCommand(dump.NewCmd())
-	rootCmd.AddCommand(logs.NewCmd())
-	rootCmd.AddCommand(sendevent.NewCmd())
-	rootCmd.AddCommand(start.NewCmd())
-	rootCmd.AddCommand(stop.NewCmd())
-	rootCmd.AddCommand(watch.NewCmd())
-	rootCmd.AddCommand(version.NewCmd(ver, commit))
+	rootCmd.AddCommand(delete.NewCmd(c, manifest))
+	rootCmd.AddCommand(describe.NewCmd(c, manifest))
+	rootCmd.AddCommand(dump.NewCmd(c, manifest))
+	rootCmd.AddCommand(logs.NewCmd(c, manifest))
+	rootCmd.AddCommand(sendevent.NewCmd(c, manifest))
+	rootCmd.AddCommand(start.NewCmd(c, manifest))
+	rootCmd.AddCommand(stop.NewCmd(c, manifest))
+	rootCmd.AddCommand(watch.NewCmd(c))
+	rootCmd.AddCommand(version.NewCmd(ver, commit, c))
 
-	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("broker", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		list, err := brokers.List(filepath.Dir(viper.ConfigFileUsed()), "")
-		if err != nil {
-			return []string{}, cobra.ShellCompDirectiveNoFileComp
-		}
-		return list, cobra.ShellCompDirectiveNoFileComp
-	}))
-	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("version", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return []string{}, cobra.ShellCompDirectiveNoFileComp
-	}))
+	cobra.CheckErr(rootCmd.RegisterFlagCompletionFunc("version", cobra.NoFileCompletions))
 
 	if os.Getenv("TMCTL_GENERATE_DOCS") == "true" {
 		rootCmd.DisableAutoGenTag = true
@@ -93,31 +90,4 @@ Find more information at: https://docs.triggermesh.io`,
 		os.Exit(0)
 	}
 	return rootCmd
-}
-
-func initConfig() {
-	home, err := os.UserHomeDir()
-	cobra.CheckErr(err)
-	configHome := filepath.Join(home, triggermesh.ConfigDir)
-
-	viper.SetConfigType("yaml")
-	viper.SetConfigName("config")
-	viper.AddConfigPath(configHome)
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			cobra.CheckErr(os.MkdirAll(configHome, os.ModePerm))
-			for k, v := range triggermesh.DefaultConfig {
-				viper.SetDefault(k, v)
-			}
-			if runtime.GOOS == "windows" {
-				for k, v := range triggermesh.WindowsConfig {
-					viper.SetDefault(k, v)
-				}
-			}
-			cobra.CheckErr(viper.SafeWriteConfig())
-			cobra.CheckErr(viper.ReadInConfig())
-		} else {
-			cobra.CheckErr(err)
-		}
-	}
 }

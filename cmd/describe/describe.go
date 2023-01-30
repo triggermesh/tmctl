@@ -27,17 +27,16 @@ import (
 	kyaml "sigs.k8s.io/yaml"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	eventingbroker "github.com/triggermesh/brokers/pkg/config/broker"
 
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const (
@@ -46,42 +45,41 @@ const (
 	offlineColorCode = "\033[31m"
 )
 
-type describeOptions struct {
-	ConfigBase string
-	CRD        string
-	Version    string
-	Manifest   *manifest.Manifest
+type CliOptions struct {
+	Config   *config.Config
+	Manifest *manifest.Manifest
 }
 
-func NewCmd() *cobra.Command {
-	o := &describeOptions{}
+func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
+	o := &CliOptions{
+		Config:   config,
+		Manifest: m,
+	}
 	return &cobra.Command{
 		Use:     "describe [broker]",
 		Short:   "List broker components and their statuses",
 		Example: "tmctl describe",
+		Args:    cobra.RangeArgs(0, 1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 			return []string{}, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			broker := viper.GetString("context")
-			if len(args) == 1 {
-				broker = args[0]
+			if len(args) != 0 {
+				o.Config.Context = args[0]
+				o.Manifest = manifest.New(filepath.Join(
+					o.Config.ConfigHome,
+					o.Config.Context,
+					triggermesh.ManifestFile))
+				if err := o.Manifest.Read(); err != nil {
+					return err
+				}
 			}
-			o.ConfigBase = filepath.Dir(viper.ConfigFileUsed())
-			o.Version = viper.GetString("triggermesh.version")
-			o.Manifest = manifest.New(filepath.Join(o.ConfigBase, broker, triggermesh.ManifestFile))
-			cobra.CheckErr(o.Manifest.Read())
-			crds, err := crd.Fetch(o.ConfigBase, o.Version)
-			if err != nil {
-				return err
-			}
-			o.CRD = crds
-			return o.describe(broker)
+			return o.describe()
 		},
 	}
 }
 
-func (o *describeOptions) describe(b string) error {
+func (o *CliOptions) describe() error {
 	broker := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
 	triggers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
 	producers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
@@ -99,7 +97,7 @@ func (o *describeOptions) describe(b string) error {
 	consumersPrint := false
 
 	for _, object := range o.Manifest.Objects {
-		c, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest)
+		c, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
 		if err != nil {
 			return fmt.Errorf("creating component interface: %w", err)
 		}

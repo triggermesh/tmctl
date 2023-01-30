@@ -27,6 +27,7 @@ import (
 	v1 "knative.dev/pkg/apis/duck/v1"
 
 	"github.com/docker/docker/client"
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
@@ -78,9 +79,6 @@ func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("starting container: %w", err)
 	}
-	if err := c.Connect(ctx); err != nil {
-		return nil, fmt.Errorf("container connect: %w", err)
-	}
 	w.Destination = fmt.Sprintf("http://host.docker.internal:%s", c.HostPort())
 	return c.Logs(ctx, w.client, time.Now().Add(2*time.Second), true)
 }
@@ -111,8 +109,8 @@ func (w *Wiretap) CreateTrigger(eventTypes []string) error {
 	return nil
 }
 
-func (w *Wiretap) BrokerLogs(ctx context.Context) (io.ReadCloser, error) {
-	bro, err := tmbroker.New(w.Broker, filepath.Join(w.ConfigBase, w.Broker, triggermesh.ManifestFile))
+func (w *Wiretap) BrokerLogs(ctx context.Context, c config.BrokerConfig) (io.ReadCloser, error) {
+	bro, err := tmbroker.New(w.Broker, filepath.Join(w.ConfigBase, w.Broker, triggermesh.ManifestFile), c)
 	if err != nil {
 		return nil, err
 	}

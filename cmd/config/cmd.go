@@ -17,7 +17,11 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
+
+	cliconfig "github.com/triggermesh/tmctl/pkg/config"
 )
 
 func NewCmd() *cobra.Command {
@@ -28,7 +32,38 @@ func NewCmd() *cobra.Command {
 			cmd.HelpFunc()(cmd, args)
 		},
 	}
-	configCmd.AddCommand(newGetCmd())
-	configCmd.AddCommand(newSetCmd())
+	configCmd.AddCommand(getCmd())
+	configCmd.AddCommand(setCmd())
 	return configCmd
+}
+
+func getCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "get [key]",
+		Short: "Read config value",
+		Args:  cobra.RangeArgs(0, 1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			key := ""
+			if len(args) == 1 {
+				key = args[0]
+			}
+			value, err := cliconfig.Get(key)
+			if err != nil {
+				return err
+			}
+			fmt.Println(value)
+			return nil
+		},
+	}
+}
+
+func setCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set <key> <value>",
+		Short: "Write config value",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cliconfig.Set(args[0], args[1])
+		},
+	}
 }

@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/output"
@@ -31,30 +30,32 @@ import (
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 )
 
-func (o *createOptions) newBrokerCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:     "broker <name>",
-		Short:   "Create TriggerMesh Broker. More information at https://docs.triggermesh.io/brokers/",
-		Example: "tmctl create broker foo",
-		Args:    cobra.MinimumNArgs(1),
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-			return []string{}, cobra.ShellCompDirectiveNoFileComp
-		},
+func (o *CliOptions) newBrokerCmd() *cobra.Command {
+	var version string
+	brokerCmd := &cobra.Command{
+		Use:               "broker <name>",
+		Short:             "Create TriggerMesh Broker. More information at https://docs.triggermesh.io/brokers/",
+		Example:           "tmctl create broker foo",
+		Args:              cobra.MinimumNArgs(1),
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return o.broker(args[0])
+			return o.broker(args[0], version)
 		},
 	}
+	brokerCmd.Flags().StringVar(&version, "version", o.Config.Triggermesh.Broker.Version, "TriggerMesh broker version.")
+	return brokerCmd
 }
 
-func (o *createOptions) broker(name string) error {
+func (o *CliOptions) broker(name, version string) error {
 	ctx := context.Background()
-
-	o.Manifest.Path = filepath.Join(o.ConfigBase, name, triggermesh.ManifestFile)
+	o.Manifest.Path = filepath.Join(o.Config.ConfigHome, name, triggermesh.ManifestFile)
 	if _, err := os.Stat(o.Manifest.Path); !os.IsNotExist(err) {
-		return fmt.Errorf("broker %s already exists", name)
+		return fmt.Errorf("broker %q already exists", name)
 	}
 
-	broker, err := tmbroker.New(name, o.Manifest.Path)
+	brokerConfig := o.Config.Triggermesh.Broker
+	brokerConfig.Version = version
+	broker, err := tmbroker.New(name, o.Manifest.Path, brokerConfig)
 	if err != nil {
 		return fmt.Errorf("broker: %w", err)
 	}
@@ -69,14 +70,14 @@ func (o *createOptions) broker(name string) error {
 		return fmt.Errorf("unable to update manifest: %w", err)
 	}
 
+	o.Config.Context = name
+	if err := o.Config.Save(); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+
 	log.Println("Starting container")
 	if _, err := broker.(triggermesh.Runnable).Start(ctx, nil, restart); err != nil {
 		return err
-	}
-
-	viper.Set("context", name)
-	if err := viper.WriteConfig(); err != nil {
-		return fmt.Errorf("write config: %w", err)
 	}
 
 	output.PrintStatus("broker", broker, []string{}, []string{})

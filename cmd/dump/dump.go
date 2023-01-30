@@ -24,17 +24,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/digitalocean/godo"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	kyaml "sigs.k8s.io/yaml"
 
+	"github.com/digitalocean/godo"
+	"github.com/spf13/cobra"
+
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
-	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const (
@@ -44,22 +44,24 @@ const (
 	platformDigitalOcean  = "digitalocean"
 )
 
-type dumpOptions struct {
-	Format   string
-	Context  string
-	Version  string
-	CRD      string
-	Manifest *manifest.Manifest
-	Platform string
-}
-
 type doOptions struct {
 	Region       string
 	InstanceSize string
 }
 
-func NewCmd() *cobra.Command {
-	o := &dumpOptions{}
+type CliOptions struct {
+	Config   *config.Config
+	Manifest *manifest.Manifest
+
+	Format   string
+	Platform string
+}
+
+func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
+	o := &CliOptions{
+		Config:   config,
+		Manifest: m,
+	}
 	do := &doOptions{}
 	dumpCmd := &cobra.Command{
 		Use:       "dump [broker] -p <kubernetes|knative|docker-compose|digitalocean> [-o json]",
@@ -67,19 +69,20 @@ func NewCmd() *cobra.Command {
 		Example:   "tmctl dump",
 		ValidArgs: []string{"--platform", "--output"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o.Version = viper.GetString("triggermesh.version")
-			o.Context = viper.GetString("context")
-			crds, err := crd.Fetch(filepath.Dir(viper.ConfigFileUsed()), o.Version)
-			cobra.CheckErr(err)
-			o.CRD = crds
-			if len(args) == 1 {
-				o.Context = args[0]
+			if len(args) != 0 {
+				o.Config.Context = args[0]
+				o.Manifest = manifest.New(filepath.Join(
+					o.Config.ConfigHome,
+					o.Config.Context,
+					triggermesh.ManifestFile))
+				if err := o.Manifest.Read(); err != nil {
+					return err
+				}
 			}
-			o.Manifest = manifest.New(filepath.Join(filepath.Dir(viper.ConfigFileUsed()), o.Context, triggermesh.ManifestFile))
-			cobra.CheckErr(o.Manifest.Read())
 			return o.dump(do)
 		},
 	}
+
 	dumpCmd.Flags().StringVarP(&o.Platform, "platform", "p", "kubernetes", "Target platform. One of kubernetes, knative, docker-compose, digitalocean")
 	dumpCmd.Flags().StringVarP(&o.Format, "output", "o", "yaml", "Output format")
 
@@ -101,12 +104,12 @@ func NewCmd() *cobra.Command {
 	return dumpCmd
 }
 
-func (o *dumpOptions) dump(do *doOptions) error {
+func (o *CliOptions) dump(do *doOptions) error {
 	var externalReconcilable []string
 	var output interface{}
 	for _, object := range o.Manifest.Objects {
 		additionalEnv := make(map[string]string)
-		component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest)
+		component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
 		if err != nil {
 			continue
 		}
@@ -144,7 +147,7 @@ func (o *dumpOptions) dump(do *doOptions) error {
 			}
 			if output == nil {
 				output = map[string]interface{}{
-					"name":     o.Context,
+					"name":     o.Config.Context,
 					"region":   do.Region,
 					"services": []interface{}{},
 					"workers":  []interface{}{},
@@ -214,10 +217,10 @@ func (o *dumpOptions) dump(do *doOptions) error {
 	return nil
 }
 
-func (o *dumpOptions) getStaticBrokerConfig() ([]byte, error) {
+func (o *CliOptions) getStaticBrokerConfig() ([]byte, error) {
 	var staticBrokerConfig tmbroker.Configuration
 	for _, object := range o.Manifest.Objects {
-		component, err := components.GetObject(object.Metadata.Name, o.CRD, o.Version, o.Manifest)
+		component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
 		if err != nil {
 			continue
 		}
@@ -247,7 +250,7 @@ func (o *dumpOptions) getStaticBrokerConfig() ([]byte, error) {
 	return json.Marshal(staticBrokerConfig)
 }
 
-func (o *dumpOptions) knativeEventingTransformation(object kubernetes.Object) kubernetes.Object {
+func (o *CliOptions) knativeEventingTransformation(object kubernetes.Object) kubernetes.Object {
 	switch object.APIVersion {
 	case tmbroker.APIVersion:
 		switch object.Kind {
@@ -256,7 +259,7 @@ func (o *dumpOptions) knativeEventingTransformation(object kubernetes.Object) ku
 			object.Kind = "Broker"
 		case tmbroker.TriggerKind:
 			newSpec := map[string]interface{}{
-				"broker":     o.Context,
+				"broker":     o.Config.Context,
 				"subscriber": object.Spec["target"],
 			}
 			if filter, set := object.Spec["filters"]; set {
@@ -268,7 +271,7 @@ func (o *dumpOptions) knativeEventingTransformation(object kubernetes.Object) ku
 	case "sources.triggermesh.io/v1alpha1":
 		object.Spec["sink"] = map[string]interface{}{
 			"ref": map[string]interface{}{
-				"name":       o.Context,
+				"name":       o.Config.Context,
 				"kind":       "Broker",
 				"apiVersion": "eventing.knative.dev/v1",
 			},
@@ -277,7 +280,7 @@ func (o *dumpOptions) knativeEventingTransformation(object kubernetes.Object) ku
 	return object
 }
 
-func (o *dumpOptions) format(object interface{}) ([]byte, error) {
+func (o *CliOptions) format(object interface{}) ([]byte, error) {
 	var result []byte
 	switch o.Format {
 	case "json":
