@@ -19,6 +19,7 @@ package create
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -95,10 +96,40 @@ func (o *CliOptions) trigger(name string, rawFilter string, eventSourcesFilter, 
 			return err
 		}
 	}
-	for _, filter := range filters {
-		if _, err = o.createTrigger(name, component, filter); err != nil {
+
+	oldTriggers := o.listTriggers(name + "-")
+	for i, filter := range filters {
+		newTrigger := name
+		if name != "" {
+			newTrigger = fmt.Sprintf("%s-%d", name, i+1)
+		}
+		if _, err = o.createTrigger(newTrigger, component, filter); err != nil {
+			return err
+		}
+		delete(oldTriggers, newTrigger)
+	}
+
+	for _, oldTrigger := range oldTriggers {
+		if err := oldTrigger.RemoveFromLocalConfig(); err != nil {
+			return err
+		}
+		if err := o.Manifest.Remove(oldTrigger.Name, oldTrigger.GetKind()); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (o *CliOptions) listTriggers(prefix string) map[string]*tmbroker.Trigger {
+	result := make(map[string]*tmbroker.Trigger, 0)
+	for _, v := range o.Manifest.Objects {
+		if v.Kind == tmbroker.TriggerKind && strings.HasPrefix(v.Metadata.Name, prefix) {
+			trigger, err := tmbroker.NewTrigger(v.Metadata.Name, o.Config.Context, o.Config.ConfigHome, nil, nil)
+			if err != nil {
+				continue
+			}
+			result[v.Metadata.Name] = trigger.(*tmbroker.Trigger)
+		}
+	}
+	return result
 }
