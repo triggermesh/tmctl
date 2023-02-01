@@ -18,7 +18,6 @@ package create
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -37,14 +36,11 @@ type CliOptions struct {
 	CRD      map[string]crd.CRD
 }
 
-func NewCmd(config *config.Config, crds map[string]crd.CRD) *cobra.Command {
+func NewCmd(config *config.Config, manifest *manifest.Manifest, crds map[string]crd.CRD) *cobra.Command {
 	o := &CliOptions{
-		CRD:    crds,
-		Config: config,
-		Manifest: manifest.New(filepath.Join(
-			config.ConfigHome,
-			config.Context,
-			triggermesh.ManifestFile)),
+		CRD:      crds,
+		Config:   config,
+		Manifest: manifest,
 	}
 	createCmd := &cobra.Command{
 		Use:   "create <kind>",
