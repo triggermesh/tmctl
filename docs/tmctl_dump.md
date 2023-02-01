@@ -18,6 +18,7 @@ tmctl dump
   -i, --do-instance string   DigitalOcean instance size (default "professional-xs")
   -r, --do-region string     DigitalOcean region (default "fra")
   -h, --help                 help for dump
+      --no-passwords         Remove passwords and secrets from the manifest
   -o, --output string        Output format (default "yaml")
   -p, --platform string      Target platform. One of kubernetes, knative, docker-compose, digitalocean (default "kubernetes")
 ```

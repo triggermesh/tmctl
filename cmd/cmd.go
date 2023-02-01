@@ -29,6 +29,7 @@ import (
 	"github.com/triggermesh/tmctl/cmd/delete"
 	"github.com/triggermesh/tmctl/cmd/describe"
 	"github.com/triggermesh/tmctl/cmd/dump"
+	"github.com/triggermesh/tmctl/cmd/load"
 	"github.com/triggermesh/tmctl/cmd/logs"
 	"github.com/triggermesh/tmctl/cmd/sendevent"
 	"github.com/triggermesh/tmctl/cmd/start"
@@ -70,6 +71,7 @@ Find more information at: https://docs.triggermesh.io`,
 	rootCmd.AddCommand(delete.NewCmd(c, manifest, crds))
 	rootCmd.AddCommand(describe.NewCmd(c, manifest, crds))
 	rootCmd.AddCommand(dump.NewCmd(c, manifest, crds))
+	rootCmd.AddCommand(load.NewCmd(c, crds))
 	rootCmd.AddCommand(logs.NewCmd(c, manifest, crds))
 	rootCmd.AddCommand(sendevent.NewCmd(c, manifest, crds))
 	rootCmd.AddCommand(start.NewCmd(c, manifest, crds))

@@ -47,7 +47,7 @@ func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD)
 		Config:   config,
 		Manifest: m,
 	}
-	createCmd := &cobra.Command{
+	startCmd := &cobra.Command{
 		Use:     "start [broker]",
 		Short:   "Starts TriggerMesh components",
 		Example: "tmctl start",
@@ -67,8 +67,8 @@ func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD)
 			return o.start()
 		},
 	}
-	createCmd.Flags().BoolVar(&o.Restart, "restart", false, "Restart components")
-	return createCmd
+	startCmd.Flags().BoolVar(&o.Restart, "restart", false, "Restart components")
+	return startCmd
 }
 
 func (o *CliOptions) start() error {

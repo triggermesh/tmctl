@@ -244,15 +244,15 @@ func CreateBrokerConfig(configHome, broker string) (string, error) {
 	} else if err != nil {
 		return "", fmt.Errorf("manifest file access: %w", err)
 	}
-	brokerConfig := filepath.Join(brokerHome, triggermesh.BrokerConfigFile)
-	if _, err := os.Stat(brokerConfig); os.IsNotExist(err) {
-		if _, err := os.Create(brokerConfig); err != nil {
+	brokerConfigPath := filepath.Join(brokerHome, triggermesh.BrokerConfigFile)
+	if _, err := os.Stat(brokerConfigPath); os.IsNotExist(err) {
+		if _, err := os.Create(brokerConfigPath); err != nil {
 			return "", fmt.Errorf("creating broker config: %w", err)
 		}
 	} else if err != nil {
 		return "", fmt.Errorf("broker config read: %w", err)
 	}
-	return brokerConfig, nil
+	return brokerConfigPath, nil
 }
 
 func New(name string, brokerConfig config.BrokerConfig) (triggermesh.Component, error) {

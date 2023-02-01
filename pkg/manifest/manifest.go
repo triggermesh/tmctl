@@ -57,7 +57,7 @@ func (m *Manifest) Read() error {
 	return nil
 }
 
-func (m *Manifest) write() error {
+func (m *Manifest) Write() error {
 	var output []byte
 	for _, object := range m.Objects {
 		body, err := kyaml.Marshal(object)
@@ -87,11 +87,11 @@ func (m *Manifest) Add(object triggermesh.Component) (bool, error) {
 				return false, nil
 			}
 			m.Objects[i] = k8sObject
-			return true, m.write()
+			return true, m.Write()
 		}
 	}
 	m.Objects = append(m.Objects, k8sObject)
-	return true, m.write()
+	return true, m.Write()
 }
 
 func (m *Manifest) Remove(name, kind string) error {
@@ -105,7 +105,7 @@ func (m *Manifest) Remove(name, kind string) error {
 		objects = append(objects, o)
 	}
 	m.Objects = objects
-	return m.write()
+	return m.Write()
 }
 
 func parseYAML(path string) ([]kubernetes.Object, error) {
