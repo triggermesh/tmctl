@@ -41,14 +41,11 @@ type CliOptions struct {
 	Restart bool
 }
 
-func NewCmd(config *config.Config, crd map[string]crd.CRD) *cobra.Command {
+func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD) *cobra.Command {
 	o := &CliOptions{
-		CRD:    crd,
-		Config: config,
-		Manifest: manifest.New(filepath.Join(
-			config.ConfigHome,
-			config.Context,
-			triggermesh.ManifestFile)),
+		CRD:      crd,
+		Config:   config,
+		Manifest: m,
 	}
 	createCmd := &cobra.Command{
 		Use:     "start [broker]",

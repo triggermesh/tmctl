@@ -36,13 +36,10 @@ type CliOptions struct {
 	Manifest *manifest.Manifest
 }
 
-func NewCmd(config *config.Config) *cobra.Command {
+func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
 	o := &CliOptions{
-		Config: config,
-		Manifest: manifest.New(filepath.Join(
-			config.ConfigHome,
-			config.Context,
-			triggermesh.ManifestFile)),
+		Config:   config,
+		Manifest: m,
 	}
 	return &cobra.Command{
 		Use:     "stop [broker]",
