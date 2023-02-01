@@ -156,7 +156,7 @@ func (t *Trigger) SetTarget(target triggermesh.Component) {
 }
 
 func (t *Trigger) LookupTarget() {
-	config, err := readBrokerConfig(filepath.Join(t.ConfigBase, t.Broker.Name, brokerConfigFile))
+	config, err := readBrokerConfig(filepath.Join(t.ConfigBase, t.Broker.Name, triggermesh.BrokerConfigFile))
 	if err != nil {
 		return
 	}

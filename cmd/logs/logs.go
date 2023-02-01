@@ -24,6 +24,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const defaultColorCode = "\033[0m"
@@ -58,12 +60,17 @@ var defaultLogPeriod = 24 * time.Hour
 type CliOptions struct {
 	Config   *config.Config
 	Manifest *manifest.Manifest
+	CRD      map[string]crd.CRD
 }
 
-func NewCmd(config *config.Config, manifest *manifest.Manifest) *cobra.Command {
+func NewCmd(config *config.Config, crd map[string]crd.CRD) *cobra.Command {
 	o := &CliOptions{
-		Config:   config,
-		Manifest: manifest,
+		CRD:    crd,
+		Config: config,
+		Manifest: manifest.New(filepath.Join(
+			config.ConfigHome,
+			config.Context,
+			triggermesh.ManifestFile)),
 	}
 	var follow bool
 	logsCmd := &cobra.Command{
@@ -74,6 +81,7 @@ func NewCmd(config *config.Config, manifest *manifest.Manifest) *cobra.Command {
 			return completion.ListAll(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cobra.CheckErr(o.Manifest.Read())
 			return o.logs(args, follow)
 		},
 	}
@@ -90,7 +98,7 @@ func (o *CliOptions) logs(filter []string, follow bool) error {
 
 	colorIndex := 0
 	for _, object := range o.Manifest.Objects {
-		component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
+		component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest, o.CRD)
 		if err != nil {
 			return fmt.Errorf("creating component interface: %w", err)
 		}

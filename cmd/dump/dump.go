@@ -35,6 +35,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const (
@@ -52,15 +53,20 @@ type doOptions struct {
 type CliOptions struct {
 	Config   *config.Config
 	Manifest *manifest.Manifest
+	CRD      map[string]crd.CRD
 
 	Format   string
 	Platform string
 }
 
-func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
+func NewCmd(config *config.Config, crd map[string]crd.CRD) *cobra.Command {
 	o := &CliOptions{
-		Config:   config,
-		Manifest: m,
+		CRD:    crd,
+		Config: config,
+		Manifest: manifest.New(filepath.Join(
+			config.ConfigHome,
+			config.Context,
+			triggermesh.ManifestFile)),
 	}
 	do := &doOptions{}
 	dumpCmd := &cobra.Command{
@@ -75,10 +81,8 @@ func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
 					o.Config.ConfigHome,
 					o.Config.Context,
 					triggermesh.ManifestFile))
-				if err := o.Manifest.Read(); err != nil {
-					return err
-				}
 			}
+			cobra.CheckErr(o.Manifest.Read())
 			return o.dump(do)
 		},
 	}
@@ -109,7 +113,7 @@ func (o *CliOptions) dump(do *doOptions) error {
 	var output interface{}
 	for _, object := range o.Manifest.Objects {
 		additionalEnv := make(map[string]string)
-		component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
+		component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest, o.CRD)
 		if err != nil {
 			continue
 		}
@@ -220,7 +224,7 @@ func (o *CliOptions) dump(do *doOptions) error {
 func (o *CliOptions) getStaticBrokerConfig() ([]byte, error) {
 	var staticBrokerConfig tmbroker.Configuration
 	for _, object := range o.Manifest.Objects {
-		component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
+		component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest, o.CRD)
 		if err != nil {
 			continue
 		}

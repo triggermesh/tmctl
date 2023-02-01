@@ -31,7 +31,7 @@ import (
 
 func (o *CliOptions) sourcesCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
-		sources, err := crd.ListSources(o.Config.CRDPath)
+		sources, err := crd.ListSources(o.CRD)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -57,8 +57,13 @@ func (o *CliOptions) sourcesCompletion(cmd *cobra.Command, args []string, toComp
 	toComplete = strings.TrimLeft(toComplete, "-")
 	var properties map[string]crd.Property
 
+	crd, exists := o.CRD[args[0]+"source"]
+	if !exists {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
 	if !strings.Contains(toComplete, ".") {
-		_, properties = completion.SpecFromCRD(args[0]+"source", o.Config.CRDPath)
+		_, properties = completion.SpecFromCRD(crd)
 		if property, exists := properties[toComplete]; exists {
 			if property.Typ == "object" {
 				return []string{"--" + toComplete + "."}, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
@@ -67,7 +72,7 @@ func (o *CliOptions) sourcesCompletion(cmd *cobra.Command, args []string, toComp
 		}
 	} else {
 		path := strings.Split(toComplete, ".")
-		exists, nestedProperties := completion.SpecFromCRD(args[0]+"source", o.Config.CRDPath, path...)
+		exists, nestedProperties := completion.SpecFromCRD(crd, path...)
 		if len(nestedProperties) != 0 {
 			prefix = toComplete
 			if !strings.HasSuffix(prefix, ".") && prefix != "--" {
@@ -77,7 +82,7 @@ func (o *CliOptions) sourcesCompletion(cmd *cobra.Command, args []string, toComp
 		} else if exists {
 			return []string{"--" + toComplete}, cobra.ShellCompDirectiveNoFileComp
 		} else {
-			_, properties = completion.SpecFromCRD(args[0]+"source", o.Config.CRDPath, path[:len(path)-1]...)
+			_, properties = completion.SpecFromCRD(crd, path[:len(path)-1]...)
 			prefix = strings.Join(path[:len(path)-1], ".") + "."
 		}
 	}
@@ -96,7 +101,7 @@ func (o *CliOptions) sourcesCompletion(cmd *cobra.Command, args []string, toComp
 
 func (o *CliOptions) targetsCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) == 0 {
-		targets, err := crd.ListTargets(o.Config.CRDPath)
+		targets, err := crd.ListTargets(o.CRD)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
@@ -108,7 +113,7 @@ func (o *CliOptions) targetsCompletion(cmd *cobra.Command, args []string, toComp
 	}
 
 	if lastParam(args) == "--eventTypes" && strings.HasSuffix(args[len(args)-1], ",") {
-		return completion.ListEventTypes(o.Manifest, o.Config),
+		return completion.ListEventTypes(o.Manifest, o.Config, o.CRD),
 			cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 	}
 
@@ -122,7 +127,7 @@ func (o *CliOptions) targetsCompletion(cmd *cobra.Command, args []string, toComp
 	case "--source":
 		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 	case "--eventTypes":
-		return completion.ListEventTypes(o.Manifest, o.Config),
+		return completion.ListEventTypes(o.Manifest, o.Config, o.CRD),
 			cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 	}
 	if strings.HasPrefix(args[len(args)-1], "--") {
@@ -133,8 +138,13 @@ func (o *CliOptions) targetsCompletion(cmd *cobra.Command, args []string, toComp
 	toComplete = strings.TrimLeft(toComplete, "-")
 	var properties map[string]crd.Property
 
+	crd, exists := o.CRD[args[0]+"source"]
+	if !exists {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
 	if !strings.Contains(toComplete, ".") {
-		_, properties = completion.SpecFromCRD(args[0]+"target", o.Config.CRDPath)
+		_, properties = completion.SpecFromCRD(crd)
 		if property, exists := properties[toComplete]; exists {
 			if property.Typ == "object" {
 				return []string{"--" + toComplete + "."}, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
@@ -143,7 +153,7 @@ func (o *CliOptions) targetsCompletion(cmd *cobra.Command, args []string, toComp
 		}
 	} else {
 		path := strings.Split(toComplete, ".")
-		exists, nestedProperties := completion.SpecFromCRD(args[0]+"target", o.Config.CRDPath, path...)
+		exists, nestedProperties := completion.SpecFromCRD(crd, path...)
 		if len(nestedProperties) != 0 {
 			prefix = toComplete
 			if !strings.HasSuffix(prefix, ".") && prefix != "--" {
@@ -153,7 +163,7 @@ func (o *CliOptions) targetsCompletion(cmd *cobra.Command, args []string, toComp
 		} else if exists {
 			return []string{"--" + toComplete}, cobra.ShellCompDirectiveNoFileComp
 		} else {
-			_, properties = completion.SpecFromCRD(args[0]+"target", o.Config.CRDPath, path[:len(path)-1]...)
+			_, properties = completion.SpecFromCRD(crd, path[:len(path)-1]...)
 			prefix = strings.Join(path[:len(path)-1], ".") + "."
 		}
 	}

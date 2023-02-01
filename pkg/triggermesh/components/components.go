@@ -31,15 +31,17 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/source"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/target"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-func GetObject(name string, config *config.Config, manifest *manifest.Manifest) (triggermesh.Component, error) {
+func GetObject(name string, config *config.Config, manifest *manifest.Manifest, crds map[string]crd.CRD) (triggermesh.Component, error) {
 	for _, object := range manifest.Objects {
 		if object.Metadata.Name == name {
 			broker, set := object.Metadata.Labels["triggermesh.io/context"]
 			if !set {
 				return nil, fmt.Errorf("context label not set")
 			}
+			crd := crds[strings.ToLower(object.Kind)]
 			switch object.APIVersion {
 			case "sources.triggermesh.io/v1alpha1":
 				status := make(map[string]interface{}, 0)
@@ -52,15 +54,15 @@ func GetObject(name string, config *config.Config, manifest *manifest.Manifest) 
 						}
 					}
 				}
-				return source.New(object.Metadata.Name, config.CRDPath, object.Kind, broker, config.Triggermesh.ComponentsVersion, object.Spec, status), nil
+				return source.New(object.Metadata.Name, object.Kind, broker, config.Triggermesh.ComponentsVersion, crd, object.Spec, status), nil
 			case "targets.triggermesh.io/v1alpha1":
-				return target.New(object.Metadata.Name, config.CRDPath, object.Kind, broker, config.Triggermesh.ComponentsVersion, object.Spec), nil
+				return target.New(object.Metadata.Name, object.Kind, broker, config.Triggermesh.ComponentsVersion, crd, object.Spec), nil
 			case "flow.triggermesh.io/v1alpha1":
-				return transformation.New(object.Metadata.Name, config.CRDPath, object.Kind, broker, config.Triggermesh.ComponentsVersion, object.Spec), nil
+				return transformation.New(object.Metadata.Name, object.Kind, broker, config.Triggermesh.ComponentsVersion, crd, object.Spec), nil
 			case "eventing.triggermesh.io/v1alpha1":
 				switch object.Kind {
 				case "RedisBroker":
-					return tmbroker.New(object.Metadata.Name, manifest.Path, config.Triggermesh.Broker)
+					return tmbroker.New(object.Metadata.Name, config.Triggermesh.Broker)
 				case "Trigger":
 					brokerConfigPath := filepath.Dir(manifest.Path)
 					baseConfigPath := filepath.Dir(brokerConfigPath)

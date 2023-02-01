@@ -18,6 +18,7 @@ package create
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -27,25 +28,34 @@ import (
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 type CliOptions struct {
 	Config   *config.Config
 	Manifest *manifest.Manifest
+	CRD      map[string]crd.CRD
 }
 
-func NewCmd(config *config.Config, manifest *manifest.Manifest) *cobra.Command {
+func NewCmd(config *config.Config, crds map[string]crd.CRD) *cobra.Command {
 	o := &CliOptions{
-		Config:   config,
-		Manifest: manifest,
+		CRD:    crds,
+		Config: config,
+		Manifest: manifest.New(filepath.Join(
+			config.ConfigHome,
+			config.Context,
+			triggermesh.ManifestFile)),
 	}
 	createCmd := &cobra.Command{
 		Use:   "create <kind>",
 		Short: "Create TriggerMesh component",
 		// CompletionOptions: cobra.CompletionOptions{DisableDescriptions: true},
 		Args: cobra.MinimumNArgs(1),
-		PersistentPreRun: func(_ *cobra.Command, _ []string) {
+		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 			cobra.CheckErr(docker.CheckDaemon())
+			if cmd.Name() != "broker" {
+				cobra.CheckErr(o.Manifest.Read())
+			}
 		},
 	}
 	createCmd.AddCommand(o.newBrokerCmd())
@@ -85,7 +95,7 @@ func isFlag(s string) bool {
 func (o *CliOptions) translateEventSource(eventSourcesFilter []string) ([]string, error) {
 	var result []string
 	for _, source := range eventSourcesFilter {
-		s, err := components.GetObject(source, o.Config, o.Manifest)
+		s, err := components.GetObject(source, o.Config, o.Manifest, o.CRD)
 		if err != nil {
 			return nil, fmt.Errorf("%q event producer object: %w", source, err)
 		}

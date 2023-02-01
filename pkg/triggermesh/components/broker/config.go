@@ -61,7 +61,7 @@ func writeBrokerConfig(path string, configuration *Configuration) error {
 }
 
 func (t *Trigger) WriteLocalConfig() error {
-	configFile := filepath.Join(t.ConfigBase, t.Broker.Name, brokerConfigFile)
+	configFile := filepath.Join(t.ConfigBase, t.Broker.Name, triggermesh.BrokerConfigFile)
 	configuration, err := readBrokerConfig(configFile)
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -91,7 +91,7 @@ func (t *Trigger) WriteLocalConfig() error {
 }
 
 func (t *Trigger) RemoveFromLocalConfig() error {
-	configFile := filepath.Join(t.ConfigBase, t.Broker.Name, brokerConfigFile)
+	configFile := filepath.Join(t.ConfigBase, t.Broker.Name, triggermesh.BrokerConfigFile)
 	configuration, err := readBrokerConfig(configFile)
 	if err != nil {
 		return fmt.Errorf("broker config: %w", err)
@@ -101,7 +101,7 @@ func (t *Trigger) RemoveFromLocalConfig() error {
 }
 
 func GetTargetTriggers(target, broker, configBase string) ([]triggermesh.Component, error) {
-	config, err := readBrokerConfig(filepath.Join(configBase, broker, brokerConfigFile))
+	config, err := readBrokerConfig(filepath.Join(configBase, broker, triggermesh.BrokerConfigFile))
 	if err != nil {
 		return nil, fmt.Errorf("read broker config: %w", err)
 	}

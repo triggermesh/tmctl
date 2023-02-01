@@ -49,7 +49,7 @@ func (o *CliOptions) newTargetCmd() *cobra.Command {
 		ValidArgsFunction:  o.targetsCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 || args[0] == "--help" {
-				targets, err := crd.ListTargets(o.Config.CRDPath)
+				targets, err := crd.ListTargets(o.CRD)
 				if err != nil {
 					return fmt.Errorf("list sources: %w", err)
 				}
@@ -72,7 +72,7 @@ func (o *CliOptions) newTargetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			o.Config.CRDPath = crd
+			o.CRD = crd
 
 			var eventSourcesFilter, eventTypesFilter []string
 			if sf, exists := params["source"]; exists {
@@ -118,7 +118,11 @@ func (o *CliOptions) target(name, kind string, args map[string]string, eventSour
 	}
 	eventTypesFilter = append(eventTypesFilter, et...)
 
-	t := target.New(name, o.Config.CRDPath, kind, o.Config.Context, o.Config.Triggermesh.ComponentsVersion, args)
+	crd, exists := o.CRD[kind+"target"]
+	if !exists {
+		return fmt.Errorf("CRD for kind %q not found", kind)
+	}
+	t := target.New(name, kind, o.Config.Context, o.Config.Triggermesh.ComponentsVersion, crd, args)
 
 	secrets, secretsEnv, err := components.ProcessSecrets(t.(triggermesh.Parent), o.Manifest)
 	if err != nil {
