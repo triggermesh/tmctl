@@ -18,6 +18,7 @@ package create
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -84,10 +85,40 @@ func (o *createOptions) trigger(name string, eventSourcesFilter, eventTypesFilte
 			return err
 		}
 	}
-	for _, et := range eventTypesFilter {
-		if _, err = o.createTrigger(name, component, tmbroker.FilterExactAttribute("type", et)); err != nil {
+
+	oldTriggers := o.listTriggers(name + "-")
+	for i, et := range eventTypesFilter {
+		newTrigger := name
+		if name != "" {
+			newTrigger = fmt.Sprintf("%s-%d", name, i+1)
+		}
+		if _, err = o.createTrigger(newTrigger, component, tmbroker.FilterExactAttribute("type", et)); err != nil {
+			return err
+		}
+		delete(oldTriggers, newTrigger)
+	}
+
+	for _, oldTrigger := range oldTriggers {
+		if err := oldTrigger.RemoveFromLocalConfig(); err != nil {
+			return err
+		}
+		if err := o.Manifest.Remove(oldTrigger.Name, oldTrigger.GetKind()); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (o *createOptions) listTriggers(prefix string) map[string]*tmbroker.Trigger {
+	result := make(map[string]*tmbroker.Trigger, 0)
+	for _, v := range o.Manifest.Objects {
+		if v.Kind == tmbroker.TriggerKind && strings.HasPrefix(v.Metadata.Name, prefix) {
+			trigger, err := tmbroker.NewTrigger(v.Metadata.Name, o.Context, o.ConfigBase, nil, nil)
+			if err != nil {
+				continue
+			}
+			result[v.Metadata.Name] = trigger.(*tmbroker.Trigger)
+		}
+	}
+	return result
 }
