@@ -166,6 +166,10 @@ func (b *Broker) GetSpec() map[string]interface{} {
 	return b.spec
 }
 
+func (b *Broker) SetSpec(spec map[string]interface{}) {
+	b.spec = spec
+}
+
 func (b *Broker) GetPort(ctx context.Context) (string, error) {
 	container, err := b.Info(ctx)
 	if err != nil {

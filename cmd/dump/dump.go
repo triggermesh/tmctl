@@ -44,6 +44,8 @@ const (
 	platformKnative       = "knative"
 	platformDockerCompose = "docker-compose"
 	platformDigitalOcean  = "digitalocean"
+
+	redactTag = "!user input"
 )
 
 type doOptions struct {
@@ -59,7 +61,7 @@ type CliOptions struct {
 	Format   string
 	Platform string
 
-	NoPasswords bool
+	NoSecrets bool
 }
 
 func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD) *cobra.Command {
@@ -88,7 +90,7 @@ func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD)
 	}
 
 	dumpCmd.Flags().StringVarP(&o.Platform, "platform", "p", "kubernetes", "Target platform. One of kubernetes, knative, docker-compose, digitalocean")
-	dumpCmd.Flags().BoolVar(&o.NoPasswords, "no-passwords", false, "Remove passwords and secrets from the manifest")
+	dumpCmd.Flags().BoolVar(&o.NoSecrets, "no-secrets", false, "Remove secret values from the manifest")
 	dumpCmd.Flags().StringVarP(&o.Format, "output", "o", "yaml", "Output format")
 
 	dumpCmd.Flags().StringVarP(&do.Region, "do-region", "r", "fra", "DigitalOcean region")
@@ -118,10 +120,10 @@ func (o *CliOptions) dump(do *doOptions) error {
 		if err != nil {
 			continue
 		}
-		if o.NoPasswords && component.GetAPIVersion() == "v1" && component.GetKind() == "Secret" {
+		if o.NoSecrets && component.GetAPIVersion() == "v1" && component.GetKind() == "Secret" {
 			redactedData := make(map[string]string, len(component.GetSpec()))
 			for key := range component.GetSpec() {
-				redactedData[key] = "<redacted>"
+				redactedData[key] = triggermesh.UserInputTag
 			}
 			component = secret.New(component.GetName(), o.Config.Context, redactedData)
 			object, _ = component.AsK8sObject()

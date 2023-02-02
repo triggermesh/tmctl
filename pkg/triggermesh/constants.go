@@ -22,6 +22,8 @@ const (
 	ManifestFile     = "manifest.yaml"
 	BrokerConfigFile = "broker.conf"
 
+	UserInputTag = "<user_input>"
+
 	// objects meta
 	ContextLabel                = "triggermesh.io/context"
 	ExternalResourcesAnnotation = "triggermesh.io/external-resources"

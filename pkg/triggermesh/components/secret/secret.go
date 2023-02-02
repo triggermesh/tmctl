@@ -66,6 +66,12 @@ func (s *Secret) GetSpec() map[string]interface{} {
 	return spec
 }
 
+func (s *Secret) SetSpec(data map[string]interface{}) {
+	for k, v := range data {
+		s.data[k] = v.(string)
+	}
+}
+
 func New(name, context string, data map[string]string) triggermesh.Component {
 	return &Secret{
 		Name:    name,

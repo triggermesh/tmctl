@@ -195,6 +195,10 @@ func (t *Transformation) GetSpec() map[string]interface{} {
 	return t.spec
 }
 
+func (t *Transformation) SetSpec(spec map[string]interface{}) {
+	t.spec = spec
+}
+
 func (t *Transformation) GetEventTypes() ([]string, error) {
 	if et := t.getContextTransformationValue("type"); len(et) != 0 {
 		return et, nil
