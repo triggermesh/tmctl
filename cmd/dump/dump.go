@@ -44,8 +44,6 @@ const (
 	platformKnative       = "knative"
 	platformDockerCompose = "docker-compose"
 	platformDigitalOcean  = "digitalocean"
-
-	redactTag = "!user input"
 )
 
 type doOptions struct {

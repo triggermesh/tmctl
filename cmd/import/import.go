@@ -25,17 +25,16 @@ import (
 )
 
 func NewCmd(config *config.Config, crd map[string]crd.CRD) *cobra.Command {
-	var from, name string
+	var from string
 	importCmd := &cobra.Command{
 		Use:     "import -f <path/to/manifest.yaml>/<manifest URL>",
 		Short:   "Import TriggerMesh manifest",
 		Example: "tmctl import -f manifest.yaml",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return load.Import(name, from, config, crd)
+			return load.Import(from, config, crd)
 		},
 	}
-	importCmd.Flags().StringVar(&name, "name", "", "Set imported broker name")
 	importCmd.Flags().StringVarP(&from, "from", "f", "", "Import manifest from")
-	importCmd.MarkFlagRequired("f")
+	cobra.CheckErr(importCmd.MarkFlagRequired("from"))
 	return importCmd
 }

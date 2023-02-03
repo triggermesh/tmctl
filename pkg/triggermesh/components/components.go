@@ -76,15 +76,13 @@ func GetObject(name string, config *config.Config, manifest *manifest.Manifest, 
 				if err != nil {
 					return nil, fmt.Errorf("trigger spec: %w", err)
 				}
-				target, err := GetObject(targetName, config, manifest, crds)
-				if err != nil {
-					return nil, fmt.Errorf("trigger's target ref: %w", err)
-				}
 				trigger, err := tmbroker.NewTrigger(object.Metadata.Name, broker, baseConfigPath, nil, filter)
 				if err != nil {
 					return nil, fmt.Errorf("trigger object: %w", err)
 				}
-				trigger.(*tmbroker.Trigger).SetTarget(target)
+				if target, _ := GetObject(targetName, config, manifest, crds); target != nil {
+					trigger.(*tmbroker.Trigger).SetTarget(target)
+				}
 				return trigger, nil
 			}
 		case "serving.knative.dev/v1":

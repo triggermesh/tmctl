@@ -35,21 +35,19 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-func Import(contextName, from string, config *cliconfig.Config, crd map[string]crd.CRD) error {
+func Import(from string, config *cliconfig.Config, crd map[string]crd.CRD) error {
 	m, err := getManifest(from)
 	if err != nil {
 		return fmt.Errorf("manifest %q: %w", from, err)
 	}
 
-	// create broker first
-	for i, object := range m.Objects {
+	contextName := ""
+	// create broker and its configs first
+	for _, object := range m.Objects {
 		if object.Kind != tmbroker.BrokerKind {
 			continue
 		}
-		if contextName == "" {
-			contextName = object.Metadata.Name
-		}
-		m.Objects[i].Metadata.Name = contextName
+		contextName = object.Metadata.Name
 		if _, err := tmbroker.CreateBrokerConfig(config.ConfigHome, contextName); err != nil {
 			return fmt.Errorf("creating broker object: %w", err)
 		}
@@ -61,9 +59,8 @@ func Import(contextName, from string, config *cliconfig.Config, crd map[string]c
 
 	m.Path = filepath.Join(config.ConfigHome, contextName, triggermesh.ManifestFile)
 
-	// insert user input, update context name
+	// fill in user input, update broker config
 	for i, object := range m.Objects {
-		m.Objects[i].Metadata.Labels[triggermesh.ContextLabel] = contextName
 		component, err := components.GetObject(object.Metadata.Name, config, m, crd)
 		if err != nil {
 			return err
@@ -73,6 +70,13 @@ func Import(contextName, from string, config *cliconfig.Config, crd map[string]c
 			return err
 		}
 		component.SetSpec(filledSpec)
+
+		if object.Kind == tmbroker.TriggerKind {
+			if err := component.(*tmbroker.Trigger).WriteLocalConfig(); err != nil {
+				return err
+			}
+		}
+
 		newObj, err := component.AsK8sObject()
 		if err != nil {
 			return err
@@ -84,31 +88,14 @@ func Import(contextName, from string, config *cliconfig.Config, crd map[string]c
 		return err
 	}
 
-	// write broker config
-	for _, object := range m.Objects {
-		if object.Kind != tmbroker.TriggerKind {
-			continue
-		}
-		trigger, err := components.GetObject(object.Metadata.Name, config, m, crd)
-		if err != nil {
-			return err
-		}
-		if err := trigger.(*tmbroker.Trigger).WriteLocalConfig(); err != nil {
-			return err
-		}
-	}
-
-	descr := &describe.CliOptions{
+	_ = (&describe.CliOptions{
 		Config:   config,
 		Manifest: m,
 		CRD:      crd,
-	}
-	_ = descr.Describe()
+	}).Describe()
 
-	log.Printf("Switching context to %q", contextName)
-	cliconfig.Set("context", contextName)
-	log.Println("Done")
-	return nil
+	log.Printf("Done. Switching context to %q", contextName)
+	return cliconfig.Set("context", contextName)
 }
 
 func getManifest(from string) (*manifest.Manifest, error) {
@@ -172,6 +159,28 @@ func parseUserInputTags(name, kind string, spec map[string]interface{}) (map[str
 				return nil, err
 			}
 			filledSpec[key] = filled
+		case []interface{}:
+			var items []interface{}
+			for _, item := range v {
+				if itemObject, ok := item.(map[string]interface{}); ok {
+					filled, err := parseUserInputTags(name, kind, itemObject)
+					if err != nil {
+						return nil, err
+					}
+					items = append(items, filled)
+				} else if itemString, ok := item.(string); ok {
+					if itemString != triggermesh.UserInputTag {
+						continue
+					}
+					fmt.Printf("%s/%s: ", name, key)
+					input, err := readStdin()
+					if err != nil {
+						return nil, err
+					}
+					items = append(items, input)
+				}
+				filledSpec[key] = items
+			}
 		}
 	}
 	return filledSpec, nil

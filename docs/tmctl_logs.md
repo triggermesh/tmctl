@@ -22,7 +22,7 @@ tmctl logs
 ### Options inherited from parent commands
 
 ```
-      --version string   TriggerMesh components version. (default "v1.23.0")
+      --version string   TriggerMesh components version. (default "v1.23.1")
 ```
 
 ### SEE ALSO
