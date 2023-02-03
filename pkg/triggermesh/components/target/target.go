@@ -199,6 +199,10 @@ func (t *Target) GetSpec() map[string]interface{} {
 	return t.spec
 }
 
+func (t *Target) SetSpec(spec map[string]interface{}) {
+	t.spec = spec
+}
+
 func (t *Target) GetPort(ctx context.Context) (string, error) {
 	container, err := t.Info(ctx)
 	if err != nil {

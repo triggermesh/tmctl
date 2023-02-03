@@ -75,12 +75,12 @@ func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD)
 					triggermesh.ManifestFile))
 			}
 			cobra.CheckErr(o.Manifest.Read())
-			return o.describe()
+			return o.Describe()
 		},
 	}
 }
 
-func (o *CliOptions) describe() error {
+func (o *CliOptions) Describe() error {
 	broker := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
 	triggers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
 	producers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)

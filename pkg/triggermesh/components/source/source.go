@@ -226,6 +226,10 @@ func (s *Source) GetSpec() map[string]interface{} {
 	return s.spec
 }
 
+func (s *Source) SetSpec(spec map[string]interface{}) {
+	s.spec = spec
+}
+
 func (s *Source) GetEventTypes() ([]string, error) {
 	// try GetEventTypes method first
 	o, err := s.asUnstructured()
