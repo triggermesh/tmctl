@@ -12,7 +12,7 @@ Find more information at: https://docs.triggermesh.io
 
 ```
   -h, --help             help for tmctl
-      --version string   TriggerMesh components version. (default "v1.23.1")
+      --version string   TriggerMesh components version. (default "v1.23.2")
 ```
 
 ### SEE ALSO

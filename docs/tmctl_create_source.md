@@ -25,7 +25,7 @@ tmctl create source httppoller \
 ### Options inherited from parent commands
 
 ```
-      --version string   TriggerMesh components version. (default "v1.23.1")
+      --version string   TriggerMesh components version. (default "v1.23.2")
 ```
 
 ### SEE ALSO
