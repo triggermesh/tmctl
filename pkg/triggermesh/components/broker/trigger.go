@@ -91,6 +91,15 @@ func (t *Trigger) GetSpec() map[string]interface{} {
 	}
 }
 
+func (t *Trigger) SetSpec(spec map[string]interface{}) {
+	if filters, ok := spec["filters"]; ok {
+		t.Filters = filters.([]eventingbroker.Filter)
+	}
+	if target, ok := spec["target"]; ok {
+		t.Target = target.(duckv1.Destination)
+	}
+}
+
 func NewTrigger(name, broker, configBase string, target triggermesh.Component, filter *eventingbroker.Filter) (triggermesh.Component, error) {
 	trigger := &Trigger{
 		Name:       name,
@@ -156,7 +165,7 @@ func (t *Trigger) SetTarget(target triggermesh.Component) {
 }
 
 func (t *Trigger) LookupTarget() {
-	config, err := readBrokerConfig(filepath.Join(t.ConfigBase, t.Broker.Name, brokerConfigFile))
+	config, err := readBrokerConfig(filepath.Join(t.ConfigBase, t.Broker.Name, triggermesh.BrokerConfigFile))
 	if err != nil {
 		return
 	}

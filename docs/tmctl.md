@@ -12,7 +12,7 @@ Find more information at: https://docs.triggermesh.io
 
 ```
   -h, --help             help for tmctl
-      --version string   TriggerMesh components version. (default "v1.23.0")
+      --version string   TriggerMesh components version. (default "v1.23.1")
 ```
 
 ### SEE ALSO
@@ -23,6 +23,7 @@ Find more information at: https://docs.triggermesh.io
 * [tmctl delete](tmctl_delete.md)	 - Delete components by names
 * [tmctl describe](tmctl_describe.md)	 - List broker components and their statuses
 * [tmctl dump](tmctl_dump.md)	 - Generate TriggerMesh manifests
+* [tmctl import](tmctl_import.md)	 - Import TriggerMesh manifest
 * [tmctl logs](tmctl_logs.md)	 - Display components logs
 * [tmctl send-event](tmctl_send-event.md)	 - Send CloudEvent to the target
 * [tmctl start](tmctl_start.md)	 - Starts TriggerMesh components

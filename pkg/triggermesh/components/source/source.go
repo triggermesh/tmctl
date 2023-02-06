@@ -51,8 +51,9 @@ var (
 )
 
 type Source struct {
-	Name    string
-	CRDFile string
+	Name string
+
+	CRD crd.CRD
 
 	Broker  string
 	Kind    string
@@ -63,7 +64,7 @@ type Source struct {
 }
 
 func (s *Source) asUnstructured() (unstructured.Unstructured, error) {
-	return kubernetes.CreateUnstructured(s.GetKind(), s.CRDFile, s.getMeta(), s.spec, s.status)
+	return kubernetes.CreateUnstructured(s.CRD, s.getMeta(), s.spec, s.status)
 }
 
 func (s *Source) AsK8sObject() (kubernetes.Object, error) {
@@ -78,7 +79,7 @@ func (s *Source) AsK8sObject() (kubernetes.Object, error) {
 			"apiVersion": tmbroker.APIVersion,
 		},
 	}
-	return kubernetes.CreateObject(s.GetKind(), s.CRDFile, s.getMeta(), spec)
+	return kubernetes.CreateObject(s.CRD, s.getMeta(), spec)
 }
 
 func (s *Source) AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error) {
@@ -224,6 +225,10 @@ func (s *Source) GetSpec() map[string]interface{} {
 	return s.spec
 }
 
+func (s *Source) SetSpec(spec map[string]interface{}) {
+	s.spec = spec
+}
+
 func (s *Source) GetEventTypes() ([]string, error) {
 	// try GetEventTypes method first
 	o, err := s.asUnstructured()
@@ -238,12 +243,12 @@ func (s *Source) GetEventTypes() ([]string, error) {
 		return eventAttributes.ProducedEventTypes, nil
 	}
 	// then read CRD annotations
-	sourceCRD, err := crd.GetResourceCRD(s.Kind, s.CRDFile)
-	if err != nil {
-		return []string{}, fmt.Errorf("source CRD: %w", err)
-	}
+	// sourceCRD, err := crd.GetResourceCRD(s.Kind, s.CRD)
+	// if err != nil {
+	// 	return []string{}, fmt.Errorf("source CRD: %w", err)
+	// }
 	var et crd.EventTypes
-	if err := json.Unmarshal([]byte(sourceCRD.Metadata.Annotations.EventTypes), &et); err != nil {
+	if err := json.Unmarshal([]byte(s.CRD.Metadata.Annotations.EventTypes), &et); err != nil {
 		return []string{}, fmt.Errorf("event types CRD: %w", err)
 	}
 	var result []string
@@ -270,7 +275,7 @@ func (s *Source) GetEventSource() (string, error) {
 }
 
 func (s *Source) GetChildren() ([]triggermesh.Component, error) {
-	secrets, err := kubernetes.ExtractSecrets(s.Name, s.Kind, s.CRDFile, s.spec)
+	secrets, err := kubernetes.ExtractSecrets(s.Name, s.CRD, s.spec)
 	if err != nil {
 		return nil, fmt.Errorf("extracting secrets: %w", err)
 	}
@@ -359,7 +364,7 @@ func (s *Source) GetExternalResources() map[string]interface{} {
 	return s.status
 }
 
-func New(name, crdFile, kind, broker, version string, params interface{}, status map[string]interface{}) triggermesh.Component {
+func New(name, kind, broker, version string, crd crd.CRD, params interface{}, status map[string]interface{}) triggermesh.Component {
 	var spec map[string]interface{}
 	switch p := params.(type) {
 	case map[string]string:
@@ -382,7 +387,7 @@ func New(name, crdFile, kind, broker, version string, params interface{}, status
 
 	return &Source{
 		Name:    name,
-		CRDFile: crdFile,
+		CRD:     crd,
 		Broker:  broker,
 		Kind:    k,
 		Version: version,

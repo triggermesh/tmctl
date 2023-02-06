@@ -69,10 +69,10 @@ func ListAll(m *manifest.Manifest) []string {
 	return list
 }
 
-func ListEventTypes(m *manifest.Manifest, c *config.Config) []string {
+func ListEventTypes(m *manifest.Manifest, c *config.Config, crds map[string]crd.CRD) []string {
 	var eventTypes []string
 	for _, object := range m.Objects {
-		c, err := components.GetObject(object.Metadata.Name, c, m)
+		c, err := components.GetObject(object.Metadata.Name, c, m, crds)
 		if err == nil {
 			if producer, ok := c.(triggermesh.Producer); ok {
 				et, _ := producer.GetEventTypes()
@@ -104,13 +104,10 @@ func ListFilteredEventTypes(broker, configBase string, m *manifest.Manifest) []s
 }
 
 // SpecFromCRD returns spec completions based on OpenAPI schema of custom resource.
-func SpecFromCRD(name, crdFile string, path ...string) (bool, map[string]crd.Property) {
+func SpecFromCRD(c crd.CRD, path ...string) (bool, map[string]crd.Property) {
 	result := make(map[string]crd.Property, 0)
-	c, err := crd.GetResourceCRD(name, crdFile)
-	if err != nil {
-		return false, result
-	}
 	var schema *crd.Schema
+	var err error
 	for _, version := range c.Spec.Versions {
 		if version.Served {
 			if schema, err = crd.GetSchema(version.Schema.OpenAPIV3Schema.Properties.Spec); err != nil {

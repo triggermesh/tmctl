@@ -83,7 +83,7 @@ EOF`,
 
 	crd, err := crd.Fetch(o.Config.ConfigHome, o.Config.Triggermesh.ComponentsVersion)
 	cobra.CheckErr(err)
-	o.Config.CRDPath = crd
+	o.CRD = crd
 
 	transformationCmd.Flags().StringVar(&name, "name", "", "Transformation name")
 	transformationCmd.Flags().StringVarP(&file, "from", "f", "", "Transformation specification file")
@@ -96,7 +96,7 @@ EOF`,
 		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("eventTypes", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return completion.ListEventTypes(o.Manifest, o.Config), cobra.ShellCompDirectiveNoFileComp
+		return completion.ListEventTypes(o.Manifest, o.Config, o.CRD), cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListTargets(o.Manifest), cobra.ShellCompDirectiveNoFileComp
@@ -143,7 +143,12 @@ func (o *CliOptions) transformation(name, target, file string, eventSourcesFilte
 		return fmt.Errorf("decode spec: %w", err)
 	}
 
-	t := transformation.New(name, o.Config.CRDPath, "transformation", o.Config.Context, o.Config.Triggermesh.ComponentsVersion, spec)
+	crd, exists := o.CRD["transformation"]
+	if !exists {
+		return fmt.Errorf("CRD for kind \"transformation\" not found")
+	}
+
+	t := transformation.New(name, "transformation", o.Config.Context, o.Config.Triggermesh.ComponentsVersion, crd, spec)
 
 	transformationEventType := fmt.Sprintf("%s.output", t.GetName())
 	if et, _ := t.(triggermesh.Producer).GetEventTypes(); len(et) == 0 {
@@ -250,7 +255,7 @@ func readInput() (string, error) {
 }
 
 func (o *CliOptions) lookupTarget(ctx context.Context, target string) (triggermesh.Component, error) {
-	targetObject, err := components.GetObject(target, o.Config, o.Manifest)
+	targetObject, err := components.GetObject(target, o.Config, o.Manifest, o.CRD)
 	if err != nil {
 		return nil, fmt.Errorf("transformation target: %w", err)
 	}

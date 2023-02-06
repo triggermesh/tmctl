@@ -60,10 +60,9 @@ func TestListEventTypes(t *testing.T) {
 		"foo-transformation.output",
 	}
 	c := &config.Config{
-		CRDPath:     test.CRD(),
 		Triggermesh: config.TmConfig{ComponentsVersion: version},
 	}
-	assert.Equal(t, expectedEventTypes, ListEventTypes(m, c))
+	assert.Equal(t, expectedEventTypes, ListEventTypes(m, c, test.CRD()))
 }
 
 func TestFilteredEventTypes(t *testing.T) {
@@ -77,7 +76,8 @@ func TestFilteredEventTypes(t *testing.T) {
 }
 
 func TestSpecFromCRD(t *testing.T) {
-	exists, arnOptions := SpecFromCRD("AWSS3Source", test.CRD(), "auth", "credentials")
+	s3crd := test.CRD()["awss3source"]
+	exists, arnOptions := SpecFromCRD(s3crd, "auth", "credentials")
 	credsStruct := map[string]crd.Property{
 		"accessKeyID": {
 			Required:    false,
@@ -93,11 +93,7 @@ func TestSpecFromCRD(t *testing.T) {
 	assert.True(t, exists)
 	assert.Equal(t, credsStruct, arnOptions)
 
-	exists, r := SpecFromCRD("AWSS3Source", test.CRD(), "nonexisting")
-	assert.False(t, exists)
-	assert.Equal(t, map[string]crd.Property{}, r)
-
-	exists, r = SpecFromCRD("AWSS4", test.CRD())
+	exists, r := SpecFromCRD(s3crd, "nonexisting")
 	assert.False(t, exists)
 	assert.Equal(t, map[string]crd.Property{}, r)
 }

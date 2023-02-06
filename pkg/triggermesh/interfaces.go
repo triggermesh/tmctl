@@ -33,6 +33,8 @@ type Component interface {
 	GetKind() string
 	GetAPIVersion() string
 	GetSpec() map[string]interface{}
+
+	SetSpec(map[string]interface{})
 }
 
 // Runnable is the interface for components that can run as Docker containers.

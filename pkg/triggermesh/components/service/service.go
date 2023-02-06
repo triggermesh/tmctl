@@ -179,6 +179,12 @@ func (s *Service) GetSpec() map[string]interface{} {
 	return spec
 }
 
+func (s *Service) SetSpec(spec map[string]interface{}) {
+	for k, v := range spec {
+		s.params[k] = v.(string)
+	}
+}
+
 func (s *Service) IsSource() bool {
 	return s.role == Producer
 }

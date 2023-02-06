@@ -53,10 +53,8 @@ func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
 					o.Config.ConfigHome,
 					o.Config.Context,
 					triggermesh.ManifestFile))
-				if err := o.Manifest.Read(); err != nil {
-					return err
-				}
 			}
+			cobra.CheckErr(o.Manifest.Read())
 			return o.stop()
 		},
 	}

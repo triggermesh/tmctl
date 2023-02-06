@@ -42,12 +42,8 @@ type Metadata struct {
 	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
-func CreateObject(resource, crdFile string, metadata Metadata, spec map[string]interface{}) (Object, error) {
-	crdObject, err := crd.GetResourceCRD(resource, crdFile)
-	if err != nil {
-		return Object{}, fmt.Errorf("CRD schema not found: %w", err)
-	}
-	schema, version, err := getObjectCRD(crdObject)
+func CreateObject(crd crd.CRD, metadata Metadata, spec map[string]interface{}) (Object, error) {
+	schema, version, err := getObjectCRD(crd)
 	if err != nil {
 		return Object{}, fmt.Errorf("object schema: %w", err)
 	}
@@ -58,19 +54,15 @@ func CreateObject(resource, crdFile string, metadata Metadata, spec map[string]i
 		return Object{}, fmt.Errorf("CR validation: %w", err)
 	}
 	return Object{
-		APIVersion: fmt.Sprintf("%s/%s", crdObject.Spec.Group, version),
-		Kind:       crdObject.Spec.Names.Kind,
+		APIVersion: fmt.Sprintf("%s/%s", crd.Spec.Group, version),
+		Kind:       crd.Spec.Names.Kind,
 		Metadata:   metadata,
 		Spec:       spec,
 	}, nil
 }
 
-func CreateUnstructured(resource, crdFile string, metadata Metadata, spec, status map[string]interface{}) (unstructured.Unstructured, error) {
-	crdObject, err := crd.GetResourceCRD(resource, crdFile)
-	if err != nil {
-		return unstructured.Unstructured{}, fmt.Errorf("CRD schema not found: %w", err)
-	}
-	schema, version, err := getObjectCRD(crdObject)
+func CreateUnstructured(crd crd.CRD, metadata Metadata, spec, status map[string]interface{}) (unstructured.Unstructured, error) {
+	schema, version, err := getObjectCRD(crd)
 	if err != nil {
 		return unstructured.Unstructured{}, fmt.Errorf("object schema: %w", err)
 	}
@@ -81,8 +73,8 @@ func CreateUnstructured(resource, crdFile string, metadata Metadata, spec, statu
 		return unstructured.Unstructured{}, fmt.Errorf("CR validation: %w", err)
 	}
 	u := unstructured.Unstructured{}
-	u.SetAPIVersion(fmt.Sprintf("%s/%s", crdObject.Spec.Group, version))
-	u.SetKind(crdObject.Spec.Names.Kind)
+	u.SetAPIVersion(fmt.Sprintf("%s/%s", crd.Spec.Group, version))
+	u.SetKind(crd.Spec.Names.Kind)
 	u.SetName(metadata.Name)
 	u.SetNamespace(metadata.Namespace)
 	u.SetLabels(metadata.Labels)
@@ -125,12 +117,8 @@ func getObjectCRD(crdObject crd.CRD) (*crd.Schema, string, error) {
 // ExtractSecrets looks up resource schema, extracts secret objects
 // if passed spec contains secret data and returns a map with base64 encoded values.
 // It does not validate the spec against the CRD.
-func ExtractSecrets(componentName, resource, crdFile string, spec map[string]interface{}) (map[string]string, error) {
-	crdObject, err := crd.GetResourceCRD(resource, crdFile)
-	if err != nil {
-		return nil, err
-	}
-	schema, _, err := getObjectCRD(crdObject)
+func ExtractSecrets(componentName string, c crd.CRD, spec map[string]interface{}) (map[string]string, error) {
+	schema, _, err := getObjectCRD(c)
 	if err != nil {
 		return nil, err
 	}

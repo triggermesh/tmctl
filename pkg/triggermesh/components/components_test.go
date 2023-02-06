@@ -34,11 +34,10 @@ func TestGetObject(t *testing.T) {
 	m := manifest.New(test.Manifest())
 	assert.NoError(t, m.Read())
 	c := &config.Config{
-		CRDPath:     test.CRD(),
 		Triggermesh: config.TmConfig{ComponentsVersion: version},
 	}
 	for _, object := range m.Objects {
-		component, err := GetObject(object.Metadata.Name, c, m)
+		component, err := GetObject(object.Metadata.Name, c, m, test.CRD())
 		assert.NoError(t, err)
 		if component == nil {
 			continue
@@ -72,7 +71,7 @@ func TestProcessSecrets(t *testing.T) {
 
 	for name, spec := range specs {
 		t.Run(name, func(t *testing.T) {
-			s := source.New("foo-awss3source", test.CRD(), "awss3source", "foo", version, spec, nil)
+			s := source.New("foo-awss3source", "awss3source", "foo", version, test.CRD()["awss3source"], spec, nil)
 			secrets, plainValues, err := ProcessSecrets(s.(triggermesh.Parent), m)
 			assert.NoError(t, err)
 

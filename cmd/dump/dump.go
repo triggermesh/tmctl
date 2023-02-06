@@ -35,6 +35,8 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const (
@@ -52,13 +54,17 @@ type doOptions struct {
 type CliOptions struct {
 	Config   *config.Config
 	Manifest *manifest.Manifest
+	CRD      map[string]crd.CRD
 
 	Format   string
 	Platform string
+
+	NoSecrets bool
 }
 
-func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
+func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD) *cobra.Command {
 	o := &CliOptions{
+		CRD:      crd,
 		Config:   config,
 		Manifest: m,
 	}
@@ -75,15 +81,14 @@ func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
 					o.Config.ConfigHome,
 					o.Config.Context,
 					triggermesh.ManifestFile))
-				if err := o.Manifest.Read(); err != nil {
-					return err
-				}
 			}
+			cobra.CheckErr(o.Manifest.Read())
 			return o.dump(do)
 		},
 	}
 
 	dumpCmd.Flags().StringVarP(&o.Platform, "platform", "p", "kubernetes", "Target platform. One of kubernetes, knative, docker-compose, digitalocean")
+	dumpCmd.Flags().BoolVar(&o.NoSecrets, "no-secrets", false, "Remove secret values from the manifest")
 	dumpCmd.Flags().StringVarP(&o.Format, "output", "o", "yaml", "Output format")
 
 	dumpCmd.Flags().StringVarP(&do.Region, "do-region", "r", "fra", "DigitalOcean region")
@@ -109,9 +114,17 @@ func (o *CliOptions) dump(do *doOptions) error {
 	var output interface{}
 	for _, object := range o.Manifest.Objects {
 		additionalEnv := make(map[string]string)
-		component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
+		component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest, o.CRD)
 		if err != nil {
 			continue
+		}
+		if o.NoSecrets && component.GetAPIVersion() == "v1" && component.GetKind() == "Secret" {
+			redactedData := make(map[string]string, len(component.GetSpec()))
+			for key := range component.GetSpec() {
+				redactedData[key] = triggermesh.UserInputTag
+			}
+			component = secret.New(component.GetName(), o.Config.Context, redactedData)
+			object, _ = component.AsK8sObject()
 		}
 		if reconcilable, ok := component.(triggermesh.Reconcilable); ok {
 			if container, ok := component.(triggermesh.Runnable); ok {
@@ -220,7 +233,7 @@ func (o *CliOptions) dump(do *doOptions) error {
 func (o *CliOptions) getStaticBrokerConfig() ([]byte, error) {
 	var staticBrokerConfig tmbroker.Configuration
 	for _, object := range o.Manifest.Objects {
-		component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
+		component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest, o.CRD)
 		if err != nil {
 			continue
 		}

@@ -36,15 +36,18 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 type CliOptions struct {
 	Config   *config.Config
 	Manifest *manifest.Manifest
+	CRD      map[string]crd.CRD
 }
 
-func NewCmd(config *config.Config, manifest *manifest.Manifest) *cobra.Command {
+func NewCmd(config *config.Config, manifest *manifest.Manifest, crd map[string]crd.CRD) *cobra.Command {
 	o := &CliOptions{
+		CRD:      crd,
 		Config:   config,
 		Manifest: manifest,
 	}
@@ -62,6 +65,7 @@ tmctl delete --broker foo`,
 			if len(args) == 0 {
 				return fmt.Errorf("expected at least 1 component name, got 0")
 			}
+			cobra.CheckErr(o.Manifest.Read())
 			return o.deleteComponents(args, false)
 		},
 	}
@@ -196,7 +200,7 @@ func (o *CliOptions) cleanupSecrets(component string) {
 }
 
 func (o *CliOptions) removeExternalServices(ctx context.Context, object kubernetes.Object) error {
-	component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
+	component, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest, o.CRD)
 	if err != nil {
 		return err
 	}

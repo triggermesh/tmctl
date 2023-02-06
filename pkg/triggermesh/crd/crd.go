@@ -75,55 +75,50 @@ type EventTypes []struct {
 }
 
 // Fetch downloads the release version of TriggerMesh CRDs for specified version.
-func Fetch(configDir, version string) (string, error) {
+func Fetch(configDir, version string) (map[string]CRD, error) {
 	crdDir := filepath.Join(configDir, "crd", version)
 	crdFile := filepath.Join(crdDir, "crd.yaml")
 	if _, err := os.Stat(crdFile); err == nil {
-		return crdFile, nil
+		f, err := os.Open(crdFile)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		return Parse(f)
 	}
 	if err := os.MkdirAll(crdDir, os.ModePerm); err != nil {
-		return "", err
+		return nil, err
 	}
 	log.Printf("Fetching %s CRD", version)
 	out, err := os.Create(crdFile)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer out.Close()
 
 	resp, err := http.Get(strings.ReplaceAll(crdsURL, "$VERSION", version))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("CRD request failed: %s", resp.Status)
+		return nil, fmt.Errorf("CRD request failed: %s", resp.Status)
 	}
 	_, err = io.Copy(out, resp.Body)
-	return crdFile, err
-}
-
-func GetResourceCRD(resource, path string) (CRD, error) {
-	crds, err := readFile(path)
 	if err != nil {
-		return CRD{}, err
+		return nil, err
 	}
-	crd, ok := crds[strings.ToLower(resource)]
-	if !ok {
-		return CRD{}, fmt.Errorf("CRD for resource %q does not exist", resource)
-	}
-	return crd, nil
-}
-
-func readFile(path string) (map[string]CRD, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(crdFile)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
+	return Parse(f)
+}
 
+func Parse(reader io.ReadCloser) (map[string]CRD, error) {
 	var crds []CRD
-	decoder := yaml.NewDecoder(f)
+	decoder := yaml.NewDecoder(reader)
 	for {
 		c := new(CRD)
 		err := decoder.Decode(&c)
@@ -146,11 +141,11 @@ func readFile(path string) (map[string]CRD, error) {
 }
 
 // ListSources returns the list of resources of the "source" API group from CRD.
-func ListSources(crdFile string) ([]string, error) {
-	crds, err := readFile(crdFile)
-	if err != nil {
-		return []string{}, err
-	}
+func ListSources(crds map[string]CRD) ([]string, error) {
+	// crds, err := parse(crdReader)
+	// if err != nil {
+	// 	return []string{}, err
+	// }
 	var result []string
 	for k, crd := range crds {
 		if crd.Spec.Group == "sources.triggermesh.io" {
@@ -162,11 +157,11 @@ func ListSources(crdFile string) ([]string, error) {
 }
 
 // ListTargets returns the list of resources of the "target" API group from CRD.
-func ListTargets(crdFile string) ([]string, error) {
-	crds, err := readFile(crdFile)
-	if err != nil {
-		return []string{}, err
-	}
+func ListTargets(crds map[string]CRD) ([]string, error) {
+	// crds, err := parse(crdReader)
+	// if err != nil {
+	// 	return []string{}, err
+	// }
 	var result []string
 	for k, crd := range crds {
 		if crd.Spec.Group == "targets.triggermesh.io" {

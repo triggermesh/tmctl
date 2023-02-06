@@ -49,7 +49,7 @@ func (o *CliOptions) newSourceCmd() *cobra.Command {
 		// CompletionOptions:  cobra.CompletionOptions{DisableDescriptions: false},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 || args[0] == "--help" {
-				sources, err := crd.ListSources(o.Config.CRDPath)
+				sources, err := crd.ListSources(o.CRD)
 				if err != nil {
 					return fmt.Errorf("list sources: %w", err)
 				}
@@ -72,7 +72,8 @@ func (o *CliOptions) newSourceCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			o.Config.CRDPath = crd
+			// defer crd.Close()
+			o.CRD = crd
 
 			if _, readDisabled := params["disable-file-args"]; !readDisabled {
 				for key, value := range params {
@@ -96,7 +97,7 @@ func (o *CliOptions) newSourceCmd() *cobra.Command {
 
 func (o *CliOptions) source(name, kind string, params map[string]string) error {
 	ctx := context.Background()
-	broker, err := tmbroker.New(o.Config.Context, o.Manifest.Path, o.Config.Triggermesh.Broker)
+	broker, err := tmbroker.New(o.Config.Context, o.Config.Triggermesh.Broker)
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}
@@ -106,7 +107,11 @@ func (o *CliOptions) source(name, kind string, params map[string]string) error {
 	}
 	params["sink.uri"] = "http://host.docker.internal:" + port
 
-	s := source.New(name, o.Config.CRDPath, kind, o.Config.Context, o.Config.Triggermesh.ComponentsVersion, params, nil)
+	crd, exists := o.CRD[kind+"source"]
+	if !exists {
+		return fmt.Errorf("CRD for kind %q not found", kind)
+	}
+	s := source.New(name, kind, o.Config.Context, o.Config.Triggermesh.ComponentsVersion, crd, params, nil)
 
 	secrets, secretsEnv, err := components.ProcessSecrets(s.(triggermesh.Parent), o.Manifest)
 	if err != nil {
@@ -145,7 +150,7 @@ func (o *CliOptions) source(name, kind string, params map[string]string) error {
 
 func (o *CliOptions) sourceFromImage(name, image string, params map[string]string) error {
 	ctx := context.Background()
-	broker, err := tmbroker.New(o.Config.Context, o.Manifest.Path, o.Config.Triggermesh.Broker)
+	broker, err := tmbroker.New(o.Config.Context, o.Config.Triggermesh.Broker)
 	if err != nil {
 		return fmt.Errorf("broker object: %v", err)
 	}

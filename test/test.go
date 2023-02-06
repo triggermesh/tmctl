@@ -17,8 +17,11 @@ limitations under the License.
 package test
 
 import (
+	"os"
 	"path"
 	"runtime"
+
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 func Manifest() string {
@@ -26,9 +29,17 @@ func Manifest() string {
 	return path.Dir(filename) + "/fixtures/manifest.yaml"
 }
 
-func CRD() string {
+func CRD() map[string]crd.CRD {
 	_, filename, _, _ := runtime.Caller(0)
-	return path.Dir(filename) + "/fixtures/crd.yaml"
+	reader, err := os.Open(path.Dir(filename) + "/fixtures/crd.yaml")
+	if err != nil {
+		panic(err)
+	}
+	crds, err := crd.Parse(reader)
+	if err != nil {
+		panic(err)
+	}
+	return crds
 }
 
 func ConfigBase() string {

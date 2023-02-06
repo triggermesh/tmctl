@@ -36,6 +36,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/env"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/secret"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 )
 
@@ -48,8 +49,9 @@ var (
 )
 
 type Target struct {
-	Name    string
-	CRDFile string
+	Name string
+
+	CRD crd.CRD
 
 	Broker  string
 	Version string
@@ -59,11 +61,11 @@ type Target struct {
 }
 
 func (t *Target) asUnstructured() (unstructured.Unstructured, error) {
-	return kubernetes.CreateUnstructured(t.GetKind(), t.CRDFile, t.getMeta(), t.spec, nil)
+	return kubernetes.CreateUnstructured(t.CRD, t.getMeta(), t.spec, nil)
 }
 
 func (t *Target) AsK8sObject() (kubernetes.Object, error) {
-	return kubernetes.CreateObject(t.GetKind(), t.CRDFile, t.getMeta(), t.spec)
+	return kubernetes.CreateObject(t.CRD, t.getMeta(), t.spec)
 }
 
 func (t *Target) getMeta() kubernetes.Metadata {
@@ -196,6 +198,10 @@ func (t *Target) GetSpec() map[string]interface{} {
 	return t.spec
 }
 
+func (t *Target) SetSpec(spec map[string]interface{}) {
+	t.spec = spec
+}
+
 func (t *Target) GetPort(ctx context.Context) (string, error) {
 	container, err := t.Info(ctx)
 	if err != nil {
@@ -205,7 +211,7 @@ func (t *Target) GetPort(ctx context.Context) (string, error) {
 }
 
 func (t *Target) GetChildren() ([]triggermesh.Component, error) {
-	secrets, err := kubernetes.ExtractSecrets(t.Name, t.Kind, t.CRDFile, t.spec)
+	secrets, err := kubernetes.ExtractSecrets(t.Name, t.CRD, t.spec)
 	if err != nil {
 		return nil, fmt.Errorf("extracting secrets: %w", err)
 	}
@@ -278,7 +284,7 @@ func (t *Target) Logs(ctx context.Context, since time.Time, follow bool) (io.Rea
 	return container.Logs(ctx, client, since, follow)
 }
 
-func New(name, crdFile, kind, broker, version string, params interface{}) triggermesh.Component {
+func New(name, kind, broker, version string, crd crd.CRD, params interface{}) triggermesh.Component {
 	var spec map[string]interface{}
 	switch p := params.(type) {
 	case map[string]string:
@@ -302,7 +308,7 @@ func New(name, crdFile, kind, broker, version string, params interface{}) trigge
 
 	return &Target{
 		Name:    name,
-		CRDFile: crdFile,
+		CRD:     crd,
 		Broker:  broker,
 		Kind:    k,
 		Version: version,

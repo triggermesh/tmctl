@@ -37,6 +37,7 @@ import (
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const (
@@ -48,10 +49,12 @@ const (
 type CliOptions struct {
 	Config   *config.Config
 	Manifest *manifest.Manifest
+	CRD      map[string]crd.CRD
 }
 
-func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
+func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD) *cobra.Command {
 	o := &CliOptions{
+		CRD:      crd,
 		Config:   config,
 		Manifest: m,
 	}
@@ -70,16 +73,14 @@ func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
 					o.Config.ConfigHome,
 					o.Config.Context,
 					triggermesh.ManifestFile))
-				if err := o.Manifest.Read(); err != nil {
-					return err
-				}
 			}
-			return o.describe()
+			cobra.CheckErr(o.Manifest.Read())
+			return o.Describe()
 		},
 	}
 }
 
-func (o *CliOptions) describe() error {
+func (o *CliOptions) Describe() error {
 	broker := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
 	triggers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
 	producers := tabwriter.NewWriter(os.Stdout, 10, 5, 5, ' ', 0)
@@ -97,7 +98,7 @@ func (o *CliOptions) describe() error {
 	consumersPrint := false
 
 	for _, object := range o.Manifest.Objects {
-		c, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
+		c, err := components.GetObject(object.Metadata.Name, o.Config, o.Manifest, o.CRD)
 		if err != nil {
 			return fmt.Errorf("creating component interface: %w", err)
 		}

@@ -18,8 +18,11 @@ package triggermesh
 
 // TriggerMesh constant values used as default paths, configs, etc.
 const (
-	Namespace    = "local"
-	ManifestFile = "manifest.yaml"
+	Namespace        = "local"
+	ManifestFile     = "manifest.yaml"
+	BrokerConfigFile = "broker.conf"
+
+	UserInputTag = "<user_input>"
 
 	// objects meta
 	ContextLabel                = "triggermesh.io/context"

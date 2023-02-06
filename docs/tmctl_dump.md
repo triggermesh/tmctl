@@ -18,6 +18,7 @@ tmctl dump
   -i, --do-instance string   DigitalOcean instance size (default "professional-xs")
   -r, --do-region string     DigitalOcean region (default "fra")
   -h, --help                 help for dump
+      --no-secrets           Remove secret values from the manifest
   -o, --output string        Output format (default "yaml")
   -p, --platform string      Target platform. One of kubernetes, knative, docker-compose, digitalocean (default "kubernetes")
 ```
@@ -25,7 +26,7 @@ tmctl dump
 ### Options inherited from parent commands
 
 ```
-      --version string   TriggerMesh components version. (default "v1.23.0")
+      --version string   TriggerMesh components version. (default "v1.23.1")
 ```
 
 ### SEE ALSO

@@ -30,6 +30,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 const (
@@ -40,10 +41,12 @@ const (
 type CliOptions struct {
 	Config   *config.Config
 	Manifest *manifest.Manifest
+	CRD      map[string]crd.CRD
 }
 
-func NewCmd(config *config.Config, manifest *manifest.Manifest) *cobra.Command {
+func NewCmd(config *config.Config, manifest *manifest.Manifest, crd map[string]crd.CRD) *cobra.Command {
 	o := &CliOptions{
+		CRD:      crd,
 		Config:   config,
 		Manifest: manifest,
 	}
@@ -56,6 +59,7 @@ func NewCmd(config *config.Config, manifest *manifest.Manifest) *cobra.Command {
 			return []string{"--target", "--eventType"}, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cobra.CheckErr(o.Manifest.Read())
 			if target == "" {
 				target = o.Config.Context
 			}
@@ -76,7 +80,7 @@ func NewCmd(config *config.Config, manifest *manifest.Manifest) *cobra.Command {
 
 func (o *CliOptions) send(eventType, target, data string) error {
 	ctx := context.Background()
-	component, err := components.GetObject(target, o.Config, o.Manifest)
+	component, err := components.GetObject(target, o.Config, o.Manifest, o.CRD)
 	if err != nil {
 		return fmt.Errorf("destination target: %w", err)
 	}

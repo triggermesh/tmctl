@@ -30,21 +30,24 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 type CliOptions struct {
-	Restart bool
-
 	Config   *config.Config
 	Manifest *manifest.Manifest
+	CRD      map[string]crd.CRD
+
+	Restart bool
 }
 
-func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
+func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD) *cobra.Command {
 	o := &CliOptions{
+		CRD:      crd,
 		Config:   config,
 		Manifest: m,
 	}
-	createCmd := &cobra.Command{
+	startCmd := &cobra.Command{
 		Use:     "start [broker]",
 		Short:   "Starts TriggerMesh components",
 		Example: "tmctl start",
@@ -59,15 +62,13 @@ func NewCmd(config *config.Config, m *manifest.Manifest) *cobra.Command {
 					o.Config.ConfigHome,
 					o.Config.Context,
 					triggermesh.ManifestFile))
-				if err := o.Manifest.Read(); err != nil {
-					return err
-				}
 			}
+			cobra.CheckErr(o.Manifest.Read())
 			return o.start()
 		},
 	}
-	createCmd.Flags().BoolVar(&o.Restart, "restart", false, "Restart components")
-	return createCmd
+	startCmd.Flags().BoolVar(&o.Restart, "restart", false, "Restart components")
+	return startCmd
 }
 
 func (o *CliOptions) start() error {
@@ -76,7 +77,7 @@ func (o *CliOptions) start() error {
 	// start eventing first
 	for _, object := range o.Manifest.Objects {
 		if object.Kind == tmbroker.BrokerKind {
-			b, err := tmbroker.New(object.Metadata.Name, o.Manifest.Path, o.Config.Triggermesh.Broker)
+			b, err := tmbroker.New(object.Metadata.Name, o.Config.Triggermesh.Broker)
 			if err != nil {
 				return fmt.Errorf("creating broker object: %w", err)
 			}
@@ -93,7 +94,7 @@ func (o *CliOptions) start() error {
 		if object.APIVersion == tmbroker.APIVersion {
 			continue
 		}
-		c, _ := components.GetObject(object.Metadata.Name, o.Config, o.Manifest)
+		c, _ := components.GetObject(object.Metadata.Name, o.Config, o.Manifest, o.CRD)
 		if c == nil {
 			continue
 		}

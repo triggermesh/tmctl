@@ -1,21 +1,22 @@
-## tmctl stop
+## tmctl import
 
-Stops TriggerMesh components, removes docker containers
+Import TriggerMesh manifest
 
 ```
-tmctl stop [broker] [flags]
+tmctl import -f <path/to/manifest.yaml>/<manifest URL> [flags]
 ```
 
 ### Examples
 
 ```
-tmctl stop
+tmctl import -f manifest.yaml
 ```
 
 ### Options
 
 ```
-  -h, --help   help for stop
+  -f, --from string   Import manifest from
+  -h, --help          help for import
 ```
 
 ### Options inherited from parent commands
