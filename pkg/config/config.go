@@ -47,6 +47,9 @@ const (
 	defaultProduceTimeout   = "1s"
 	// Broker config polling period. On Windows only.
 	defaultConfigPollingPeriod = "PT2S"
+
+	// TriggerMesh DockerHub Registry
+	DockerRegistry = "triggermesh"
 )
 
 type Config struct {

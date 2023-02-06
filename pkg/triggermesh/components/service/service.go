@@ -29,6 +29,7 @@ import (
 
 	"github.com/digitalocean/godo"
 
+	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
@@ -126,10 +127,8 @@ func (s *Service) AsDigitalOceanObject(additionalEnvs map[string]string) (interf
 	return godo.AppServiceSpec{
 		Name: s.Name,
 		Image: &godo.ImageSourceSpec{
-			DeployOnPush: &godo.ImageSourceSpecDeployOnPush{
-				Enabled: true,
-			},
-			RegistryType: godo.ImageSourceSpecRegistryType_DOCR,
+			RegistryType: godo.ImageSourceSpecRegistryType_DockerHub,
+			Registry:     config.DockerRegistry,
 			Repository:   image[0],
 			Tag:          image[1],
 		},
