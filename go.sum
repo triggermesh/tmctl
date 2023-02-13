@@ -1004,8 +1004,8 @@ github.com/triggermesh/brokers v1.1.0 h1:vvx85dwjM/d77IN/ZtxRd9Gw+YdZ3kzIeddPJU2
 github.com/triggermesh/brokers v1.1.0/go.mod h1:iJs5x6BTv6YdRXc75X0t81PB5CtpIN7hLAEX8fmFVbY=
 github.com/triggermesh/triggermesh v1.23.2 h1:XcAmdoO5DFGUV4jY93xgakRIgs4+5ikpsEH/LjwXEwI=
 github.com/triggermesh/triggermesh v1.23.2/go.mod h1:I4Tk6+tOzHRJ+eWa90PYQeNM9myyTG0g73lK3VBvCv4=
-github.com/triggermesh/triggermesh-core v1.0.0 h1:87ZfIj6ms/ahdl4Eq4q6qKJG2aRPvSyclA5SURwHE0A=
-github.com/triggermesh/triggermesh-core v1.0.0/go.mod h1:TV9g+gg6P11x3B7/UfhxfSHD9yWv2JJO20fHa675cMo=
+github.com/triggermesh/triggermesh-core v1.1.0 h1:4N/Bgd3OqQ0m2L2N00L0J1dTlSxN/rg59WKkhe/oeD8=
+github.com/triggermesh/triggermesh-core v1.1.0/go.mod h1:f4HsTXKfUFFwkaCVxBSjm+WghwdSTX6Xc2BZMQNjGrQ=
 github.com/tsenart/go-tsz v0.0.0-20180814232043-cdeb9e1e981e/go.mod h1:SWZznP1z5Ki7hDT2ioqiFKEse8K9tU2OUvaRI0NeGQo=
 github.com/tsenart/vegeta/v12 v12.8.4/go.mod h1:ZiJtwLn/9M4fTPdMY7bdbIeyNeFVE8/AHbWFqCsUuho=
 github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=
