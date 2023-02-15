@@ -163,24 +163,20 @@ func decodeSecrets(secrets []triggermesh.Component) (map[string]string, error) {
 }
 
 func parseTriggerSpec(spec map[string]interface{}) (string, *eventingbroker.Filter, error) {
-	filter, err := yaml.Marshal(spec["filters"])
+	triggerSpec, err := yaml.Marshal(spec)
 	if err != nil {
 		return "", nil, err
 	}
-	var f []eventingbroker.Filter
-	if err := yaml.Unmarshal(filter, &f); err != nil {
+	t := struct {
+		Filters []eventingbroker.Filter `yaml:"filters,omitempty"`
+		Target  duckv1.Destination      `yaml:"target"`
+	}{}
+	if err := yaml.Unmarshal(triggerSpec, &t); err != nil {
 		return "", nil, err
 	}
-	if l := len(f); l != 1 {
-		return "", nil, fmt.Errorf("expected 1 filter condition, got %d", l)
+	var filter *eventingbroker.Filter
+	if len(t.Filters) == 1 {
+		filter = &t.Filters[0]
 	}
-	target, err := yaml.Marshal(spec["target"])
-	if err != nil {
-		return "", nil, err
-	}
-	var t duckv1.Destination
-	if err := yaml.Unmarshal(target, &t); err != nil {
-		return "", nil, err
-	}
-	return t.Ref.Name, &f[0], nil
+	return t.Target.Ref.Name, filter, nil
 }
