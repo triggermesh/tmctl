@@ -2,7 +2,6 @@
 set -e
 
 PKG_NAME=tmctl
-PKG_VERSION=
 GITHUB_URL=https://github.com/triggermesh/tmctl
 
 PLATFORM=
