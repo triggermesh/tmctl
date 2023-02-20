@@ -16,13 +16,13 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.1
-	github.com/triggermesh/brokers v1.1.0
+	github.com/triggermesh/brokers v1.1.1
 	github.com/triggermesh/triggermesh v1.23.2
 	github.com/triggermesh/triggermesh-core v1.1.0
 	google.golang.org/api v0.108.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.26.0
-	k8s.io/apimachinery v0.26.0
+	k8s.io/api v0.26.1
+	k8s.io/apimachinery v0.26.1
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
 	knative.dev/pkg v0.0.0-20221011175852-714b7630a836
 	sigs.k8s.io/yaml v1.3.0
@@ -57,7 +57,7 @@ require (
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/cloudevents/sdk-go/observability/opencensus/v2 v2.12.0 // indirect
+	github.com/cloudevents/sdk-go/observability/opencensus/v2 v2.13.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/digitalocean/godo v1.97.0
