@@ -150,6 +150,11 @@ func (o *CliOptions) target(name, kind string, args map[string]string, eventSour
 		return err
 	}
 
+	if metricsPort, err := t.(triggermesh.Monitorable).MetricsPort(ctx); err == nil {
+		if err := o.Monitoring.AddTarget(t.GetName(), metricsPort, o.Config.Context); err != nil {
+			return err
+		}
+	}
 	// update our triggers in case of target container restart
 	if restart || secretsChanged {
 		if err := o.updateTriggers(t); err != nil {

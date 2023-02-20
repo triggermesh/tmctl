@@ -30,10 +30,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/adapter/reconciler"
 )
 
-const (
-	registry    = "gcr.io/triggermesh"
-	adapterPort = "8080/tcp"
-)
+const registry = "gcr.io/triggermesh"
 
 func Image(object unstructured.Unstructured, version string) string {
 	// components with custom images
@@ -54,14 +51,15 @@ func Image(object unstructured.Unstructured, version string) string {
 	return fmt.Sprintf("%s/%s-adapter:%s", registry, strings.ToLower(object.GetKind()), version)
 }
 
-func RuntimeParams(object unstructured.Unstructured, image string, additionalEnvs map[string]string) ([]docker.ContainerOption, []docker.HostOption, error) {
+func RuntimeParams(object unstructured.Unstructured, image string, additionalEnvs map[string]string, ports ...string) ([]docker.ContainerOption, []docker.HostOption, error) {
 	co := []docker.ContainerOption{
 		docker.WithImage(image),
-		docker.WithPort(adapterPort),
+		docker.WithPort(ports...),
 		// docker.WithErrorLoggingLevel(),
+		docker.WithMetricsConfig(object.GetKind()),
 	}
 	ho := []docker.HostOption{
-		docker.WithHostPortBinding(adapterPort),
+		docker.WithHostPortBinding(ports...),
 		docker.WithExtraHost(),
 	}
 

@@ -144,6 +144,13 @@ func (o *CliOptions) source(name, kind string, params map[string]string) error {
 	if _, err := s.(triggermesh.Runnable).Start(ctx, secretsEnv, (restart || secretsChanged)); err != nil {
 		return err
 	}
+
+	if metricsPort, err := s.(triggermesh.Monitorable).MetricsPort(ctx); err == nil {
+		if err := o.Monitoring.AddTarget(s.GetName(), metricsPort, o.Config.Context); err != nil {
+			return err
+		}
+	}
+
 	output.PrintStatus("producer", s, []string{}, []string{})
 	return nil
 }

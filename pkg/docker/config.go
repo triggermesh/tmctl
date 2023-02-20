@@ -17,7 +17,9 @@ limitations under the License.
 package docker
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -25,7 +27,10 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 )
 
-const errorLoggingLevel = `K_LOGGING_CONFIG={"zap-logger-config":"{\"level\": \"error\"}"}`
+const (
+	envErrorLoggingLevel = `K_LOGGING_CONFIG={"zap-logger-config":"{\"level\": \"error\"}"}`
+	envMetricsPort       = "METRICS_PROMETHEUS_PORT=9092"
+)
 
 type ContainerOption func(*container.Config)
 type HostOption func(*container.HostConfig)
@@ -42,12 +47,12 @@ func WithEnv(env []string) ContainerOption {
 	}
 }
 
-func WithPort(port nat.Port) ContainerOption {
-	return func(cc *container.Config) {
-		cc.ExposedPorts = nat.PortSet{
-			port: struct{}{},
-		}
+func WithPort(ports ...string) ContainerOption {
+	portSet := make(nat.PortSet)
+	for _, port := range ports {
+		portSet[nat.Port(port)] = struct{}{}
 	}
+	return func(cc *container.Config) { cc.ExposedPorts = portSet }
 }
 
 func WithEntrypoint(entrypoint []string) ContainerOption {
@@ -56,23 +61,29 @@ func WithEntrypoint(entrypoint []string) ContainerOption {
 	}
 }
 
-func WithVolumeBind(bind string) HostOption {
-	return func(hc *container.HostConfig) {
-		hc.Binds = []string{bind}
+func WithCmd(cmd []string) ContainerOption {
+	return func(cc *container.Config) {
+		cc.Cmd = cmd
 	}
 }
 
-func WithHostPortBinding(containerPort nat.Port) HostOption {
+func WithVolumeBind(bind string) HostOption {
 	return func(hc *container.HostConfig) {
-		hc.PortBindings = nat.PortMap{
-			containerPort: []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: strconv.Itoa(pkg.OpenPort()),
-				},
+		hc.Binds = append(hc.Binds, bind)
+	}
+}
+
+func WithHostPortBinding(containerPorts ...string) HostOption {
+	ports := make(nat.PortMap)
+	for _, containerPort := range containerPorts {
+		ports[nat.Port(containerPort)] = []nat.PortBinding{
+			{
+				HostIP:   "0.0.0.0",
+				HostPort: strconv.Itoa(pkg.OpenPort()),
 			},
 		}
 	}
+	return func(hc *container.HostConfig) { hc.PortBindings = ports }
 }
 
 func WithExtraHost() HostOption {
@@ -83,6 +94,14 @@ func WithExtraHost() HostOption {
 
 func WithErrorLoggingLevel() ContainerOption {
 	return func(cc *container.Config) {
-		cc.Env = append(cc.Env, errorLoggingLevel)
+		cc.Env = append(cc.Env, envErrorLoggingLevel)
+	}
+}
+
+func WithMetricsConfig(component string) ContainerOption {
+	metricsEnv := fmt.Sprintf("K_METRICS_CONFIG={\"Domain\":\"triggermesh.io\",\"Component\":\"%s\",\"PrometheusPort\":0,\"PrometheusHost\":\"\",\"ConfigMap\":{\"metrics.backend-destination\":\"prometheus\"}}",
+		strings.ToLower(component))
+	return func(cc *container.Config) {
+		cc.Env = append(cc.Env, []string{metricsEnv, envMetricsPort}...)
 	}
 }

@@ -234,8 +234,11 @@ func (c *Container) LookupHostConfig(ctx context.Context, client *client.Client)
 	return c, nil
 }
 
-func (c *Container) HostPort() string {
-	for _, bindings := range c.runtimeHostConfig.PortBindings {
+func (c *Container) HostPort(containerPort string) string {
+	for port, bindings := range c.runtimeHostConfig.PortBindings {
+		if port.Port() != containerPort {
+			continue
+		}
 		for _, binding := range bindings {
 			return binding.HostPort
 		}

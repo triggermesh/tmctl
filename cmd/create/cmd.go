@@ -25,22 +25,25 @@ import (
 	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/monitoring"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
 type CliOptions struct {
-	Config   *config.Config
-	Manifest *manifest.Manifest
-	CRD      map[string]crd.CRD
+	Config     *config.Config
+	Manifest   *manifest.Manifest
+	CRD        map[string]crd.CRD
+	Monitoring *monitoring.Configuration
 }
 
-func NewCmd(config *config.Config, manifest *manifest.Manifest, crds map[string]crd.CRD) *cobra.Command {
+func NewCmd(config *config.Config, manifest *manifest.Manifest, crds map[string]crd.CRD, prom *monitoring.Configuration) *cobra.Command {
 	o := &CliOptions{
-		CRD:      crds,
-		Config:   config,
-		Manifest: manifest,
+		CRD:        crds,
+		Config:     config,
+		Manifest:   manifest,
+		Monitoring: prom,
 	}
 	createCmd := &cobra.Command{
 		Use:   "create <kind>",

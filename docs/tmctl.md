@@ -25,6 +25,7 @@ Find more information at: https://docs.triggermesh.io
 * [tmctl dump](tmctl_dump.md)	 - Generate TriggerMesh manifests
 * [tmctl import](tmctl_import.md)	 - Import TriggerMesh manifest
 * [tmctl logs](tmctl_logs.md)	 - Display components logs
+* [tmctl monitor](tmctl_monitor.md)	 - Monitor TriggerMesh components
 * [tmctl send-event](tmctl_send-event.md)	 - Send CloudEvent to the target
 * [tmctl start](tmctl_start.md)	 - Starts TriggerMesh components
 * [tmctl stop](tmctl_stop.md)	 - Stops TriggerMesh components, removes docker containers

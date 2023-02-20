@@ -31,6 +31,7 @@ import (
 	"github.com/triggermesh/tmctl/cmd/dump"
 	import_ "github.com/triggermesh/tmctl/cmd/import"
 	"github.com/triggermesh/tmctl/cmd/logs"
+	"github.com/triggermesh/tmctl/cmd/monitor"
 	"github.com/triggermesh/tmctl/cmd/sendevent"
 	"github.com/triggermesh/tmctl/cmd/start"
 	"github.com/triggermesh/tmctl/cmd/stop"
@@ -40,6 +41,7 @@ import (
 	cliconfig "github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/monitoring"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
@@ -59,6 +61,10 @@ Find more information at: https://docs.triggermesh.io`,
 	crds, err := crd.Fetch(c.ConfigHome, c.Triggermesh.ComponentsVersion)
 	cobra.CheckErr(err)
 
+	prom, err := monitoring.NewConfiguration(filepath.Join(c.ConfigHome, "prometheus.yaml"))
+	cobra.CheckErr(err)
+	cobra.CheckErr(prom.Read())
+
 	manifest := manifest.New(filepath.Join(
 		c.ConfigHome,
 		c.Context,
@@ -66,15 +72,16 @@ Find more information at: https://docs.triggermesh.io`,
 	_ = manifest.Read()
 
 	rootCmd.AddCommand(brokers.NewCmd(c))
-	rootCmd.AddCommand(create.NewCmd(c, manifest, crds))
+	rootCmd.AddCommand(create.NewCmd(c, manifest, crds, prom))
 	rootCmd.AddCommand(config.NewCmd())
-	rootCmd.AddCommand(delete.NewCmd(c, manifest, crds))
+	rootCmd.AddCommand(delete.NewCmd(c, manifest, crds, prom))
 	rootCmd.AddCommand(describe.NewCmd(c, manifest, crds))
 	rootCmd.AddCommand(dump.NewCmd(c, manifest, crds))
 	rootCmd.AddCommand(import_.NewCmd(c, crds))
 	rootCmd.AddCommand(logs.NewCmd(c, manifest, crds))
+	rootCmd.AddCommand(monitor.NewCmd(c, prom))
 	rootCmd.AddCommand(sendevent.NewCmd(c, manifest, crds))
-	rootCmd.AddCommand(start.NewCmd(c, manifest, crds))
+	rootCmd.AddCommand(start.NewCmd(c, manifest, crds, prom))
 	rootCmd.AddCommand(stop.NewCmd(c, manifest))
 	rootCmd.AddCommand(watch.NewCmd(c))
 	rootCmd.AddCommand(version.NewCmd(ver, commit, c))

@@ -28,7 +28,10 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require github.com/google/go-querystring v1.1.0 // indirect
+require (
+	github.com/google/go-querystring v1.1.0 // indirect
+	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
+)
 
 replace k8s.io/client-go => k8s.io/client-go v0.25.3
 

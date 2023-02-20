@@ -40,11 +40,12 @@ import (
 )
 
 var (
-	_ triggermesh.Component  = (*Transformation)(nil)
-	_ triggermesh.Consumer   = (*Transformation)(nil)
-	_ triggermesh.Producer   = (*Transformation)(nil)
-	_ triggermesh.Runnable   = (*Transformation)(nil)
-	_ triggermesh.Exportable = (*Transformation)(nil)
+	_ triggermesh.Component   = (*Transformation)(nil)
+	_ triggermesh.Consumer    = (*Transformation)(nil)
+	_ triggermesh.Producer    = (*Transformation)(nil)
+	_ triggermesh.Runnable    = (*Transformation)(nil)
+	_ triggermesh.Exportable  = (*Transformation)(nil)
+	_ triggermesh.Monitorable = (*Transformation)(nil)
 )
 
 type Transformation struct {
@@ -162,7 +163,7 @@ func (t *Transformation) asContainer(additionalEnvs map[string]string) (*docker.
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
 	image := adapter.Image(o, t.Version)
-	co, ho, err := adapter.RuntimeParams(o, image, additionalEnvs)
+	co, ho, err := adapter.RuntimeParams(o, image, additionalEnvs, triggermesh.AdapterPort, triggermesh.MetricsPort)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
@@ -244,7 +245,7 @@ func (t *Transformation) GetPort(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("container object: %w", err)
 	}
-	return container.HostPort(), nil
+	return container.HostPort("8080"), nil
 }
 
 func (t *Transformation) Start(ctx context.Context, additionalEnvs map[string]string, restart bool) (*docker.Container, error) {
@@ -298,20 +299,6 @@ func (t *Transformation) Logs(ctx context.Context, since time.Time, follow bool)
 	return container.Logs(ctx, client, since, follow)
 }
 
-func New(name, kind, broker, version string, crd crd.CRD, spec map[string]interface{}) triggermesh.Component {
-	if name == "" {
-		name = fmt.Sprintf("%s-transformation", broker)
-	}
-	return &Transformation{
-		Name:    name,
-		CRD:     crd,
-		Broker:  broker,
-		Version: version,
-
-		spec: spec,
-	}
-}
-
 // getContextTransformationValue return the value of "Add" transformation
 // applied on context attributes. Does not support complex tramsformations.
 func (t *Transformation) getContextTransformationValue(key string) []string {
@@ -335,4 +322,26 @@ func (t *Transformation) getContextTransformationValue(key string) []string {
 		}
 	}
 	return []string{}
+}
+
+func (t *Transformation) MetricsPort(ctx context.Context) (string, error) {
+	container, err := t.Info(ctx)
+	if err != nil {
+		return "", fmt.Errorf("container object: %w", err)
+	}
+	return container.HostPort("9092"), nil
+}
+
+func New(name, kind, broker, version string, crd crd.CRD, spec map[string]interface{}) triggermesh.Component {
+	if name == "" {
+		name = fmt.Sprintf("%s-transformation", broker)
+	}
+	return &Transformation{
+		Name:    name,
+		CRD:     crd,
+		Broker:  broker,
+		Version: version,
+
+		spec: spec,
+	}
 }

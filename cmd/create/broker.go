@@ -85,6 +85,12 @@ func (o *CliOptions) broker(name, version string) error {
 		return err
 	}
 
+	if metricsPort, err := broker.(triggermesh.Monitorable).MetricsPort(ctx); err == nil {
+		if err := o.Monitoring.AddTarget(name+"_broker", metricsPort, name); err != nil {
+			return err
+		}
+	}
+
 	output.PrintStatus("broker", broker, []string{}, []string{})
 	return nil
 }

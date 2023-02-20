@@ -74,7 +74,13 @@ type Reconcilable interface {
 	GetExternalResources() map[string]interface{}
 }
 
+// Exportable components are the components that can be exported to platforms
+// other than Docker and K8s.
 type Exportable interface {
 	AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error)
 	AsDigitalOceanObject(additionalEnvs map[string]string) (interface{}, error)
+}
+
+type Monitorable interface {
+	MetricsPort(context.Context) (string, error)
 }

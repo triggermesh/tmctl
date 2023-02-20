@@ -139,7 +139,7 @@ func (s *Service) AsDigitalOceanObject(additionalEnvs map[string]string) (interf
 	}, nil
 }
 
-func (s *Service) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {
+func (s *Service) AsContainer(additionalEnvs map[string]string) (*docker.Container, error) {
 	u, err := s.asUnstructured()
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
@@ -147,7 +147,7 @@ func (s *Service) asContainer(additionalEnvs map[string]string) (*docker.Contain
 	for k, v := range additionalEnvs {
 		s.params[k] = v
 	}
-	co, ho, err := adapter.RuntimeParams(u, s.Image, s.params)
+	co, ho, err := adapter.RuntimeParams(u, s.Image, s.params, triggermesh.AdapterPort)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
@@ -198,7 +198,7 @@ func (s *Service) GetPort(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("container object: %w", err)
 	}
-	return container.HostPort(), nil
+	return container.HostPort("8080"), nil
 }
 
 func (s *Service) GetEventTypes() ([]string, error) {
@@ -228,7 +228,7 @@ func (s *Service) Start(ctx context.Context, additionalEnvs map[string]string, r
 	if err != nil {
 		return nil, fmt.Errorf("docker client: %w", err)
 	}
-	container, err := s.asContainer(additionalEnvs)
+	container, err := s.AsContainer(additionalEnvs)
 	if err != nil {
 		return nil, fmt.Errorf("container object: %w", err)
 	}
@@ -240,7 +240,7 @@ func (s *Service) Stop(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("docker client: %w", err)
 	}
-	container, err := s.asContainer(nil)
+	container, err := s.AsContainer(nil)
 	if err != nil {
 		return fmt.Errorf("container object: %w", err)
 	}
@@ -252,7 +252,7 @@ func (s *Service) Info(ctx context.Context) (*docker.Container, error) {
 	if err != nil {
 		return nil, fmt.Errorf("docker client: %w", err)
 	}
-	container, err := s.asContainer(nil)
+	container, err := s.AsContainer(nil)
 	if err != nil {
 		return nil, fmt.Errorf("container object: %w", err)
 	}
@@ -264,7 +264,7 @@ func (s *Service) Logs(ctx context.Context, since time.Time, follow bool) (io.Re
 	if err != nil {
 		return nil, fmt.Errorf("docker client: %w", err)
 	}
-	container, err := s.asContainer(nil)
+	container, err := s.AsContainer(nil)
 	if err != nil {
 		return nil, fmt.Errorf("container object: %w", err)
 	}

@@ -33,6 +33,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/monitoring"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
@@ -40,16 +41,18 @@ import (
 )
 
 type CliOptions struct {
-	Config   *config.Config
-	Manifest *manifest.Manifest
-	CRD      map[string]crd.CRD
+	Config     *config.Config
+	Manifest   *manifest.Manifest
+	CRD        map[string]crd.CRD
+	Monitoring *monitoring.Configuration
 }
 
-func NewCmd(config *config.Config, manifest *manifest.Manifest, crd map[string]crd.CRD) *cobra.Command {
+func NewCmd(config *config.Config, manifest *manifest.Manifest, crd map[string]crd.CRD, prom *monitoring.Configuration) *cobra.Command {
 	o := &CliOptions{
-		CRD:      crd,
-		Config:   config,
-		Manifest: manifest,
+		CRD:        crd,
+		Config:     config,
+		Manifest:   manifest,
+		Monitoring: prom,
 	}
 	var broker string
 	deleteCmd := &cobra.Command{
@@ -146,6 +149,7 @@ func (o *CliOptions) deleteEverything(ctx context.Context, object kubernetes.Obj
 	o.removeObject(object.Metadata.Name)
 	o.cleanupTriggers(object.Metadata.Name)
 	o.cleanupSecrets(object.Metadata.Name)
+	o.deleteMonitoring(object.Metadata.Name)
 }
 
 func (o *CliOptions) removeObject(component string) {
@@ -239,4 +243,8 @@ func (o *CliOptions) deleteCompletion(cmd *cobra.Command, args []string, _ strin
 			cobra.ShellCompDirectiveNoFileComp
 	}
 	return nil, cobra.ShellCompDirectiveNoFileComp
+}
+
+func (o *CliOptions) deleteMonitoring(name string) {
+	o.Monitoring.DeleteTarget(name)
 }

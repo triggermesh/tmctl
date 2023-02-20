@@ -47,7 +47,7 @@ func TestWithPort(t *testing.T) {
 		port: struct{}{},
 	}
 	cc := &container.Config{}
-	WithPort(port)(cc)
+	WithPort(string(port))(cc)
 	assert.Equal(t, portSet, cc.ExposedPorts)
 }
 
@@ -69,7 +69,7 @@ func TestWithHostPortBinding(t *testing.T) {
 	port, err := nat.NewPort("TCP", "8080")
 	assert.NoError(t, err)
 	hc := &container.HostConfig{}
-	WithHostPortBinding(port)(hc)
+	WithHostPortBinding(string(port))(hc)
 	assert.Len(t, hc.PortBindings[port], 1)
 	assert.Equal(t, "0.0.0.0", hc.PortBindings[port][0].HostIP)
 }
@@ -84,5 +84,5 @@ func TestWithExtraHost(t *testing.T) {
 func TestWithErrorLoggingLevel(t *testing.T) {
 	cc := &container.Config{}
 	WithErrorLoggingLevel()(cc)
-	assert.Contains(t, cc.Env, errorLoggingLevel)
+	assert.Contains(t, cc.Env, envErrorLoggingLevel)
 }

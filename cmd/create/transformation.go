@@ -171,6 +171,11 @@ func (o *CliOptions) transformation(name, target, file string, eventSourcesFilte
 		return err
 	}
 
+	if metricsPort, err := t.(triggermesh.Monitorable).MetricsPort(ctx); err == nil {
+		if err := o.Monitoring.AddTarget(t.GetName(), metricsPort, o.Config.Context); err != nil {
+			return err
+		}
+	}
 	// update our triggers in case of target container restart
 	if restart {
 		if err := o.updateTriggers(t); err != nil {

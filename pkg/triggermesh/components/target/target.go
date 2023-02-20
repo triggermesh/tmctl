@@ -41,11 +41,12 @@ import (
 )
 
 var (
-	_ triggermesh.Component  = (*Target)(nil)
-	_ triggermesh.Consumer   = (*Target)(nil)
-	_ triggermesh.Runnable   = (*Target)(nil)
-	_ triggermesh.Parent     = (*Target)(nil)
-	_ triggermesh.Exportable = (*Target)(nil)
+	_ triggermesh.Component   = (*Target)(nil)
+	_ triggermesh.Consumer    = (*Target)(nil)
+	_ triggermesh.Runnable    = (*Target)(nil)
+	_ triggermesh.Parent      = (*Target)(nil)
+	_ triggermesh.Exportable  = (*Target)(nil)
+	_ triggermesh.Monitorable = (*Target)(nil)
 )
 
 type Target struct {
@@ -166,7 +167,7 @@ func (t *Target) asContainer(additionalEnvs map[string]string) (*docker.Containe
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
 	image := adapter.Image(o, t.Version)
-	co, ho, err := adapter.RuntimeParams(o, image, additionalEnvs)
+	co, ho, err := adapter.RuntimeParams(o, image, additionalEnvs, triggermesh.AdapterPort, triggermesh.MetricsPort)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
@@ -207,7 +208,7 @@ func (t *Target) GetPort(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("container object: %w", err)
 	}
-	return container.HostPort(), nil
+	return container.HostPort("8080"), nil
 }
 
 func (t *Target) GetChildren() ([]triggermesh.Component, error) {
@@ -282,6 +283,14 @@ func (t *Target) Logs(ctx context.Context, since time.Time, follow bool) (io.Rea
 		return nil, fmt.Errorf("container config: %w", err)
 	}
 	return container.Logs(ctx, client, since, follow)
+}
+
+func (t *Target) MetricsPort(ctx context.Context) (string, error) {
+	container, err := t.Info(ctx)
+	if err != nil {
+		return "", fmt.Errorf("container object: %w", err)
+	}
+	return container.HostPort("9092"), nil
 }
 
 func New(name, kind, broker, version string, crd crd.CRD, params interface{}) triggermesh.Component {

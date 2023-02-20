@@ -78,7 +78,7 @@ func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("starting container: %w", err)
 	}
-	w.Destination = fmt.Sprintf("http://host.docker.internal:%s", c.HostPort())
+	w.Destination = fmt.Sprintf("http://host.docker.internal:%s", c.HostPort("8080"))
 	return c.Logs(ctx, w.client, time.Now().Add(2*time.Second), true)
 }
 

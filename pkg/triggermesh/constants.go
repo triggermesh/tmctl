@@ -27,4 +27,8 @@ const (
 	// objects meta
 	ContextLabel                = "triggermesh.io/context"
 	ExternalResourcesAnnotation = "triggermesh.io/external-resources"
+
+	// adapter params
+	AdapterPort = "8080/tcp"
+	MetricsPort = "9092/tcp"
 )

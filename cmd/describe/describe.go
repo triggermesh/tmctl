@@ -196,7 +196,7 @@ func status(component triggermesh.Component) string {
 		if err != nil || !c.Online {
 			return offlineStatus
 		}
-		return fmt.Sprintf("%sonline(http://localhost:%s)%s", successColorCode, c.HostPort(), defaultColorCode)
+		return fmt.Sprintf("%sonline(http://localhost:%s)%s", successColorCode, c.HostPort("8080"), defaultColorCode)
 	}
 	return offlineStatus
 }

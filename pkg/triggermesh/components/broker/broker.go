@@ -38,10 +38,11 @@ import (
 )
 
 var (
-	_ triggermesh.Component  = (*Broker)(nil)
-	_ triggermesh.Runnable   = (*Broker)(nil)
-	_ triggermesh.Consumer   = (*Broker)(nil)
-	_ triggermesh.Exportable = (*Broker)(nil)
+	_ triggermesh.Component   = (*Broker)(nil)
+	_ triggermesh.Runnable    = (*Broker)(nil)
+	_ triggermesh.Consumer    = (*Broker)(nil)
+	_ triggermesh.Exportable  = (*Broker)(nil)
+	_ triggermesh.Monitorable = (*Broker)(nil)
 )
 
 const (
@@ -128,7 +129,7 @@ func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Containe
 	if err != nil {
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
-	co, ho, err := adapter.RuntimeParams(o, b.image, additionalEnvs)
+	co, ho, err := adapter.RuntimeParams(o, b.image, additionalEnvs, triggermesh.AdapterPort, triggermesh.MetricsPort)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
@@ -176,7 +177,7 @@ func (b *Broker) GetPort(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("container object: %w", err)
 	}
-	return container.HostPort(), nil
+	return container.HostPort("8080"), nil
 }
 
 func (b *Broker) ConsumedEventTypes() ([]string, error) {
@@ -260,13 +261,12 @@ func CreateBrokerConfig(configHome, broker string) (string, error) {
 	return brokerConfigPath, nil
 }
 
-func New(name string, brokerConfig config.BrokerConfig) (triggermesh.Component, error) {
-	return &Broker{
-		Name: name,
-
-		image:      image(brokerConfig),
-		entrypoint: brokerEntrypoint(brokerConfig),
-	}, nil
+func (b *Broker) MetricsPort(ctx context.Context) (string, error) {
+	container, err := b.Info(ctx)
+	if err != nil {
+		return "", fmt.Errorf("container object: %w", err)
+	}
+	return container.HostPort("9092"), nil
 }
 
 func image(c config.BrokerConfig) string {
@@ -313,4 +313,13 @@ func brokerEntrypoint(c config.BrokerConfig) []string {
 		}
 	}
 	return append(entrypoint, []string{"--broker-config-path", "/etc/triggermesh/broker.conf"}...)
+}
+
+func New(name string, brokerConfig config.BrokerConfig) (triggermesh.Component, error) {
+	return &Broker{
+		Name: name,
+
+		image:      image(brokerConfig),
+		entrypoint: brokerEntrypoint(brokerConfig),
+	}, nil
 }

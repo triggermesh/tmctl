@@ -26,6 +26,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/manifest"
+	"github.com/triggermesh/tmctl/pkg/monitoring"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	tmbroker "github.com/triggermesh/tmctl/pkg/triggermesh/components/broker"
@@ -34,18 +35,20 @@ import (
 )
 
 type CliOptions struct {
-	Config   *config.Config
-	Manifest *manifest.Manifest
-	CRD      map[string]crd.CRD
+	Config     *config.Config
+	Manifest   *manifest.Manifest
+	CRD        map[string]crd.CRD
+	Monitoring *monitoring.Configuration
 
 	Restart bool
 }
 
-func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD) *cobra.Command {
+func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD, prom *monitoring.Configuration) *cobra.Command {
 	o := &CliOptions{
-		CRD:      crd,
-		Config:   config,
-		Manifest: m,
+		CRD:        crd,
+		Config:     config,
+		Monitoring: prom,
+		Manifest:   m,
 	}
 	startCmd := &cobra.Command{
 		Use:     "start [broker]",
@@ -86,7 +89,14 @@ func (o *CliOptions) start() error {
 			if err != nil {
 				return fmt.Errorf("starting broker container: %w", err)
 			}
-			brokerPort = container.HostPort()
+			brokerPort = container.HostPort("8080")
+
+			if metricsPort, err := b.(triggermesh.Monitorable).MetricsPort(ctx); err == nil {
+				if err := o.Monitoring.AddTarget(b.GetName()+"_broker", metricsPort, b.GetName()); err != nil {
+					return err
+				}
+			}
+			break
 		}
 	}
 
@@ -141,6 +151,13 @@ func (o *CliOptions) start() error {
 				t.(*tmbroker.Trigger).SetTarget(c)
 				if err := t.(*tmbroker.Trigger).WriteLocalConfig(); err != nil {
 					return fmt.Errorf("updating broker config: %w", err)
+				}
+			}
+		}
+		if monitorable, ok := c.(triggermesh.Monitorable); ok {
+			if metricsPort, err := monitorable.MetricsPort(ctx); err == nil {
+				if err := o.Monitoring.AddTarget(c.GetName(), metricsPort, o.Config.Context); err != nil {
+					return err
 				}
 			}
 		}

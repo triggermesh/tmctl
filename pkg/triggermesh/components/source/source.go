@@ -48,6 +48,7 @@ var (
 	_ triggermesh.Runnable     = (*Source)(nil)
 	_ triggermesh.Parent       = (*Source)(nil)
 	_ triggermesh.Exportable   = (*Source)(nil)
+	_ triggermesh.Monitorable  = (*Source)(nil)
 )
 
 type Source struct {
@@ -193,7 +194,7 @@ func (s *Source) asContainer(additionalEnvs map[string]string) (*docker.Containe
 		return nil, fmt.Errorf("creating object: %w", err)
 	}
 	image := adapter.Image(o, s.Version)
-	co, ho, err := adapter.RuntimeParams(o, image, additionalEnvs)
+	co, ho, err := adapter.RuntimeParams(o, image, additionalEnvs, triggermesh.AdapterPort, triggermesh.MetricsPort)
 	if err != nil {
 		return nil, fmt.Errorf("creating adapter params: %w", err)
 	}
@@ -362,6 +363,14 @@ func (s *Source) UpdateStatus(status map[string]interface{}) {
 
 func (s *Source) GetExternalResources() map[string]interface{} {
 	return s.status
+}
+
+func (s *Source) MetricsPort(ctx context.Context) (string, error) {
+	container, err := s.Info(ctx)
+	if err != nil {
+		return "", fmt.Errorf("container object: %w", err)
+	}
+	return container.HostPort("9092"), nil
 }
 
 func New(name, kind, broker, version string, crd crd.CRD, params interface{}, status map[string]interface{}) triggermesh.Component {
