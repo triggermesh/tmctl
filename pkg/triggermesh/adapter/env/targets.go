@@ -25,7 +25,6 @@ import (
 
 	targetsv1alpha1 "github.com/triggermesh/triggermesh/pkg/apis/targets/v1alpha1"
 
-	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/alibabaosstarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/awscomprehendtarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/awsdynamodbtarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/awseventbridgetarget"
@@ -36,7 +35,6 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/awssqstarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/azureeventhubstarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/cloudeventstarget"
-	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/confluenttarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/datadogtarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/elasticsearchtarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/googlecloudfirestoretarget"
@@ -44,32 +42,25 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/googlecloudstoragetarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/googlecloudworkflowstarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/googlesheettarget"
-	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/hasuratarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/httptarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/ibmmqtarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/jiratarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/kafkatarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/logzmetricstarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/logztarget"
+	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/mongodbtarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/oracletarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/salesforcetarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/sendgridtarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/slacktarget"
+	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/solacetarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/splunktarget"
-	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/tektontarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/twiliotarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/zendesktarget"
 )
 
 func targets(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 	switch object.GetKind() {
-	// Flow API group
-	case "AlibabaOSSTarget":
-		var o *targetsv1alpha1.AlibabaOSSTarget
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
-		}
-		return alibabaosstarget.MakeAppEnv(o), nil
 	case "AWSComprehendTarget":
 		var o *targetsv1alpha1.AWSComprehendTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -130,12 +121,6 @@ func targets(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return cloudeventstarget.MakeAppEnv(o), nil
-	case "ConfluentTarget":
-		var o *targetsv1alpha1.ConfluentTarget
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
-		}
-		return confluenttarget.MakeAppEnv(o), nil
 	case "DatadogTarget":
 		var o *targetsv1alpha1.DatadogTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -178,12 +163,6 @@ func targets(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return googlesheettarget.MakeAppEnv(o), nil
-	case "HasuraTarget":
-		var o *targetsv1alpha1.HasuraTarget
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
-		}
-		return hasuratarget.MakeAppEnv(o), nil
 	case "HTTPTarget":
 		var o *targetsv1alpha1.HTTPTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -220,6 +199,12 @@ func targets(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return logztarget.MakeAppEnv(o), nil
+	case "MongoDBTarget":
+		var o *targetsv1alpha1.MongoDBTarget
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return nil, err
+		}
+		return mongodbtarget.MakeAppEnv(o), nil
 	case "OracleTarget":
 		var o *targetsv1alpha1.OracleTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -244,18 +229,18 @@ func targets(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return slacktarget.MakeAppEnv(o), nil
+	case "SolaceTarget":
+		var o *targetsv1alpha1.SolaceTarget
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return nil, err
+		}
+		return solacetarget.MakeAppEnv(o), nil
 	case "SplunkTarget":
 		var o *targetsv1alpha1.SplunkTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
 			return nil, err
 		}
 		return splunktarget.MakeAppEnv(o), nil
-	case "TektonTarget":
-		var o *targetsv1alpha1.TektonTarget
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
-		}
-		return tektontarget.MakeAppEnv(o), nil
 	case "TwilioTarget":
 		var o *targetsv1alpha1.TwilioTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {

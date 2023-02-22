@@ -27,17 +27,6 @@ import (
 
 func targets(object unstructured.Unstructured) (EventAttributes, error) {
 	switch object.GetKind() {
-	// Flow API group
-	case "AlibabaOSSTarget":
-		var o *targetsv1alpha1.AlibabaOSSTarget
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return EventAttributes{}, err
-		}
-		return EventAttributes{
-			ProducedEventTypes:  o.GetEventTypes(),
-			ProducedEventSource: o.AsEventSource(),
-			AcceptedEventTypes:  o.AcceptedEventTypes(),
-		}, nil
 	case "AWSComprehendTarget":
 		var o *targetsv1alpha1.AWSComprehendTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
@@ -158,16 +147,6 @@ func targets(object unstructured.Unstructured) (EventAttributes, error) {
 			ProducedEventSource: o.AsEventSource(),
 			AcceptedEventTypes:  o.AcceptedEventTypes(),
 		}, nil
-	case "HasuraTarget":
-		var o *targetsv1alpha1.HasuraTarget
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return EventAttributes{}, err
-		}
-		return EventAttributes{
-			ProducedEventTypes:  o.GetEventTypes(),
-			ProducedEventSource: o.AsEventSource(),
-			AcceptedEventTypes:  o.AcceptedEventTypes(),
-		}, nil
 	case "HTTPTarget":
 		return EventAttributes{}, nil
 	case "IBMMQTarget":
@@ -209,6 +188,16 @@ func targets(object unstructured.Unstructured) (EventAttributes, error) {
 			ProducedEventTypes:  o.GetEventTypes(),
 			ProducedEventSource: o.AsEventSource(),
 		}, nil
+	case "MongoDBTarget":
+		var o *targetsv1alpha1.MongoDBTarget
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return EventAttributes{}, err
+		}
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+			AcceptedEventTypes:  o.AcceptedEventTypes(),
+		}, nil
 	case "OracleTarget":
 		return EventAttributes{}, nil
 	case "SalesforceTarget":
@@ -241,18 +230,10 @@ func targets(object unstructured.Unstructured) (EventAttributes, error) {
 			ProducedEventSource: o.AsEventSource(),
 			AcceptedEventTypes:  o.AcceptedEventTypes(),
 		}, nil
+	case "SolaceTarget":
+		return EventAttributes{}, nil
 	case "SplunkTarget":
 		return EventAttributes{}, nil
-	case "TektonTarget":
-		var o *targetsv1alpha1.TektonTarget
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return EventAttributes{}, err
-		}
-		return EventAttributes{
-			ProducedEventTypes:  o.GetEventTypes(),
-			ProducedEventSource: o.AsEventSource(),
-			AcceptedEventTypes:  o.AcceptedEventTypes(),
-		}, nil
 	case "TwilioTarget":
 		var o *targetsv1alpha1.TwilioTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
