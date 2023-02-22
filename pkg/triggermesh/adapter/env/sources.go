@@ -56,6 +56,7 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/ocimetricssource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/salesforcesource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/slacksource"
+	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/solacesource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/webhooksource"
 )
 
@@ -247,6 +248,12 @@ func sources(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return slacksource.MakeAppEnv(o), nil
+	case "SolaceSource":
+		var o *sourcesv1alpha1.SolaceSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return nil, err
+		}
+		return solacesource.MakeAppEnv(o), nil
 	case "TwilioSource":
 		return []corev1.EnvVar{}, nil
 	case "WebhookSource":

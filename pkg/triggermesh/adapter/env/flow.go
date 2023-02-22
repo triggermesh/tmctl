@@ -25,7 +25,6 @@ import (
 
 	flowv1alpha1 "github.com/triggermesh/triggermesh/pkg/apis/flow/v1alpha1"
 
-	"github.com/triggermesh/triggermesh/pkg/flow/reconciler/dataweavetransformation"
 	"github.com/triggermesh/triggermesh/pkg/flow/reconciler/jqtransformation"
 	"github.com/triggermesh/triggermesh/pkg/flow/reconciler/transformation"
 	"github.com/triggermesh/triggermesh/pkg/flow/reconciler/xmltojsontransformation"
@@ -47,12 +46,6 @@ func flow(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return xslttransformation.MakeAppEnv(o), nil
-	case "DataWeaveTransformation":
-		var o *flowv1alpha1.DataWeaveTransformation
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
-			return nil, err
-		}
-		return dataweavetransformation.MakeAppEnv(o), nil
 	case "XMLToJSONTransformation":
 		var o *flowv1alpha1.XMLToJSONTransformation
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {

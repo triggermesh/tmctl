@@ -306,6 +306,15 @@ func sources(object unstructured.Unstructured) (EventAttributes, error) {
 			ProducedEventTypes:  o.GetEventTypes(),
 			ProducedEventSource: o.AsEventSource(),
 		}, nil
+	case "SolaceSource":
+		var o *sourcesv1alpha1.SolaceSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return EventAttributes{}, err
+		}
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+		}, nil
 	case "TwilioSource":
 		var o *sourcesv1alpha1.TwilioSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
