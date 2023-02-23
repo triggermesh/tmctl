@@ -17,11 +17,13 @@ limitations under the License.
 package crd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -31,8 +33,29 @@ import (
 )
 
 const (
-	crdsURL = "https://github.com/triggermesh/triggermesh/releases/download/$VERSION/triggermesh-crds.yaml"
+	crdsURL         = "https://github.com/triggermesh/triggermesh/releases/download/$VERSION/triggermesh-crds.yaml"
+	commitStatusURL = "https://api.github.com/repos/triggermesh/triggermesh/commits/$REF/status"
+	ciArtifactsURL  = "https://circleci.com/api/v2/project/gh/triggermesh/triggermesh/$JOB/artifacts"
+
+	ciBuildImageContext = "ci/circleci: publish-image"
 )
+
+var semverRegexp = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
+
+type ghJobStatus struct {
+	SHA      string `json:"sha"`
+	Statuses []struct {
+		State     string `json:"state"`
+		TargetURL string `json:"target_url"`
+		Context   string `json:"context"`
+	} `json:"statuses"`
+}
+
+type ciArtifacts struct {
+	Items []struct {
+		URL string `json:"url"`
+	} `json:"items"`
+}
 
 type CRD struct {
 	APIVersion string `yaml:"apiVersion"`
@@ -78,7 +101,7 @@ type EventTypes []struct {
 func Fetch(configDir, version string) (map[string]CRD, error) {
 	crdDir := filepath.Join(configDir, "crd", version)
 	crdFile := filepath.Join(crdDir, "crd.yaml")
-	if _, err := os.Stat(crdFile); err == nil {
+	if stat, err := os.Stat(crdFile); err == nil && stat.Size() != 0 {
 		f, err := os.Open(crdFile)
 		if err != nil {
 			return nil, err
@@ -96,11 +119,18 @@ func Fetch(configDir, version string) (map[string]CRD, error) {
 	}
 	defer out.Close()
 
-	resp, err := http.Get(strings.ReplaceAll(crdsURL, "$VERSION", version))
-	if err != nil {
-		return nil, err
+	var resp *http.Response
+	if release := semverRegexp.MatchString(version); release {
+		if resp, err = http.Get(strings.ReplaceAll(crdsURL, "$VERSION", version)); err != nil {
+			return nil, err
+		}
+	} else {
+		if resp, err = getBuildArtifact(version); err != nil {
+			return nil, fmt.Errorf("%q build: %w", version, err)
+		}
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("CRD request failed: %s", resp.Status)
 	}
@@ -170,4 +200,53 @@ func ListTargets(crds map[string]CRD) ([]string, error) {
 	}
 	sort.Strings(result)
 	return result, nil
+}
+
+func getBuildArtifact(ref string) (*http.Response, error) {
+	ghCommit, err := http.Get(strings.Replace(commitStatusURL, "$REF", ref, -1))
+	if err != nil {
+		return nil, err
+	}
+	defer ghCommit.Body.Close()
+
+	var ghJob ghJobStatus
+	if err := json.NewDecoder(ghCommit.Body).Decode(&ghJob); err != nil {
+		return nil, err
+	}
+	ciJobID := ""
+	for _, status := range ghJob.Statuses {
+		if status.Context == ciBuildImageContext {
+			if status.State != "success" {
+				return nil, fmt.Errorf("dev build is not ready")
+			}
+			path := strings.Split(status.TargetURL, "/")
+			ciJobID = path[len(path)-1]
+			break
+		}
+	}
+	if ciJobID == "" {
+		return nil, fmt.Errorf("CI build job not found")
+	}
+
+	ciBuild, err := http.Get(strings.Replace(ciArtifactsURL, "$JOB", ciJobID, -1))
+	if err != nil {
+		return nil, err
+	}
+	defer ciBuild.Body.Close()
+
+	var artifacts ciArtifacts
+	if err := json.NewDecoder(ciBuild.Body).Decode(&artifacts); err != nil {
+		return nil, err
+	}
+	crdURL := ""
+	for _, artifact := range artifacts.Items {
+		if strings.HasSuffix(artifact.URL, "/triggermesh-crds.yaml") {
+			crdURL = artifact.URL
+			break
+		}
+	}
+	if crdURL == "" {
+		return nil, fmt.Errorf("CRD artifact not found")
+	}
+	return http.Get(crdURL)
 }
