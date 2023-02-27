@@ -15,7 +15,7 @@ require (
 	github.com/docker/docker v23.0.1+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/spf13/cobra v1.6.1
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/triggermesh/brokers v1.1.1
 	github.com/triggermesh/triggermesh v1.23.1-0.20230221073043-5c2326b5159a
 	github.com/triggermesh/triggermesh-core v1.1.1
