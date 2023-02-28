@@ -29,7 +29,6 @@ import (
 
 	"github.com/digitalocean/godo"
 
-	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
@@ -121,16 +120,26 @@ func (s *Service) AsDigitalOceanObject(additionalEnvs map[string]string) (interf
 	}
 
 	// Get the image and tag
-	imageSplit := strings.Split(s.Image, "/")[2]
-	image := strings.Split(imageSplit, ":")
+	repository := ""
+	tag := "latest"
+
+	imageSplit := strings.Split(s.Image, "/")
+	if t := strings.Split(imageSplit[len(imageSplit)-1], ":"); len(t) == 2 && t[1] != "" {
+		repository = t[0]
+		tag = t[1]
+	}
+	registry := imageSplit[0]
+	if len(imageSplit) == 3 {
+		registry = imageSplit[1]
+	}
 
 	return godo.AppServiceSpec{
 		Name: s.Name,
 		Image: &godo.ImageSourceSpec{
 			RegistryType: godo.ImageSourceSpecRegistryType_DockerHub,
-			Registry:     config.DockerRegistry,
-			Repository:   image[0],
-			Tag:          image[1],
+			Registry:     registry,
+			Repository:   repository,
+			Tag:          tag,
 		},
 		InternalPorts:    []int64{8080},
 		Envs:             envs,
