@@ -27,6 +27,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/triggermesh/tmctl/pkg/completion"
+	transformationgui "github.com/triggermesh/tmctl/pkg/gui/transformation"
 	"github.com/triggermesh/tmctl/pkg/log"
 	"github.com/triggermesh/tmctl/pkg/output"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
@@ -63,6 +64,7 @@ https://github.com/triggermesh/triggermesh/tree/main/config/samples/bumblebee`
 )
 
 func (o *CliOptions) newTransformationCmd() *cobra.Command {
+	var graphical bool
 	var name, target, file string
 	var eventSourcesFilter, eventTypesFilter []string
 	transformationCmd := &cobra.Command{
@@ -77,6 +79,9 @@ func (o *CliOptions) newTransformationCmd() *cobra.Command {
 EOF`,
 		ValidArgs: []string{"--name", "--target", "--source", "--eventTypes", "--from"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if graphical {
+				return o.gui(name)
+			}
 			return o.transformation(name, target, file, eventSourcesFilter, eventTypesFilter)
 		},
 	}
@@ -87,6 +92,7 @@ EOF`,
 
 	transformationCmd.Flags().StringVar(&name, "name", "", "Transformation name")
 	transformationCmd.Flags().StringVarP(&file, "from", "f", "", "Transformation specification file")
+	transformationCmd.Flags().BoolVar(&graphical, "gui", true, "Pseudo graphical interface")
 	transformationCmd.Flags().StringVar(&target, "target", "", "Target name")
 	transformationCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Sources component names")
 	transformationCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
@@ -102,6 +108,11 @@ EOF`,
 		return completion.ListTargets(o.Manifest), cobra.ShellCompDirectiveNoFileComp
 	}))
 	return transformationCmd
+}
+
+func (o *CliOptions) gui(name string) error {
+	return transformationgui.Create()
+	// return gui.Sample()
 }
 
 func (o *CliOptions) transformation(name, target, file string, eventSourcesFilter, eventTypesFilter []string) error {

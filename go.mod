@@ -31,6 +31,9 @@ require (
 require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.11.3 // indirect
+	github.com/jroimartin/gocui v0.5.0 // indirect
+	github.com/mattn/go-runewidth v0.0.9 // indirect
+	github.com/nsf/termbox-go v1.1.1 // indirect
 )
 
 replace k8s.io/client-go => k8s.io/client-go v0.25.3
