@@ -138,7 +138,7 @@ func (o *CliOptions) targetsCompletion(cmd *cobra.Command, args []string, toComp
 	toComplete = strings.TrimLeft(toComplete, "-")
 	var properties map[string]crd.Property
 
-	crd, exists := o.CRD[args[0]+"source"]
+	crd, exists := o.CRD[args[0]+"target"]
 	if !exists {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
