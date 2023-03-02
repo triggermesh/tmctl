@@ -63,7 +63,8 @@ type CRD struct {
 	Metadata   struct {
 		Name        string `yaml:"name"`
 		Annotations struct {
-			EventTypes string `yaml:"registry.knative.dev/eventTypes"`
+			ProducedEventTypes string `yaml:"registry.knative.dev/eventTypes"`
+			ConsumedEventTypes string `yaml:"registry.triggermesh.io/acceptedEventTypes"`
 		} `yaml:"annotations"`
 	} `yaml:"metadata"`
 	Spec struct {
@@ -94,7 +95,8 @@ type CRD struct {
 }
 
 type EventTypes []struct {
-	Type string `json:"type"`
+	Type   string `json:"type"`
+	Schema string `json:"schema"`
 }
 
 // Fetch downloads the release version of TriggerMesh CRDs for specified version.
