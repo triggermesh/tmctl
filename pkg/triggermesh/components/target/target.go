@@ -18,6 +18,7 @@ package target
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strconv"
@@ -224,13 +225,25 @@ func (t *Target) GetChildren() ([]triggermesh.Component, error) {
 func (t *Target) ConsumedEventTypes() ([]string, error) {
 	o, err := t.asUnstructured()
 	if err != nil {
-		return nil, err
+		return t.tryCRDEventTypes()
 	}
 	eventAttributes, err := adapter.EventAttributes(o)
 	if err != nil {
-		return []string{}, err
+		return t.tryCRDEventTypes()
 	}
 	return eventAttributes.AcceptedEventTypes, nil
+}
+
+func (t *Target) tryCRDEventTypes() ([]string, error) {
+	var et crd.EventTypes
+	if err := json.Unmarshal([]byte(t.CRD.Metadata.Annotations.ConsumedEventTypes), &et); err != nil {
+		return []string{}, fmt.Errorf("unable to parse event annotations: %w", err)
+	}
+	var result []string
+	for _, e := range et {
+		result = append(result, e.Type)
+	}
+	return result, nil
 }
 
 func (t *Target) Start(ctx context.Context, additionalEnvs map[string]string, restart bool) (*docker.Container, error) {

@@ -233,27 +233,26 @@ func (s *Source) GetEventTypes() ([]string, error) {
 	// try GetEventTypes method first
 	o, err := s.asUnstructured()
 	if err != nil {
-		return []string{}, fmt.Errorf("unstructured object: %w", err)
+		return s.tryCRDEventTypes()
 	}
 	eventAttributes, err := adapter.EventAttributes(o)
 	if err != nil {
-		return []string{}, fmt.Errorf("source event attributes: %w", err)
+		return s.tryCRDEventTypes()
 	}
 	if len(eventAttributes.ProducedEventTypes) != 0 {
 		return eventAttributes.ProducedEventTypes, nil
 	}
-	// then read CRD annotations
-	// sourceCRD, err := crd.GetResourceCRD(s.Kind, s.CRD)
-	// if err != nil {
-	// 	return []string{}, fmt.Errorf("source CRD: %w", err)
-	// }
+	return s.tryCRDEventTypes()
+}
+
+func (s *Source) tryCRDEventTypes() ([]string, error) {
 	var et crd.EventTypes
-	if err := json.Unmarshal([]byte(s.CRD.Metadata.Annotations.EventTypes), &et); err != nil {
-		return []string{}, fmt.Errorf("event types CRD: %w", err)
+	if err := json.Unmarshal([]byte(s.CRD.Metadata.Annotations.ProducedEventTypes), &et); err != nil {
+		return []string{}, fmt.Errorf("unable to parse event annotations: %w", err)
 	}
 	var result []string
-	for _, v := range et {
-		result = append(result, v.Type)
+	for _, e := range et {
+		result = append(result, e.Type)
 	}
 	return result, nil
 }
