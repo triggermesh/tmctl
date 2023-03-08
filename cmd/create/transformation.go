@@ -111,7 +111,8 @@ EOF`,
 }
 
 func (o *CliOptions) gui(name string) error {
-	return transformationgui.Create()
+
+	return transformationgui.Create(o.CRD, o.Manifest, o.Config)
 	// return gui.Sample()
 }
 
