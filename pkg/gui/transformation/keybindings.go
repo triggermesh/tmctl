@@ -31,6 +31,8 @@ type signal struct {
 	line   string
 }
 
+var jsonSkipLines = []string{"{", "}", "[", "]", "],", "},"}
+
 func NewKeybindingHandler() *keybindingHandler {
 	return &keybindingHandler{
 		signals: make(chan signal),
@@ -89,6 +91,10 @@ func (h *keybindingHandler) Apply(g *gocui.Gui) error {
 	if err := g.SetKeybinding("sourceEvent", gocui.KeyEnter, gocui.ModNone, popOperationsView); err != nil {
 		return err
 	}
+	// operation cancel
+	if err := g.SetKeybinding("transformationOperation", gocui.KeyEsc, gocui.ModNone, h.cancelOperationView); err != nil {
+		return err
+	}
 	// select operations
 	if err := g.SetKeybinding("transformationOperation", gocui.KeyArrowUp, gocui.ModNone, h.cursorUp); err != nil {
 		return err
@@ -115,10 +121,6 @@ func (h *keybindingHandler) Apply(g *gocui.Gui) error {
 		return err
 	}
 
-	if err := g.SetKeybinding("operation", gocui.KeyEnter, gocui.ModNone, h.delOperationView); err != nil {
-		return err
-	}
-
 	if err := g.SetKeybinding("transformationContext", gocui.KeyCtrlR, gocui.ModNone, h.transformationNextView); err != nil {
 		return err
 	}
@@ -129,11 +131,48 @@ func (h *keybindingHandler) Apply(g *gocui.Gui) error {
 }
 
 func (h *keybindingHandler) selectOperation(g *gocui.Gui, v *gocui.View) error {
-	if err := h.sendSignal(g); err != nil {
+	_, cy := v.Cursor()
+	operation, err := v.Line(cy)
+	if err != nil {
 		return err
 	}
-	g.DeleteView("transformationOperation")
-	g.SetCurrentView("sourceEvent")
+
+	switch operation {
+	case "-delete", "-parse":
+		if err := h.sendSignal(g); err != nil {
+			return err
+		}
+		if err := g.DeleteView("transformationOperation"); err != nil {
+			return err
+		}
+		if _, err := g.SetCurrentView("sourceEvent"); err != nil {
+			return err
+		}
+	case "-add", "-store", "-shift":
+		if err := popInputValueView(operation+":", g, v); err != nil {
+			return err
+		}
+		if err := g.DeleteView("transformationOperation"); err != nil {
+			return err
+		}
+		// read value
+		if err := g.SetKeybinding("operationValue", gocui.KeyEnter, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
+			h.signals <- signal{
+				origin: "transformationOperation",
+				line:   operation + ":" + strings.TrimSpace(v.Buffer()),
+			}
+			if err := g.DeleteView("operationValue"); err != nil {
+				return err
+			}
+			if _, err := g.SetCurrentView("sourceEvent"); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -191,6 +230,7 @@ func (h *keybindingHandler) sourceEventCursorLeft(g *gocui.Gui, v *gocui.View) e
 	}
 	newView.Highlight = true
 	v.Highlight = false
+	v.SetCursor(0, 0)
 	return h.sendSignal(g)
 }
 
@@ -222,13 +262,23 @@ func (h *keybindingHandler) cursorUp(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+func isUseless(s string) bool {
+	// s = strings.TrimSpace(s)
+	// for _, v := range jsonSkipLines {
+	// 	if s == v {
+	// 		return true
+	// 	}
+	// }
+	return false
+}
+
 func (h *keybindingHandler) cursorDownWithSignal(g *gocui.Gui, v *gocui.View) error {
 	ox, oy := v.Origin()
 	cx, cy := v.Cursor()
 	dy := cy + 1
 	if l, err := v.Line(dy); err != nil || l == "" {
 		return nil
-	} else if strings.HasSuffix(l, ":") {
+	} else if strings.HasSuffix(l, ":") || isUseless(l) {
 		v.SetCursor(cx, dy)
 		return h.cursorDownWithSignal(g, v)
 	}
@@ -246,7 +296,7 @@ func (h *keybindingHandler) cursorUpWithSignal(g *gocui.Gui, v *gocui.View) erro
 	dy := cy - 1
 	if l, err := v.Line(dy); err != nil || l == "" {
 		return nil
-	} else if strings.HasSuffix(l, ":") {
+	} else if strings.HasSuffix(l, ":") || isUseless(l) {
 		v.SetCursor(cx, dy)
 		return h.cursorUpWithSignal(g, v)
 	}
@@ -291,14 +341,14 @@ func (h *keybindingHandler) transformationNextView(g *gocui.Gui, v *gocui.View) 
 	return h.sendSignal(g)
 }
 
-func (h *keybindingHandler) delOperationView(g *gocui.Gui, v *gocui.View) error {
-	if err := g.DeleteView("operation"); err != nil {
+func (h *keybindingHandler) cancelOperationView(g *gocui.Gui, v *gocui.View) error {
+	if err := g.DeleteView("transformationOperation"); err != nil {
 		return err
 	}
 	if _, err := g.SetCurrentView("sourceEvent"); err != nil {
 		return err
 	}
-	return h.sendSignal(g)
+	return nil
 }
 
 func (h *keybindingHandler) sendSignal(g *gocui.Gui) error {

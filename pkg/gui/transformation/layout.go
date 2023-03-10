@@ -128,3 +128,14 @@ func popOperationsView(g *gocui.Gui, v *gocui.View) error {
 	ops.SelBgColor = gocui.ColorGreen
 	return nil
 }
+
+func popInputValueView(operation string, g *gocui.Gui, v *gocui.View) error {
+	maxX, maxY := g.Size()
+	val := genericViewOrPanic(g, operation, "operationValue", maxX/2-30, maxY/2-1, maxX/2+30, maxY/2+1)
+	val.Editable = true
+
+	if _, err := g.SetCurrentView(val.Name()); err != nil {
+		return err
+	}
+	return nil
+}

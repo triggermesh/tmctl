@@ -20,18 +20,27 @@ import (
 	"encoding/json"
 )
 
+const (
+	jsonSchemaDraft04   = "http://json-schema.org/draft-04/schema#"
+	jsonSchemaDraft07   = "http://json-schema.org/draft-07/schema#"
+	jsonSchemaDraft2020 = "https://json-schema.org/draft/2020-12/schema"
+)
+
 type Schema struct {
+	Draft       string `json:"$schema"`
+	Ref         string `json:"$ref"`
+	Definitions Index  `json:"definitions"`
+	Defs        Index  `json:"$defs"`
+
 	Title                string        `json:"title"`
 	Description          string        `json:"description"`
 	Name                 string        `json:"name"`
 	Type                 interface{}   `json:"type"`
-	Definitions          Index         `json:"definitions"`
 	Properties           Index         `json:"properties"`
 	PatternProperties    Index         `json:"patternProperties"`
 	AdditionalProperties interface{}   `json:"additionalProperties"`
 	Items                *Schema       `json:"items"`
 	Media                Media         `json:"media"`
-	Ref                  string        `json:"$ref"`
 	Required             []string      `json:"required"`
 	Examples             []interface{} `json:"examples"`
 }
@@ -42,33 +51,62 @@ type Media struct {
 	BinaryEncoding string `json:"binaryEncoding"`
 }
 
-func responseToSchema(data []byte) (Schema, error) {
-	var s Schema
-	return s, json.Unmarshal(data, &s)
-}
-
-func schemaToData(s Schema) map[string]interface{} {
+func schemaToData(data []byte) map[string]interface{} {
 	// the list of sources for sample event:
 	// - examples
-	// - "required"
-	// - properties
-	// - the first definition
+	// - $ref to $definitions
+	// - required property
+
+	var s Schema
+	if err := json.Unmarshal(data, &s); err != nil {
+		return map[string]interface{}{
+			"error unmarshaling schema": err,
+		}
+	}
 
 	if len(s.Examples) != 0 {
 		return s.Examples[0].(map[string]interface{})
 	}
-	firstDefinition := ""
+
 	definitions := make(map[string]*Schema)
-	for property, definition := range s.Definitions {
-		if firstDefinition == "" {
-			firstDefinition = property
+
+	switch s.Draft {
+	case jsonSchemaDraft04, jsonSchemaDraft07:
+		for name, definition := range s.Definitions {
+			definitions["#/definitions/"+name] = definition
 		}
-		definitions["#/definitions/"+property] = definition
+	case jsonSchemaDraft2020:
+		for name, definition := range s.Defs {
+			definitions["#/$defs/"+name] = definition
+		}
+	default:
+		return map[string]interface{}{
+			"unsupported schema version": s.Draft,
+		}
 	}
-	if len(s.Properties) == 0 {
-		s.Properties = map[string]*Schema{
-			firstDefinition: definitions["#/definitions/"+firstDefinition],
+
+	if s.Ref != "" {
+		d, exists := definitions[s.Ref]
+		if !exists {
+			return map[string]interface{}{
+				"definition is missing": s.Ref,
+			}
 		}
+		return generateSample(*d, definitions)
+	}
+
+	if len(s.Required) != 0 && len(s.Properties) != 0 {
+		result := make(map[string]interface{}, len(s.Required))
+		for _, required := range s.Required {
+			p, exists := s.Properties[required]
+			if !exists {
+				return map[string]interface{}{
+					"property is missing": required,
+				}
+			}
+			result[required] = generateSample(*p, definitions)
+		}
+		return result
 	}
 	return generateSample(s, definitions)
 }
