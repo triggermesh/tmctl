@@ -308,9 +308,9 @@ func brokerEntrypoint(c config.BrokerConfig) []string {
 		if c.Redis.SkipVerify {
 			entrypoint = append(entrypoint, "--redis.tls-skip-verify")
 		}
-		if c.ConfigPollingPeriod != "" {
-			entrypoint = append(entrypoint, []string{"--config-polling-period", c.ConfigPollingPeriod}...)
-		}
+	}
+	if c.ConfigPollingPeriod != "" {
+		entrypoint = append(entrypoint, []string{"--config-polling-period", c.ConfigPollingPeriod}...)
 	}
 	return append(entrypoint, []string{"--broker-config-path", "/etc/triggermesh/broker.conf"}...)
 }
