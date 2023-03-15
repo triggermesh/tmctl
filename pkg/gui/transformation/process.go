@@ -34,7 +34,8 @@ const (
 )
 
 func ProcessKeystrokes(g *gocui.Gui, signals chan signal) error {
-	nesting := make([]string, 10)
+	nesting := make([]string, 10) // maximum level of objects netsing in the event
+	currentEventType := ""
 
 	for s := range signals {
 		switch s.origin {
@@ -42,7 +43,17 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal) error {
 			outputView, _ := g.View("sourceEvent")
 			outputView.Clear()
 			outputView.Wrap = true
-			fmt.Fprintln(outputView, loadSample(strings.TrimLeft(strings.TrimSpace(s.line), "-")))
+
+			eventType := strings.TrimLeft(strings.TrimSpace(s.line), "-")
+			fmt.Fprintln(outputView, loadSample(eventType))
+
+			if currentEventType == "" {
+				currentEventType = eventType
+			} else if currentEventType != eventType {
+				currentEventType = eventType
+				transformationView, _ := g.View("transformation")
+				transformationView.Clear()
+			}
 		case "targets":
 			outputView, _ := g.View("targetEvent")
 			outputView.Clear()
@@ -62,33 +73,41 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal) error {
 			}
 		case "transformationOperation":
 			transformations := []v1alpha1.Transform{}
-			transformationView, _ := g.View("transformationContext")
+			transformationView, _ := g.View("transformation")
 			if err := yaml.Unmarshal([]byte(transformationView.Buffer()), &transformations); err != nil {
 				fmt.Fprintln(transformationView, err.Error())
 				continue
 			}
-
 			value := ""
 			operation := strings.TrimLeft(s.line, "-")
 			if line := strings.Split(operation, ":"); len(line) == 2 {
 				operation = line[0]
 				value = line[1]
 			}
-			transformations = updateTransformations(transformations, operation, nesting, value)
+
+			path := strings.Join(removeEmptyStrings(nesting), ".")
+			if s.isHotKey {
+				path = ""
+			}
+			if operation == "store" {
+				transformations = updateTransformations(transformations, operation, value, path)
+			} else {
+				transformations = updateTransformations(transformations, operation, path, value)
+			}
+			transformations = rearrange(transformations)
 
 			output, err := yaml.Marshal(transformations)
 			if err != nil {
 				fmt.Fprintln(transformationView, err.Error())
 				continue
 			}
-
 			transformationView.Clear()
 			transformationView.Write(output)
 		default:
-			// debug
-			debugOutput, _ := g.View("transformationContext")
-			debugOutput.Autoscroll = true
-			fmt.Fprintln(debugOutput, s)
+			// // debug
+			// debugOutput, _ := g.View("transformation")
+			// debugOutput.Autoscroll = true
+			// fmt.Fprintln(debugOutput, s)
 		}
 		g.Update(func(g *gocui.Gui) error { return nil })
 	}
@@ -125,23 +144,25 @@ func removeEmptyStrings(s []string) []string {
 	return r
 }
 
-func updateTransformations(transformations []v1alpha1.Transform, operation string, path []string, value string) []v1alpha1.Transform {
+func updateTransformations(transformations []v1alpha1.Transform, operation string, path string, value string) []v1alpha1.Transform {
 	if len(transformations) == 0 {
-		return append(transformations, v1alpha1.Transform{
-			Operation: operation,
-			Paths: []v1alpha1.Path{
-				{
-					Key:   strings.Join(removeEmptyStrings(path), "."),
-					Value: value,
+		return []v1alpha1.Transform{
+			{
+				Operation: operation,
+				Paths: []v1alpha1.Path{
+					{
+						Key:   path,
+						Value: value,
+					},
 				},
 			},
-		})
+		}
 	}
 
 	for k, v := range transformations {
 		if v.Operation == operation {
 			v.Paths = append(v.Paths, v1alpha1.Path{
-				Key:   strings.Join(removeEmptyStrings(path), "."),
+				Key:   path,
 				Value: value,
 			})
 			transformations[k] = v
@@ -153,9 +174,55 @@ func updateTransformations(transformations []v1alpha1.Transform, operation strin
 		Operation: operation,
 		Paths: []v1alpha1.Path{
 			{
-				Key:   strings.Join(removeEmptyStrings(path), "."),
+				Key:   path,
 				Value: value,
 			},
 		},
 	})
+}
+
+func rearrange(transformations []v1alpha1.Transform) []v1alpha1.Transform {
+	store := []v1alpha1.Transform{}
+	delete := []v1alpha1.Transform{}
+	add := []v1alpha1.Transform{}
+	shift := []v1alpha1.Transform{}
+	parse := []v1alpha1.Transform{}
+
+	wipeData := false
+
+	for _, transformation := range transformations {
+		switch transformation.Operation {
+		case "parse":
+			parse = append(parse, transformation)
+		case "store":
+			store = append(store, transformation)
+		case "delete":
+			for _, path := range transformation.Paths {
+				if path.Key == "" {
+					wipeData = true
+					delete = []v1alpha1.Transform{{
+						Operation: "delete",
+						Paths:     []v1alpha1.Path{{Key: ""}},
+					}}
+					break
+				}
+			}
+			if !wipeData {
+				delete = append(delete, transformation)
+			}
+		case "add":
+			add = append(add, transformation)
+		case "shift":
+			shift = append(shift, transformation)
+		}
+	}
+
+	// first operations are parse and store
+	transformations = append(parse, store...)
+	// then we delete, including full event wipe
+	transformations = append(transformations, delete...)
+	// modification operations go last
+	transformations = append(transformations, append(add, shift...)...)
+
+	return transformations
 }

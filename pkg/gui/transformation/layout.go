@@ -18,7 +18,6 @@ package transformation
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/jroimartin/gocui"
 )
@@ -30,8 +29,7 @@ type layout struct {
 	targets     *gocui.View
 	targetsSide *gocui.View
 
-	transformationContext *gocui.View
-	transformationData    *gocui.View
+	transformation *gocui.View
 }
 
 func NewLayout() *layout {
@@ -53,19 +51,19 @@ func (l *layout) draw(g *gocui.Gui) error {
 
 	l.sourcesSide = genericViewOrPanic(g, "Event sample", "sourceEvent", int(0.15*float32(maxX)), 0, maxX/2, maxY/2-1)
 	l.targetsSide = genericViewOrPanic(g, "Event sample", "targetEvent", int(0.15*float32(maxX)), maxY/2, maxX/2, maxY-1)
-	transformation := genericViewOrPanic(g, "Transformation (Ctrl+R)", "transformation", maxX/2+1, 0, maxX-1, maxY-1)
+	l.transformation = genericViewOrPanic(g, "Transformation (Ctrl+E)", "transformation", maxX/2+1, 0, maxX-1, int(0.8*float32(maxY)))
 
-	fmt.Fprintln(transformation, "Context:")
-	_, vy := transformation.Size()
-	fmt.Fprintf(transformation, "%sData:", strings.Repeat("\n", vy/2))
+	help := genericViewOrPanic(g, "Help", "help", maxX/2+1, int(0.8*float32(maxY))+1, maxX-1, maxY-1)
 
-	l.transformationContext = genericViewOrPanic(g, "Transformation Context", "transformationContext", maxX/2+5, 2, maxX-2, int(0.5*float32(maxY)))
-	l.transformationContext.Frame = false
-	l.transformationContext.Editable = true
-
-	l.transformationData = genericViewOrPanic(g, "Transformation Data", "transformationData", maxX/2+5, int(0.5*float32(maxY))+2, maxX-2, maxY-2)
-	l.transformationData.Frame = false
-	l.transformationData.Editable = true
+	help.Clear()
+	fmt.Fprintln(help, "Ctrl+S - Event Sources list")
+	fmt.Fprintln(help, "Ctrl+T - Event Targets list")
+	fmt.Fprintln(help, "Ctrl+E - Transformation editor")
+	fmt.Fprintln(help, "---")
+	fmt.Fprintln(help, "Ctrl+W - Wipe event")
+	fmt.Fprintln(help, "---")
+	fmt.Fprintln(help, "Ctrl+Space - Create the transformation")
+	fmt.Fprintln(help, "Ctrl+C - Exit the wizard")
 
 	return nil
 }
@@ -129,12 +127,18 @@ func popOperationsView(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
-func popInputValueView(operation string, g *gocui.Gui, v *gocui.View) error {
+func popInputValueView(operation string, g *gocui.Gui, v *gocui.View) (*gocui.View, error) {
 	maxX, maxY := g.Size()
 	val := genericViewOrPanic(g, operation, "operationValue", maxX/2-30, maxY/2-1, maxX/2+30, maxY/2+1)
 	val.Editable = true
+	return g.SetCurrentView(val.Name())
+}
 
-	if _, err := g.SetCurrentView(val.Name()); err != nil {
+func popTransformationNameView(g *gocui.Gui, v *gocui.View) error {
+	maxX, maxY := g.Size()
+	nameView := genericViewOrPanic(g, "Name (optional):", "transformationName", maxX/2-30, maxY/2-1, maxX/2+30, maxY/2+1)
+	nameView.Editable = true
+	if _, err := g.SetCurrentView(nameView.Name()); err != nil {
 		return err
 	}
 	return nil

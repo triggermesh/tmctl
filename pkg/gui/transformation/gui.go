@@ -17,7 +17,11 @@ limitations under the License.
 package transformation
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
 	"time"
 
 	"github.com/jroimartin/gocui"
@@ -29,10 +33,10 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
-func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config.Config) error {
+func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config.Config) (string, string, string, io.Reader, error) {
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
-		return err
+		return "", "", "", nil, err
 	}
 	defer g.Close()
 
@@ -43,7 +47,7 @@ func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config
 
 	errC := make(chan error)
 	go func() {
-		if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
+		if err := g.MainLoop(); err != nil {
 			errC <- err
 		}
 		close(errC)
@@ -59,12 +63,12 @@ func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config
 	}
 
 	if layout.sources == nil {
-		return fmt.Errorf("view init timeout")
+		return "", "", "", nil, fmt.Errorf("view init timeout")
 	}
 
 	sources, targets, err := sourcesAndTargets(manifest, config, crds)
 	if err != nil {
-		return fmt.Errorf("component event types: %w", err)
+		return "", "", "", nil, fmt.Errorf("component event types: %w", err)
 	}
 	for source, eventTypes := range sources {
 		fmt.Fprintf(layout.sources, "%s:\n", source)
@@ -82,14 +86,31 @@ func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config
 	}
 	g.Update(func(g *gocui.Gui) error { return nil })
 
-	keyHandler := NewKeybindingHandler()
-	if err := keyHandler.Apply(g); err != nil {
-		return err
+	keybindingHandler := NewKeybindingHandler()
+	if err := keybindingHandler.Create(g); err != nil {
+		return "", "", "", nil, err
 	}
 
-	go ProcessKeystrokes(g, keyHandler.signals)
+	go ProcessKeystrokes(g, keybindingHandler.signals)
 
-	return <-errC
+	select {
+	case err := <-errC:
+		return "", "", "", nil, err
+	case name := <-keybindingHandler.createAndExit:
+		sourceET, target, spec, err := readLayout(layout)
+		if err != nil {
+			return "", "", "", nil, err
+		}
+		g.Close()
+		s := map[string]interface{}{
+			"data": spec,
+		}
+		b := new(bytes.Buffer)
+		if err := json.NewEncoder(b).Encode(s); err != nil {
+			return "", "", "", nil, err
+		}
+		return name, target, sourceET, b, err
+	}
 }
 
 func sourcesAndTargets(m *manifest.Manifest, config *config.Config, crds map[string]crd.CRD) (map[string][]string, map[string][]string, error) {
@@ -139,4 +160,23 @@ func targetEventTypes(name string, config *config.Config, manifest *manifest.Man
 		return []string{}, err
 	}
 	return object.(triggermesh.Consumer).ConsumedEventTypes()
+}
+
+func readLayout(l *layout) (string, string, string, error) {
+	_, cy := l.sources.Cursor()
+	source, err := l.sources.Line(cy)
+	if err != nil {
+		return "", "", "", err
+	}
+	source = strings.TrimLeft(strings.TrimSpace(source), "-")
+	_, cy = l.targets.Cursor()
+	target, err := l.targets.Line(cy)
+	if err != nil {
+		return "", "", "", err
+	}
+	if target == "*" {
+		target = ""
+	}
+	spec := l.transformation.Buffer()
+	return source, target, spec, nil
 }

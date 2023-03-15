@@ -18,11 +18,14 @@ package create
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
+	"github.com/jroimartin/gocui"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
@@ -64,7 +67,7 @@ https://github.com/triggermesh/triggermesh/tree/main/config/samples/bumblebee`
 )
 
 func (o *CliOptions) newTransformationCmd() *cobra.Command {
-	var graphical bool
+	var wizard bool
 	var name, target, file string
 	var eventSourcesFilter, eventTypesFilter []string
 	transformationCmd := &cobra.Command{
@@ -79,10 +82,24 @@ func (o *CliOptions) newTransformationCmd() *cobra.Command {
 EOF`,
 		ValidArgs: []string{"--name", "--target", "--source", "--eventTypes", "--from"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if graphical {
-				return o.gui(name)
+			if wizard {
+				name, target, sourceType, spec, err := transformationgui.Create(o.CRD, o.Manifest, o.Config)
+				if err == gocui.ErrQuit {
+					return nil
+				}
+				if err != nil {
+					return fmt.Errorf("transformation wizard error: %w", err)
+				}
+				return o.transformation(name, target, spec, []string{}, []string{sourceType})
 			}
-			return o.transformation(name, target, file, eventSourcesFilter, eventTypesFilter)
+			if file != "" {
+				data, err := os.ReadFile(file)
+				if err != nil {
+					return fmt.Errorf("file %q read: %w", file, err)
+				}
+				return o.transformation(name, target, bytes.NewBuffer(data), eventSourcesFilter, eventTypesFilter)
+			}
+			return nil
 		},
 	}
 
@@ -92,7 +109,7 @@ EOF`,
 
 	transformationCmd.Flags().StringVar(&name, "name", "", "Transformation name")
 	transformationCmd.Flags().StringVarP(&file, "from", "f", "", "Transformation specification file")
-	transformationCmd.Flags().BoolVar(&graphical, "gui", true, "Pseudo graphical interface")
+	transformationCmd.Flags().BoolVar(&wizard, "wizard", true, "Transformation wizard")
 	transformationCmd.Flags().StringVar(&target, "target", "", "Target name")
 	transformationCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Sources component names")
 	transformationCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
@@ -110,13 +127,7 @@ EOF`,
 	return transformationCmd
 }
 
-func (o *CliOptions) gui(name string) error {
-
-	return transformationgui.Create(o.CRD, o.Manifest, o.Config)
-	// return gui.Sample()
-}
-
-func (o *CliOptions) transformation(name, target, file string, eventSourcesFilter, eventTypesFilter []string) error {
+func (o *CliOptions) transformation(name, target string, specReader io.Reader, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
 	var targetComponent triggermesh.Component
 	if target != "" {
@@ -139,14 +150,14 @@ func (o *CliOptions) transformation(name, target, file string, eventSourcesFilte
 	eventTypesFilter = append(eventTypesFilter, et...)
 
 	var data []byte
-	if file == "" {
+	if specReader == nil {
 		input, err := fromStdIn()
 		if err != nil {
 			return fmt.Errorf("stdin read: %w", err)
 		}
 		data = []byte(input)
 	} else {
-		specFile, err := os.ReadFile(file)
+		specFile, err := io.ReadAll(specReader)
 		if err != nil {
 			return fmt.Errorf("spec file read: %w", err)
 		}

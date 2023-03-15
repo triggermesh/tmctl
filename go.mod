@@ -15,6 +15,7 @@ require (
 	github.com/docker/docker v23.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/spf13/cobra v1.7.0
+	github.com/jroimartin/gocui v0.5.0
 	github.com/stretchr/testify v1.8.2
 	github.com/triggermesh/brokers v1.2.1
 	github.com/triggermesh/triggermesh v1.24.4
@@ -29,16 +30,10 @@ require (
 )
 
 require (
-	github.com/a-h/generate v0.0.0-20220105161013-96c14dfdfb60 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.11.3 // indirect
-	github.com/jroimartin/gocui v0.5.0 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/nsf/termbox-go v1.1.1 // indirect
-	github.com/tfkhsr/jsonschema v0.0.0-20180218143334-273afdd5a88c // indirect
-	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
-	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
-	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 )
 
 replace k8s.io/client-go => k8s.io/client-go v0.25.3
