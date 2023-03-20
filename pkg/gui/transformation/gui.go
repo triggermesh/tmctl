@@ -30,6 +30,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
@@ -91,13 +92,13 @@ func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config
 		return "", "", "", nil, err
 	}
 
-	go ProcessKeystrokes(g, keybindingHandler.signals)
+	go ProcessKeystrokes(g, keybindingHandler.signals, config.SchemaRegistry)
 
 	select {
 	case err := <-errC:
 		return "", "", "", nil, err
 	case name := <-keybindingHandler.createAndExit:
-		sourceET, target, spec, err := readLayout(layout)
+		sourceEventType, targetComponent, targetEventType, spec, err := readLayout(layout)
 		if err != nil {
 			return "", "", "", nil, err
 		}
@@ -105,11 +106,14 @@ func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config
 		s := map[string]interface{}{
 			"data": spec,
 		}
+		if targetEventType != "" {
+			s["context"] = json.RawMessage("[{\"operation\":\"add\",\"paths\":[{\"key\":\"type\",\"value\":\"" + targetEventType + "\"}]}]")
+		}
 		b := new(bytes.Buffer)
 		if err := json.NewEncoder(b).Encode(s); err != nil {
 			return "", "", "", nil, err
 		}
-		return name, target, sourceET, b, err
+		return name, sourceEventType, targetComponent, b, err
 	}
 }
 
@@ -130,17 +134,17 @@ func sourcesAndTargets(m *manifest.Manifest, config *config.Config, crds map[str
 				return nil, nil, err
 			}
 			targets[object.Metadata.Name] = et
-			// case service.APIVersion:
-			// 	role, set := object.Metadata.Labels[service.RoleLabel]
-			// 	if !set {
-			// 		continue
-			// 	}
-			// 	switch role {
-			// 	case string(service.Producer):
-			// 		sources[object.Metadata.Name] = et
-			// 	case string(service.Consumer):
-			// 		targets[object.Metadata.Name] = et
-			// 	}
+		case service.APIVersion:
+			role, set := object.Metadata.Labels[service.RoleLabel]
+			if !set {
+				continue
+			}
+			switch role {
+			case string(service.Producer):
+				sources[object.Metadata.Name] = []string{}
+			case string(service.Consumer):
+				targets[object.Metadata.Name] = []string{}
+			}
 		}
 	}
 	return sources, targets, nil
@@ -162,21 +166,42 @@ func targetEventTypes(name string, config *config.Config, manifest *manifest.Man
 	return object.(triggermesh.Consumer).ConsumedEventTypes()
 }
 
-func readLayout(l *layout) (string, string, string, error) {
+func readLayout(l *layout) (string, string, string, string, error) {
 	_, cy := l.sources.Cursor()
-	source, err := l.sources.Line(cy)
+	sourceEventType, err := l.sources.Line(cy)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
-	source = strings.TrimLeft(strings.TrimSpace(source), "-")
+	sourceEventType = strings.TrimLeft(strings.TrimSpace(sourceEventType), "-")
+
 	_, cy = l.targets.Cursor()
-	target, err := l.targets.Line(cy)
+	targetSelectedLine, err := l.targets.Line(cy)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
-	if target == "*" {
-		target = ""
+	targetEventType := ""
+	targetComponent := ""
+
+	switch {
+	case targetSelectedLine == "*":
+		targetComponent = ""
+		targetEventType = ""
+	case strings.HasPrefix(targetSelectedLine, " -"):
+		for i := cy - 1; i > 0; i-- {
+			selectedLine, err := l.targets.Line(i)
+			if err != nil {
+				break
+			}
+			if strings.HasPrefix(selectedLine, " -") {
+				continue
+			}
+			targetComponent = selectedLine
+			break
+		}
+		targetEventType = strings.TrimLeft(targetSelectedLine, " -")
+	default:
+		targetComponent = targetSelectedLine
 	}
 	spec := l.transformation.Buffer()
-	return source, target, spec, nil
+	return sourceEventType, targetComponent, targetEventType, spec, nil
 }

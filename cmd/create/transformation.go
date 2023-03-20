@@ -83,14 +83,14 @@ EOF`,
 		ValidArgs: []string{"--name", "--target", "--source", "--eventTypes", "--from"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if wizard {
-				name, target, sourceType, spec, err := transformationgui.Create(o.CRD, o.Manifest, o.Config)
+				name, sourceEventType, target, spec, err := transformationgui.Create(o.CRD, o.Manifest, o.Config)
 				if err == gocui.ErrQuit {
 					return nil
 				}
 				if err != nil {
 					return fmt.Errorf("transformation wizard error: %w", err)
 				}
-				return o.transformation(name, target, spec, []string{}, []string{sourceType})
+				return o.transformation(name, target, spec, []string{}, []string{sourceEventType})
 			}
 			if file != "" {
 				data, err := os.ReadFile(file)

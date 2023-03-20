@@ -36,8 +36,6 @@ type signal struct {
 	isHotKey bool
 }
 
-var jsonSkipLines = []string{"{", "}", "[", "]", "],", "},"}
-
 func NewKeybindingHandler() *keybindingHandler {
 	return &keybindingHandler{
 		signals:       make(chan signal),
@@ -138,15 +136,11 @@ func (h *keybindingHandler) Create(g *gocui.Gui) error {
 	if err := g.SetKeybinding("targets", gocui.KeyArrowDown, gocui.ModNone, h.cursorDownWithSignal); err != nil {
 		return err
 	}
-	// press Enter
-	// if err := g.SetKeybinding("targets", gocui.KeyEnter, gocui.ModNone, h.nextView); err != nil {
-	// return err
-	// }
 	return nil
 }
 
 func (h *keybindingHandler) saveAndExit(g *gocui.Gui, v *gocui.View) error {
-	h.createAndExit <- v.Buffer()
+	h.createAndExit <- strings.TrimSpace(v.Buffer())
 	g.DeleteKeybindings(v.Name())
 	return g.DeleteView(v.Name())
 }
@@ -220,7 +214,7 @@ func (h *keybindingHandler) switchToTransformation(g *gocui.Gui, v *gocui.View) 
 		return err
 	}
 	v.Highlight = false
-	return h.sendSignal(g)
+	return nil
 }
 
 func (h *keybindingHandler) sourceCursorRight(g *gocui.Gui, v *gocui.View) error {
@@ -272,23 +266,13 @@ func (h *keybindingHandler) cursorUp(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
-func isUseless(s string) bool {
-	// s = strings.TrimSpace(s)
-	// for _, v := range jsonSkipLines {
-	// 	if s == v {
-	// 		return true
-	// 	}
-	// }
-	return false
-}
-
 func (h *keybindingHandler) cursorDownWithSignal(g *gocui.Gui, v *gocui.View) error {
 	ox, oy := v.Origin()
 	cx, cy := v.Cursor()
 	dy := cy + 1
 	if l, err := v.Line(dy); err != nil || l == "" {
 		return nil
-	} else if strings.HasSuffix(l, ":") || isUseless(l) {
+	} else if strings.HasSuffix(l, ":") {
 		v.SetCursor(cx, dy)
 		return h.cursorDownWithSignal(g, v)
 	}
@@ -306,7 +290,7 @@ func (h *keybindingHandler) cursorUpWithSignal(g *gocui.Gui, v *gocui.View) erro
 	dy := cy - 1
 	if l, err := v.Line(dy); err != nil || l == "" {
 		return nil
-	} else if strings.HasSuffix(l, ":") || isUseless(l) {
+	} else if strings.HasSuffix(l, ":") {
 		v.SetCursor(cx, dy)
 		return h.cursorUpWithSignal(g, v)
 	}
@@ -314,25 +298,6 @@ func (h *keybindingHandler) cursorUpWithSignal(g *gocui.Gui, v *gocui.View) erro
 		if err := v.SetOrigin(ox, oy-1); err != nil {
 			return err
 		}
-	}
-	return h.sendSignal(g)
-}
-
-func (h *keybindingHandler) nextView(g *gocui.Gui, v *gocui.View) error {
-	switch v.Name() {
-	case "sources":
-		newView, err := g.SetCurrentView("targets")
-		if err != nil {
-			return err
-		}
-		newView.Highlight = true
-		v.Highlight = false
-	case "targets":
-		_, err := g.SetCurrentView("transformation")
-		if err != nil {
-			return err
-		}
-		v.Highlight = false
 	}
 	return h.sendSignal(g)
 }

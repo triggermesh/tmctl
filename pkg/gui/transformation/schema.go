@@ -18,6 +18,10 @@ package transformation
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 )
 
 const (
@@ -49,6 +53,35 @@ type Index map[string]*Schema
 
 type Media struct {
 	BinaryEncoding string `json:"binaryEncoding"`
+}
+
+type registryCache map[string][]byte
+
+func loadSample(registryUrl, eventType string, cache registryCache) string {
+	if sample, exists := cache[eventType]; exists {
+		return string(sample)
+	}
+	registryEndpoint, err := url.JoinPath(registryUrl, eventType)
+	if err != nil {
+		return fmt.Sprintf("registry URL error: %v", err)
+	}
+	resp, err := http.Get(registryEndpoint)
+	if err != nil {
+		return fmt.Sprintf("registry request error: %v", err)
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return "Not found"
+	}
+	responseData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Sprintf("registry response error: %v", err)
+	}
+	data, err := json.MarshalIndent(schemaToData(responseData), "", "  ")
+	if err != nil {
+		return fmt.Sprintf("sample error: %v", err)
+	}
+	cache[eventType] = data
+	return string(data)
 }
 
 func schemaToData(data []byte) map[string]interface{} {

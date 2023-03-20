@@ -17,10 +17,7 @@ limitations under the License.
 package transformation
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 
 	"github.com/triggermesh/triggermesh/pkg/apis/flow/v1alpha1"
@@ -29,12 +26,9 @@ import (
 	"github.com/jroimartin/gocui"
 )
 
-const (
-	registryUrl = "http://localhost:8080/apis/registry/v2/groups/schema/artifacts/"
-)
-
-func ProcessKeystrokes(g *gocui.Gui, signals chan signal) error {
+func ProcessKeystrokes(g *gocui.Gui, signals chan signal, registryUrl string) error {
 	nesting := make([]string, 10) // maximum level of objects netsing in the event
+	cache := make(registryCache, 20)
 	currentEventType := ""
 
 	for s := range signals {
@@ -45,7 +39,7 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal) error {
 			outputView.Wrap = true
 
 			eventType := strings.TrimLeft(strings.TrimSpace(s.line), "-")
-			fmt.Fprintln(outputView, loadSample(eventType))
+			fmt.Fprintln(outputView, loadSample(registryUrl, eventType, cache))
 
 			if currentEventType == "" {
 				currentEventType = eventType
@@ -58,7 +52,7 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal) error {
 			outputView, _ := g.View("targetEvent")
 			outputView.Clear()
 			outputView.Wrap = true
-			fmt.Fprintln(outputView, loadSample(strings.TrimLeft(strings.TrimSpace(s.line), "-")))
+			fmt.Fprintln(outputView, loadSample(registryUrl, strings.TrimLeft(strings.TrimSpace(s.line), "-"), cache))
 		case "sourceEvent":
 			parts := strings.Split(s.line, "\":")
 			if len(parts) == 1 {
@@ -89,11 +83,8 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal) error {
 			if s.isHotKey {
 				path = ""
 			}
-			if operation == "store" {
-				transformations = updateTransformations(transformations, operation, value, path)
-			} else {
-				transformations = updateTransformations(transformations, operation, path, value)
-			}
+
+			transformations = updateTransformations(transformations, operation, path, value)
 			transformations = rearrange(transformations)
 
 			output, err := yaml.Marshal(transformations)
@@ -114,26 +105,6 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal) error {
 	return nil
 }
 
-func loadSample(eventType string) string {
-	url := registryUrl + eventType
-	resp, err := http.Get(url)
-	if err != nil {
-		return fmt.Sprintf("registry request error: %v", err)
-	}
-	if resp.StatusCode == http.StatusNotFound {
-		return "Not found"
-	}
-	responseData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Sprintf("registry response error: %v", err)
-	}
-	data, err := json.MarshalIndent(schemaToData(responseData), "", "  ")
-	if err != nil {
-		return fmt.Sprintf("sample error: %v", err)
-	}
-	return string(data)
-}
-
 func removeEmptyStrings(s []string) []string {
 	var r []string
 	for _, str := range s {
@@ -144,7 +115,17 @@ func removeEmptyStrings(s []string) []string {
 	return r
 }
 
-func updateTransformations(transformations []v1alpha1.Transform, operation string, path string, value string) []v1alpha1.Transform {
+func updateTransformations(transformations []v1alpha1.Transform, operation, path, value string) []v1alpha1.Transform {
+	switch operation {
+	case "store":
+		p := path
+		path = value
+		value = p
+	case "shift":
+		path = fmt.Sprintf("%s:%s", path, value)
+		value = ""
+	}
+
 	if len(transformations) == 0 {
 		return []v1alpha1.Transform{
 			{

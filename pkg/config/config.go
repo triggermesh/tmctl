@@ -48,6 +48,8 @@ const (
 	// Broker config polling period. On Windows only.
 	defaultConfigPollingPeriod = "PT2S"
 
+	defaultSchemaRegistryURL = "http://localhost:8080/apis/registry/v2/groups/schema/artifacts/"
+
 	// TriggerMesh DockerHub Registry
 	DockerRegistry = "triggermesh"
 )
@@ -57,9 +59,10 @@ type Config struct {
 	ConfigHome string `yaml:"-"`
 
 	// Persisted attributes
-	Context     string   `yaml:"context"`
-	Triggermesh TmConfig `yaml:"triggermesh"`
-	Docker      Docker   `yaml:"docker"`
+	Context        string   `yaml:"context"`
+	SchemaRegistry string   `yaml:"schemaRegistry"`
+	Triggermesh    TmConfig `yaml:"triggermesh"`
+	Docker         Docker   `yaml:"docker"`
 }
 
 type Docker struct {

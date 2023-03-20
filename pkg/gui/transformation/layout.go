@@ -40,18 +40,19 @@ func (l *layout) draw(g *gocui.Gui) error {
 	var err error
 	maxX, maxY := g.Size()
 
-	l.sources, err = sourcesView(g, 0, 0, int(0.15*float32(maxX)), maxY/2-1)
+	l.sources, err = sourcesView(g, 0, 0, int(0.17*float32(maxX)), maxY/2-1)
 	if err != nil {
 		return err
 	}
-	l.targets, err = targetsView(g, 0, maxY/2, int(0.15*float32(maxX)), maxY-1)
+	l.targets, err = targetsView(g, 0, maxY/2, int(0.17*float32(maxX)), maxY-1)
 	if err != nil {
 		return err
 	}
 
-	l.sourcesSide = genericViewOrPanic(g, "Event sample", "sourceEvent", int(0.15*float32(maxX)), 0, maxX/2, maxY/2-1)
-	l.targetsSide = genericViewOrPanic(g, "Event sample", "targetEvent", int(0.15*float32(maxX)), maxY/2, maxX/2, maxY-1)
+	l.sourcesSide = genericViewOrPanic(g, "Event sample", "sourceEvent", int(0.17*float32(maxX)), 0, maxX/2, maxY/2-1)
+	l.targetsSide = genericViewOrPanic(g, "Event sample", "targetEvent", int(0.17*float32(maxX)), maxY/2, maxX/2, maxY-1)
 	l.transformation = genericViewOrPanic(g, "Transformation (Ctrl+E)", "transformation", maxX/2+1, 0, maxX-1, int(0.8*float32(maxY)))
+	l.transformation.Editable = true
 
 	help := genericViewOrPanic(g, "Help", "help", maxX/2+1, int(0.8*float32(maxY))+1, maxX-1, maxY-1)
 
