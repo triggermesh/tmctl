@@ -49,22 +49,24 @@ func (l *layout) draw(g *gocui.Gui) error {
 		return err
 	}
 
-	l.sourcesSide = genericViewOrPanic(g, "Event sample", "sourceEvent", int(0.17*float32(maxX)), 0, maxX/2, maxY/2-1)
-	l.targetsSide = genericViewOrPanic(g, "Event sample", "targetEvent", int(0.17*float32(maxX)), maxY/2, maxX/2, maxY-1)
+	l.sourcesSide = genericViewOrPanic(g, "Produced event sample", "sourceEvent", int(0.17*float32(maxX)), 0, maxX/2, maxY/2-1)
+	l.targetsSide = genericViewOrPanic(g, "Expected event sample", "targetEvent", int(0.17*float32(maxX)), maxY/2, maxX/2, maxY-1)
 	l.transformation = genericViewOrPanic(g, "Transformation (Ctrl+E)", "transformation", maxX/2+1, 0, maxX-1, int(0.8*float32(maxY)))
 	l.transformation.Editable = true
 
 	help := genericViewOrPanic(g, "Help", "help", maxX/2+1, int(0.8*float32(maxY))+1, maxX-1, maxY-1)
 
 	help.Clear()
+	fmt.Fprintln(help, "---")
 	fmt.Fprintln(help, "Ctrl+S - Event Sources list")
 	fmt.Fprintln(help, "Ctrl+T - Event Targets list")
 	fmt.Fprintln(help, "Ctrl+E - Transformation editor")
 	fmt.Fprintln(help, "---")
 	fmt.Fprintln(help, "Ctrl+W - Wipe event")
+	fmt.Fprintln(help, "Ctrl+R - Reset the transformation")
 	fmt.Fprintln(help, "---")
-	fmt.Fprintln(help, "Ctrl+Space - Create the transformation")
 	fmt.Fprintln(help, "Ctrl+C - Exit the wizard")
+	fmt.Fprintln(help, "Ctrl+Space - Create the transformation")
 
 	return nil
 }
@@ -128,10 +130,12 @@ func popOperationsView(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
-func popInputValueView(operation string, g *gocui.Gui, v *gocui.View) (*gocui.View, error) {
+func popInputValueView(path string, g *gocui.Gui) (*gocui.View, error) {
 	maxX, maxY := g.Size()
-	val := genericViewOrPanic(g, operation, "operationValue", maxX/2-30, maxY/2-1, maxX/2+30, maxY/2+1)
+	val := genericViewOrPanic(g, "input", "operationValue", maxX/2-35, maxY/2-1, maxX/2+35, maxY/2+1)
+	fmt.Fprintf(val, "%s: ", path)
 	val.Editable = true
+	val.SetCursor(len(path)+2, 0)
 	return g.SetCurrentView(val.Name())
 }
 

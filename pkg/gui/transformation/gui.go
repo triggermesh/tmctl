@@ -72,14 +72,20 @@ func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config
 		return "", "", "", nil, fmt.Errorf("component event types: %w", err)
 	}
 	for source, eventTypes := range sources {
-		fmt.Fprintf(layout.sources, "%s:\n", source)
+		if len(eventTypes) != 0 {
+			source = source + ":"
+		}
+		fmt.Fprintln(layout.sources, source)
 		for _, et := range eventTypes {
 			fmt.Fprintf(layout.sources, " -%s\n", et)
 		}
 		// fmt.Fprintln(layout.sources)
 	}
 	for target, eventTypes := range targets {
-		fmt.Fprintf(layout.targets, "%s:\n", target)
+		if len(eventTypes) != 0 {
+			target = target + ":"
+		}
+		fmt.Fprintln(layout.targets, target)
 		for _, et := range eventTypes {
 			fmt.Fprintf(layout.targets, " -%s\n", et)
 		}

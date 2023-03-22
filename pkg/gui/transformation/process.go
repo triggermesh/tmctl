@@ -54,37 +54,43 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, registryUrl string) er
 			outputView.Wrap = true
 			fmt.Fprintln(outputView, loadSample(registryUrl, strings.TrimLeft(strings.TrimSpace(s.line), "-"), cache))
 		case "sourceEvent":
-			parts := strings.Split(s.line, "\":")
-			if len(parts) == 1 {
-				continue
-			}
-			parts = strings.Split(parts[0], "\"")
-			spaces := len(parts[0])
-			key := strings.TrimSpace(parts[1])
-			nesting[spaces/2-1] = key // indentation is 2 spaces per object
-			for i := spaces / 2; i < len(nesting); i++ {
-				nesting[i] = ""
+			switch s.line {
+			case "{", "}":
+				nesting[0] = "."
+			default:
+				parts := strings.Split(s.line, "\":")
+				if len(parts) == 1 {
+					continue
+				}
+				parts = strings.Split(parts[0], "\"")
+				spaces := len(parts[0])
+				key := strings.TrimSpace(parts[1])
+				nesting[spaces/2-1] = key // indentation is 2 spaces per object
+				for i := spaces / 2; i < len(nesting); i++ {
+					nesting[i] = ""
+				}
 			}
 		case "transformationOperation":
 			transformations := []v1alpha1.Transform{}
 			transformationView, _ := g.View("transformation")
-			if err := yaml.Unmarshal([]byte(transformationView.Buffer()), &transformations); err != nil {
-				fmt.Fprintln(transformationView, err.Error())
-				continue
-			}
-			value := ""
-			operation := strings.TrimLeft(s.line, "-")
-			if line := strings.Split(operation, ":"); len(line) == 2 {
-				operation = line[0]
-				value = line[1]
-			}
 
+			operation := strings.TrimLeft(s.line, "-")
 			path := strings.Join(removeEmptyStrings(nesting), ".")
 			if s.isHotKey {
 				path = ""
 			}
 
-			transformations = updateTransformations(transformations, operation, path, value)
+			key, value, err := readOperation(operation, path, g)
+			if err != nil {
+				fmt.Fprintln(transformationView, err.Error())
+				continue
+			}
+			if err := yaml.Unmarshal([]byte(transformationView.Buffer()), &transformations); err != nil {
+				fmt.Fprintln(transformationView, err.Error())
+				continue
+			}
+
+			transformations = updateTransformations(transformations, operation, key, value)
 			transformations = rearrange(transformations)
 
 			output, err := yaml.Marshal(transformations)
@@ -95,14 +101,45 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, registryUrl string) er
 			transformationView.Clear()
 			transformationView.Write(output)
 		default:
-			// // debug
-			// debugOutput, _ := g.View("transformation")
-			// debugOutput.Autoscroll = true
-			// fmt.Fprintln(debugOutput, s)
 		}
 		g.Update(func(g *gocui.Gui) error { return nil })
 	}
 	return nil
+}
+
+func readOperation(operation, path string, g *gocui.Gui) (string, string, error) {
+	value := ""
+	switch operation {
+	case "delete", "parse":
+	case "add", "store", "shift":
+		inputValue := make(chan string)
+		inputView, err := popInputValueView(path, g)
+		if err != nil {
+			return "", "", err
+		}
+		g.Update(func(g *gocui.Gui) error { return nil })
+		if err := g.SetKeybinding(inputView.Name(), gocui.KeyEnter, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
+			value := v.Buffer()
+			if err := g.DeleteView(inputView.Name()); err != nil {
+				return err
+			}
+			g.DeleteKeybindings(inputView.Name())
+			inputValue <- value
+			return nil
+		}); err != nil {
+			return "", "", err
+		}
+		input := <-inputValue
+
+		inputs := strings.Split(input, ":")
+		path = strings.TrimSpace(inputs[0])
+		value = strings.TrimSpace(inputs[1])
+	}
+	g.DeleteView("transformationOperation")
+	if _, err := g.SetCurrentView("sourceEvent"); err != nil {
+		return "", "", err
+	}
+	return path, value, nil
 }
 
 func removeEmptyStrings(s []string) []string {
