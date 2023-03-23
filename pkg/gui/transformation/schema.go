@@ -58,6 +58,9 @@ type Media struct {
 type registryCache map[string][]byte
 
 func loadSample(registryUrl, eventType string, cache registryCache) string {
+	if eventType == "*" {
+		return "Not selected"
+	}
 	if sample, exists := cache[eventType]; exists {
 		return string(sample)
 	}
@@ -70,7 +73,7 @@ func loadSample(registryUrl, eventType string, cache registryCache) string {
 		return fmt.Sprintf("registry request error: %v", err)
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		return "Not found"
+		return "Event schema not defined"
 	}
 	responseData, err := io.ReadAll(resp.Body)
 	if err != nil {

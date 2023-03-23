@@ -52,7 +52,9 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, registryUrl string) er
 			outputView, _ := g.View("targetEvent")
 			outputView.Clear()
 			outputView.Wrap = true
-			fmt.Fprintln(outputView, loadSample(registryUrl, strings.TrimLeft(strings.TrimSpace(s.line), "-"), cache))
+			if !strings.HasSuffix(s.line, ":") {
+				fmt.Fprintln(outputView, loadSample(registryUrl, strings.TrimLeft(strings.TrimSpace(s.line), "-"), cache))
+			}
 		case "sourceEvent":
 			switch s.line {
 			case "{", "}":
@@ -100,7 +102,6 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, registryUrl string) er
 			}
 			transformationView.Clear()
 			transformationView.Write(output)
-		default:
 		}
 		g.Update(func(g *gocui.Gui) error { return nil })
 	}
@@ -131,9 +132,12 @@ func readOperation(operation, path string, g *gocui.Gui) (string, string, error)
 		}
 		input := <-inputValue
 
-		inputs := strings.Split(input, ":")
-		path = strings.TrimSpace(inputs[0])
-		value = strings.TrimSpace(inputs[1])
+		path = "."
+		value = strings.TrimSpace(input)
+		if inputs := strings.Split(input, ":"); len(inputs) == 2 {
+			path = strings.TrimSpace(inputs[0])
+			value = strings.TrimSpace(inputs[1])
+		}
 	}
 	g.DeleteView("transformationOperation")
 	if _, err := g.SetCurrentView("sourceEvent"); err != nil {

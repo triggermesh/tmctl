@@ -67,7 +67,6 @@ https://github.com/triggermesh/triggermesh/tree/main/config/samples/bumblebee`
 )
 
 func (o *CliOptions) newTransformationCmd() *cobra.Command {
-	var wizard bool
 	var name, target, file string
 	var eventSourcesFilter, eventTypesFilter []string
 	transformationCmd := &cobra.Command{
@@ -82,7 +81,8 @@ func (o *CliOptions) newTransformationCmd() *cobra.Command {
 EOF`,
 		ValidArgs: []string{"--name", "--target", "--source", "--eventTypes", "--from"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if wizard {
+			switch {
+			case o.Config.SchemaRegistry != "":
 				name, sourceEventType, target, spec, err := transformationgui.Create(o.CRD, o.Manifest, o.Config)
 				if err == gocui.ErrQuit {
 					return nil
@@ -91,15 +91,14 @@ EOF`,
 					return fmt.Errorf("transformation wizard error: %w", err)
 				}
 				return o.transformation(name, target, spec, []string{}, []string{sourceEventType})
-			}
-			if file != "" {
+			case file != "":
 				data, err := os.ReadFile(file)
 				if err != nil {
 					return fmt.Errorf("file %q read: %w", file, err)
 				}
 				return o.transformation(name, target, bytes.NewBuffer(data), eventSourcesFilter, eventTypesFilter)
 			}
-			return nil
+			return o.transformation(name, target, nil, eventSourcesFilter, eventTypesFilter)
 		},
 	}
 
@@ -109,7 +108,6 @@ EOF`,
 
 	transformationCmd.Flags().StringVar(&name, "name", "", "Transformation name")
 	transformationCmd.Flags().StringVarP(&file, "from", "f", "", "Transformation specification file")
-	transformationCmd.Flags().BoolVar(&wizard, "wizard", true, "Transformation wizard")
 	transformationCmd.Flags().StringVar(&target, "target", "", "Target name")
 	transformationCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Sources component names")
 	transformationCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")

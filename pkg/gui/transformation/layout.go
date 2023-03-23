@@ -55,7 +55,6 @@ func (l *layout) draw(g *gocui.Gui) error {
 	l.transformation.Editable = true
 
 	help := genericViewOrPanic(g, "Help", "help", maxX/2+1, int(0.8*float32(maxY))+1, maxX-1, maxY-1)
-
 	help.Clear()
 	fmt.Fprintln(help, "---")
 	fmt.Fprintln(help, "Ctrl+S - Event Sources list")
@@ -67,7 +66,6 @@ func (l *layout) draw(g *gocui.Gui) error {
 	fmt.Fprintln(help, "---")
 	fmt.Fprintln(help, "Ctrl+C - Exit the wizard")
 	fmt.Fprintln(help, "Ctrl+Space - Create the transformation")
-
 	return nil
 }
 
@@ -80,9 +78,7 @@ func sourcesView(g *gocui.Gui, x1, y1, x2, y2 int) (*gocui.View, error) {
 		sources.Title = "Source (Ctrl+S)"
 		sources.Highlight = true
 		sources.SelBgColor = gocui.ColorGreen
-
 		fmt.Fprintln(sources, "*")
-
 		if _, err := g.SetCurrentView("sources"); err != nil {
 			return nil, err
 		}
@@ -98,9 +94,7 @@ func targetsView(g *gocui.Gui, x1, y1, x2, y2 int) (*gocui.View, error) {
 		}
 		targets.Title = "Target (Ctrl+T)"
 		targets.SelBgColor = gocui.ColorGreen
-
 		fmt.Fprintln(targets, "*")
-
 	}
 	return targets, nil
 }

@@ -206,7 +206,7 @@ func readLayout(l *layout) (string, string, string, string, error) {
 		}
 		targetEventType = strings.TrimLeft(targetSelectedLine, " -")
 	default:
-		targetComponent = targetSelectedLine
+		targetComponent = strings.TrimRight(targetSelectedLine, ":")
 	}
 	spec := l.transformation.Buffer()
 	return sourceEventType, targetComponent, targetEventType, spec, nil

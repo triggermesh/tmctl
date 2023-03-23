@@ -23,8 +23,6 @@ import (
 )
 
 type keybindingHandler struct {
-	// operation string
-
 	signals       chan signal
 	createAndExit chan string
 }
@@ -149,27 +147,6 @@ func (h *keybindingHandler) saveAndExit(g *gocui.Gui, v *gocui.View) error {
 }
 
 func (h *keybindingHandler) selectOperation(g *gocui.Gui, v *gocui.View) error {
-	// _, cy := v.Cursor()
-	// operation, err := v.Line(cy)
-	// if err != nil {
-	// return err
-	// }
-
-	// switch operation {
-	// case "-delete", "-parse":
-	// if err := h.sendSignal(g); err != nil {
-	// return err
-	// }
-
-	// if _, err := g.SetCurrentView("sourceEvent"); err != nil {
-	// return err
-	// }
-	// case "-add", "-store", "-shift":
-	// if err := h.sendSignal(g); err != nil {
-	// return err
-	// }
-	// }
-	// return g.DeleteView(g.CurrentView().Name())
 	return h.sendSignal(g)
 }
 
@@ -329,8 +306,19 @@ func (h *keybindingHandler) cursorDownEventSample(g *gocui.Gui, v *gocui.View) e
 	ox, oy := v.Origin()
 	cx, cy := v.Cursor()
 	dy := cy + 1
-	if l, err := v.Line(dy); err != nil || l == "" {
+
+	l, err := v.Line(dy)
+	if err != nil || l == "}" {
 		return nil
+	}
+	switch strings.TrimSpace(l) {
+	case "":
+		return nil
+	case "}", "]", "},", "],":
+		if err := v.SetCursor(cx, dy); err != nil {
+			return err
+		}
+		return h.cursorDownEventSample(g, v)
 	}
 	if err := v.SetCursor(cx, dy); err != nil {
 		if err := v.SetOrigin(ox, oy+1); err != nil {
@@ -344,8 +332,18 @@ func (h *keybindingHandler) cursorUpEventSample(g *gocui.Gui, v *gocui.View) err
 	ox, oy := v.Origin()
 	cx, cy := v.Cursor()
 	dy := cy - 1
-	if l, err := v.Line(dy); err != nil || l == "" {
+	l, err := v.Line(dy)
+	if err != nil || l == "}" {
 		return nil
+	}
+	switch strings.TrimSpace(l) {
+	case "":
+		return nil
+	case "}", "]", "},", "],":
+		if err := v.SetCursor(cx, dy); err != nil {
+			return err
+		}
+		return h.cursorUpEventSample(g, v)
 	}
 	if err := v.SetCursor(cx, dy); err != nil && oy > 0 {
 		if err := v.SetOrigin(ox, oy-1); err != nil {
