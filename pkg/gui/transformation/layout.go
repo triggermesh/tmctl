@@ -49,8 +49,8 @@ func (l *layout) draw(g *gocui.Gui) error {
 		return err
 	}
 
-	l.sourcesSide = genericViewOrPanic(g, "Produced event sample", "sourceEvent", int(0.17*float32(maxX)), 0, maxX/2, maxY/2-1)
-	l.targetsSide = genericViewOrPanic(g, "Expected event sample", "targetEvent", int(0.17*float32(maxX)), maxY/2, maxX/2, maxY-1)
+	l.sourcesSide = genericViewOrPanic(g, "Produced event", "sourceEvent", int(0.17*float32(maxX)), 0, maxX/2, maxY/2-1)
+	l.targetsSide = genericViewOrPanic(g, "Expected event", "targetEvent", int(0.17*float32(maxX)), maxY/2, maxX/2, maxY-1)
 	l.transformation = genericViewOrPanic(g, "Transformation (Ctrl+E)", "transformation", maxX/2+1, 0, maxX-1, int(0.8*float32(maxY)))
 	l.transformation.Editable = true
 

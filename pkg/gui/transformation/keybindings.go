@@ -188,6 +188,13 @@ func (h *keybindingHandler) switchToTransformation(g *gocui.Gui, v *gocui.View) 
 }
 
 func (h *keybindingHandler) sourceCursorRight(g *gocui.Gui, v *gocui.View) error {
+	se, err := g.View("sourceEvent")
+	if err != nil {
+		return err
+	}
+	if !strings.HasPrefix(se.Buffer(), "{") {
+		return nil
+	}
 	newView, err := g.SetCurrentView("sourceEvent")
 	if err != nil {
 		return err

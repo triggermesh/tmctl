@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -34,7 +36,33 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
+type list struct {
+	targets map[string]meta
+	sources map[string]meta
+}
+
+type meta struct {
+	eventTypes []string
+	kind       string
+}
+
+type registryCache map[string][]byte
+
 func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config.Config) (string, string, string, io.Reader, error) {
+	componentsList, err := parseComponents(manifest, config, crds)
+	if err != nil {
+		return "", "", "", nil, fmt.Errorf("manifest read error: %w", err)
+	}
+
+	cache := make(registryCache)
+
+	if err := preloadRegistryData(componentsList.sources, config.SchemaRegistry, cache); err != nil {
+		return "", "", "", nil, fmt.Errorf("registry error: %w", err)
+	}
+	if err := preloadRegistryData(componentsList.targets, config.SchemaRegistry, cache); err != nil {
+		return "", "", "", nil, fmt.Errorf("registry error: %w", err)
+	}
+
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
 		return "", "", "", nil, err
@@ -67,29 +95,23 @@ func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config
 		return "", "", "", nil, fmt.Errorf("view init timeout")
 	}
 
-	sources, targets, err := sourcesAndTargets(manifest, config, crds)
-	if err != nil {
-		return "", "", "", nil, fmt.Errorf("component event types: %w", err)
-	}
-	for source, eventTypes := range sources {
-		if len(eventTypes) != 0 {
-			source = source + ":"
+	for name, source := range componentsList.sources {
+		if len(source.eventTypes) != 0 {
+			name = name + ":"
 		}
-		fmt.Fprintln(layout.sources, source)
-		for _, et := range eventTypes {
+		fmt.Fprintln(layout.sources, name)
+		for _, et := range source.eventTypes {
 			fmt.Fprintf(layout.sources, " -%s\n", et)
 		}
-		// fmt.Fprintln(layout.sources)
 	}
-	for target, eventTypes := range targets {
-		if len(eventTypes) != 0 {
-			target = target + ":"
+	for name, target := range componentsList.targets {
+		if len(target.eventTypes) != 0 {
+			name = name + ":"
 		}
-		fmt.Fprintln(layout.targets, target)
-		for _, et := range eventTypes {
+		fmt.Fprintln(layout.targets, name)
+		for _, et := range target.eventTypes {
 			fmt.Fprintf(layout.targets, " -%s\n", et)
 		}
-		// fmt.Fprintln(layout.targets)
 	}
 	g.Update(func(g *gocui.Gui) error { return nil })
 
@@ -98,7 +120,7 @@ func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config
 		return "", "", "", nil, err
 	}
 
-	go ProcessKeystrokes(g, keybindingHandler.signals, config.SchemaRegistry)
+	go ProcessKeystrokes(g, keybindingHandler.signals, cache)
 
 	select {
 	case err := <-errC:
@@ -123,23 +145,29 @@ func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config
 	}
 }
 
-func sourcesAndTargets(m *manifest.Manifest, config *config.Config, crds map[string]crd.CRD) (map[string][]string, map[string][]string, error) {
-	sources := make(map[string][]string, 0)
-	targets := make(map[string][]string, 0)
+func parseComponents(m *manifest.Manifest, config *config.Config, crds map[string]crd.CRD) (list, error) {
+	sources := make(map[string]meta, 0)
+	targets := make(map[string]meta, 0)
 	for _, object := range m.Objects {
 		switch object.APIVersion {
 		case "sources.triggermesh.io/v1alpha1", "flow.triggermesh.io/v1alpha1":
 			et, err := sourceEventTypes(object.Metadata.Name, config, m, crds)
 			if err != nil {
-				return nil, nil, err
+				return list{}, err
 			}
-			sources[object.Metadata.Name] = et
+			sources[object.Metadata.Name] = meta{
+				eventTypes: et,
+				kind:       object.Kind,
+			}
 		case "targets.triggermesh.io/v1alpha1":
 			et, err := targetEventTypes(object.Metadata.Name, config, m, crds)
 			if err != nil {
-				return nil, nil, err
+				return list{}, err
 			}
-			targets[object.Metadata.Name] = et
+			targets[object.Metadata.Name] = meta{
+				eventTypes: et,
+				kind:       object.Kind,
+			}
 		case service.APIVersion:
 			role, set := object.Metadata.Labels[service.RoleLabel]
 			if !set {
@@ -147,13 +175,16 @@ func sourcesAndTargets(m *manifest.Manifest, config *config.Config, crds map[str
 			}
 			switch role {
 			case string(service.Producer):
-				sources[object.Metadata.Name] = []string{}
+				sources[object.Metadata.Name] = meta{}
 			case string(service.Consumer):
-				targets[object.Metadata.Name] = []string{}
+				targets[object.Metadata.Name] = meta{}
 			}
 		}
 	}
-	return sources, targets, nil
+	return list{
+		targets: targets,
+		sources: sources,
+	}, nil
 }
 
 func sourceEventTypes(name string, config *config.Config, manifest *manifest.Manifest, crds map[string]crd.CRD) ([]string, error) {
@@ -210,4 +241,35 @@ func readLayout(l *layout) (string, string, string, string, error) {
 	}
 	spec := l.transformation.Buffer()
 	return sourceEventType, targetComponent, targetEventType, spec, nil
+}
+
+func preloadRegistryData(componentsList map[string]meta, registryUrl string, cache map[string][]byte) error {
+	cache["*"] = []byte("Not selected")
+
+	for _, component := range componentsList {
+		for _, eventType := range component.eventTypes {
+			registryEndpoint, err := url.JoinPath(registryUrl, "schemagroups", component.kind, "schemas", eventType)
+			if err != nil {
+				return fmt.Errorf("registry path error: %v", err)
+			}
+			resp, err := http.Get(registryEndpoint)
+			if err != nil {
+				return fmt.Errorf("registry request error: %v", err)
+			}
+			if resp.StatusCode != http.StatusOK {
+				cache[eventType] = []byte("Event schema not available: " + resp.Status)
+				continue
+			}
+			responseData, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return fmt.Errorf("registry response read error: %v", err)
+			}
+			data, err := json.MarshalIndent(schemaToData(responseData), "", "  ")
+			if err != nil {
+				return fmt.Errorf("sample error: %v", err)
+			}
+			cache[eventType] = data
+		}
+	}
+	return nil
 }

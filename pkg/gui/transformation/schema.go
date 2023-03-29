@@ -18,10 +18,6 @@ package transformation
 
 import (
 	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 )
 
 const (
@@ -29,6 +25,10 @@ const (
 	jsonSchemaDraft07   = "http://json-schema.org/draft-07/schema#"
 	jsonSchemaDraft2020 = "https://json-schema.org/draft/2020-12/schema"
 )
+
+type CloudEventsSchema struct {
+	Data Schema `json:"Data"`
+}
 
 type Schema struct {
 	Draft       string `json:"$schema"`
@@ -55,51 +55,20 @@ type Media struct {
 	BinaryEncoding string `json:"binaryEncoding"`
 }
 
-type registryCache map[string][]byte
-
-func loadSample(registryUrl, eventType string, cache registryCache) string {
-	if eventType == "*" {
-		return "Not selected"
-	}
-	if sample, exists := cache[eventType]; exists {
-		return string(sample)
-	}
-	registryEndpoint, err := url.JoinPath(registryUrl, eventType)
-	if err != nil {
-		return fmt.Sprintf("registry URL error: %v", err)
-	}
-	resp, err := http.Get(registryEndpoint)
-	if err != nil {
-		return fmt.Sprintf("registry request error: %v", err)
-	}
-	if resp.StatusCode == http.StatusNotFound {
-		return "Event schema not defined"
-	}
-	responseData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Sprintf("registry response error: %v", err)
-	}
-	data, err := json.MarshalIndent(schemaToData(responseData), "", "  ")
-	if err != nil {
-		return fmt.Sprintf("sample error: %v", err)
-	}
-	cache[eventType] = data
-	return string(data)
-}
-
 func schemaToData(data []byte) map[string]interface{} {
 	// the list of sources for sample event:
 	// - examples
 	// - $ref to $definitions
 	// - required property
 
-	var s Schema
-	if err := json.Unmarshal(data, &s); err != nil {
+	var ces CloudEventsSchema
+	if err := json.Unmarshal(data, &ces); err != nil {
 		return map[string]interface{}{
 			"error unmarshaling schema": err,
 		}
 	}
 
+	s := ces.Data
 	if len(s.Examples) != 0 {
 		return s.Examples[0].(map[string]interface{})
 	}
@@ -215,8 +184,6 @@ func getType(t interface{}) string {
 	}
 	return ""
 }
-
-// "array", "boolean", "integer", "null", "number", "object", "string"
 
 func value(t string) interface{} {
 	switch t {

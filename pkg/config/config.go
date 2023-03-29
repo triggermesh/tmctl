@@ -48,7 +48,7 @@ const (
 	// Broker config polling period. On Windows only.
 	defaultConfigPollingPeriod = "PT2S"
 
-	defaultSchemaRegistryURL = "http://localhost:8080/apis/registry/v2/groups/schema/artifacts/"
+	defaultSchemaRegistryURL = "https://registry.staging.triggermesh.io"
 
 	// TriggerMesh DockerHub Registry
 	DockerRegistry = "triggermesh"

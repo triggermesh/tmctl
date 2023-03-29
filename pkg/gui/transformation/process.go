@@ -26,9 +26,8 @@ import (
 	"github.com/jroimartin/gocui"
 )
 
-func ProcessKeystrokes(g *gocui.Gui, signals chan signal, registryUrl string) error {
+func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache) error {
 	nesting := make([]string, 10) // maximum level of objects netsing in the event
-	cache := make(registryCache, 20)
 	currentEventType := ""
 
 	for s := range signals {
@@ -39,7 +38,7 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, registryUrl string) er
 			outputView.Wrap = true
 
 			eventType := strings.TrimLeft(strings.TrimSpace(s.line), "-")
-			fmt.Fprintln(outputView, loadSample(registryUrl, eventType, cache))
+			fmt.Fprintln(outputView, string(cache[eventType]))
 
 			if currentEventType == "" {
 				currentEventType = eventType
@@ -53,7 +52,7 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, registryUrl string) er
 			outputView.Clear()
 			outputView.Wrap = true
 			if !strings.HasSuffix(s.line, ":") {
-				fmt.Fprintln(outputView, loadSample(registryUrl, strings.TrimLeft(strings.TrimSpace(s.line), "-"), cache))
+				fmt.Fprintln(outputView, string(cache[s.line]))
 			}
 		case "sourceEvent":
 			switch s.line {
