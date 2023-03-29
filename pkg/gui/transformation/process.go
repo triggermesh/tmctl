@@ -35,7 +35,6 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache) e
 		case "sources":
 			outputView, _ := g.View("sourceEvent")
 			outputView.Clear()
-			outputView.Wrap = true
 
 			eventType := strings.TrimLeft(strings.TrimSpace(s.line), "-")
 			fmt.Fprintln(outputView, string(cache[eventType]))
@@ -50,9 +49,9 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache) e
 		case "targets":
 			outputView, _ := g.View("targetEvent")
 			outputView.Clear()
-			outputView.Wrap = true
 			if !strings.HasSuffix(s.line, ":") {
-				fmt.Fprintln(outputView, string(cache[s.line]))
+				eventType := strings.TrimLeft(strings.TrimSpace(s.line), "-")
+				fmt.Fprintln(outputView, string(cache[eventType]))
 			}
 		case "sourceEvent":
 			switch s.line {

@@ -232,7 +232,7 @@ func readLayout(l *layout) (string, string, string, string, error) {
 			if strings.HasPrefix(selectedLine, " -") {
 				continue
 			}
-			targetComponent = selectedLine
+			targetComponent = strings.TrimRight(selectedLine, ":")
 			break
 		}
 		targetEventType = strings.TrimLeft(targetSelectedLine, " -")
