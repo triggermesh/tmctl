@@ -26,7 +26,7 @@ import (
 	"github.com/jroimartin/gocui"
 )
 
-func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache) error {
+func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache) {
 	nesting := make([]string, 10) // maximum level of objects netsing in the event
 	currentEventType := ""
 
@@ -99,11 +99,10 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache) e
 				continue
 			}
 			transformationView.Clear()
-			transformationView.Write(output)
+			fmt.Fprintln(transformationView, output)
 		}
 		g.Update(func(g *gocui.Gui) error { return nil })
 	}
-	return nil
 }
 
 func readOperation(operation, path string, g *gocui.Gui) (string, string, error) {
@@ -137,7 +136,9 @@ func readOperation(operation, path string, g *gocui.Gui) (string, string, error)
 			value = strings.TrimSpace(inputs[1])
 		}
 	}
-	g.DeleteView("transformationOperation")
+	if err := g.DeleteView("transformationOperation"); err != nil {
+		return "", "", err
+	}
 	if _, err := g.SetCurrentView("sourceEvent"); err != nil {
 		return "", "", err
 	}

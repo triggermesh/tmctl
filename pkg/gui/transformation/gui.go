@@ -257,7 +257,7 @@ func preloadRegistryData(componentsList map[string]meta, registryUrl string, cac
 				return fmt.Errorf("registry request error: %v", err)
 			}
 			if resp.StatusCode != http.StatusOK {
-				cache[eventType] = []byte("Event schema not available: " + resp.Status)
+				cache[eventType] = []byte("Event schema not available")
 				continue
 			}
 			responseData, err := io.ReadAll(resp.Body)

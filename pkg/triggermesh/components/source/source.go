@@ -233,28 +233,28 @@ func (s *Source) GetEventTypes() ([]string, error) {
 	// try GetEventTypes method first
 	o, err := s.asUnstructured()
 	if err != nil {
-		return s.tryCRDEventTypes()
+		return s.tryCRDEventTypes(), nil
 	}
 	eventAttributes, err := adapter.EventAttributes(o)
 	if err != nil {
-		return s.tryCRDEventTypes()
+		return s.tryCRDEventTypes(), nil
 	}
 	if len(eventAttributes.ProducedEventTypes) != 0 {
 		return eventAttributes.ProducedEventTypes, nil
 	}
-	return s.tryCRDEventTypes()
+	return s.tryCRDEventTypes(), nil
 }
 
-func (s *Source) tryCRDEventTypes() ([]string, error) {
+func (s *Source) tryCRDEventTypes() []string {
 	var et crd.EventTypes
 	if err := json.Unmarshal([]byte(s.CRD.Metadata.Annotations.ProducedEventTypes), &et); err != nil {
-		return []string{}, fmt.Errorf("unable to parse event annotations: %w", err)
+		return []string{}
 	}
 	var result []string
 	for _, e := range et {
 		result = append(result, e.Type)
 	}
-	return result, nil
+	return result
 }
 
 func (s *Source) GetEventSource() (string, error) {

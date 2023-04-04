@@ -129,7 +129,9 @@ func popInputValueView(path string, g *gocui.Gui) (*gocui.View, error) {
 	val := genericViewOrPanic(g, "input", "operationValue", maxX/2-35, maxY/2-1, maxX/2+35, maxY/2+1)
 	fmt.Fprintf(val, "%s: ", path)
 	val.Editable = true
-	val.SetCursor(len(path)+2, 0)
+	if err := val.SetCursor(len(path)+2, 0); err != nil {
+		return nil, err
+	}
 	return g.SetCurrentView(val.Name())
 }
 

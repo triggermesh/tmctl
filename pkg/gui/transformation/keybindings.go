@@ -211,7 +211,9 @@ func (h *keybindingHandler) sourceEventCursorLeft(g *gocui.Gui, v *gocui.View) e
 	}
 	newView.Highlight = true
 	v.Highlight = false
-	v.SetCursor(0, 0)
+	if err := v.SetCursor(0, 0); err != nil {
+		return err
+	}
 	return h.sendSignal(g)
 }
 
@@ -250,7 +252,9 @@ func (h *keybindingHandler) cursorDownSources(g *gocui.Gui, v *gocui.View) error
 	if l, err := v.Line(dy); err != nil || l == "" {
 		return nil
 	} else if strings.HasSuffix(l, ":") {
-		v.SetCursor(cx, dy)
+		if err := v.SetCursor(cx, dy); err != nil {
+			return err
+		}
 		return h.cursorDownSources(g, v)
 	}
 	if err := v.SetCursor(cx, dy); err != nil {
@@ -268,7 +272,9 @@ func (h *keybindingHandler) cursorUpSources(g *gocui.Gui, v *gocui.View) error {
 	if l, err := v.Line(dy); err != nil || l == "" {
 		return nil
 	} else if strings.HasSuffix(l, ":") {
-		v.SetCursor(cx, dy)
+		if err := v.SetCursor(cx, dy); err != nil {
+			return err
+		}
 		return h.cursorUpSources(g, v)
 	}
 	if err := v.SetCursor(cx, dy); err != nil && oy > 0 {
