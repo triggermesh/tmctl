@@ -36,7 +36,7 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache) {
 			outputView, _ := g.View("sourceEvent")
 			outputView.Clear()
 
-			eventType := strings.TrimLeft(strings.TrimSpace(s.line), "-")
+			eventType := strings.TrimLeft(s.line, " -")
 			fmt.Fprintln(outputView, string(cache[eventType]))
 
 			if currentEventType == "" {
@@ -49,9 +49,11 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache) {
 		case "targets":
 			outputView, _ := g.View("targetEvent")
 			outputView.Clear()
-			if !strings.HasSuffix(s.line, ":") {
-				eventType := strings.TrimLeft(strings.TrimSpace(s.line), "-")
-				fmt.Fprintln(outputView, string(cache[eventType]))
+			line := strings.TrimLeft(s.line, " -")
+			if sample, exists := cache[line]; exists {
+				fmt.Fprintln(outputView, string(sample))
+			} else {
+				fmt.Fprintln(outputView, string("Component accepts arbitrary event format"))
 			}
 		case "sourceEvent":
 			switch s.line {
@@ -72,7 +74,10 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache) {
 			}
 		case "transformationOperation":
 			transformations := []v1alpha1.Transform{}
-			transformationView, _ := g.View("transformation")
+			transformationView, err := g.View("transformation")
+			if err != nil {
+				continue
+			}
 
 			operation := strings.TrimLeft(s.line, "-")
 			path := strings.Join(removeEmptyStrings(nesting), ".")
@@ -99,7 +104,7 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache) {
 				continue
 			}
 			transformationView.Clear()
-			fmt.Fprintln(transformationView, output)
+			fmt.Fprintln(transformationView, string(output))
 		}
 		g.Update(func(g *gocui.Gui) error { return nil })
 	}
@@ -136,12 +141,8 @@ func readOperation(operation, path string, g *gocui.Gui) (string, string, error)
 			value = strings.TrimSpace(inputs[1])
 		}
 	}
-	if err := g.DeleteView("transformationOperation"); err != nil {
-		return "", "", err
-	}
-	if _, err := g.SetCurrentView("sourceEvent"); err != nil {
-		return "", "", err
-	}
+	_ = g.DeleteView("transformationOperation")
+	_, _ = g.SetCurrentView("sourceEvent")
 	return path, value, nil
 }
 

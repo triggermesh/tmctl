@@ -236,12 +236,7 @@ func targets(object unstructured.Unstructured) (EventAttributes, error) {
 		return EventAttributes{
 			ProducedEventTypes:  o.GetEventTypes(),
 			ProducedEventSource: o.AsEventSource(),
-			// AcceptedEventTypes:  o.AcceptedEventTypes(),
-			AcceptedEventTypes: []string{
-				"com.slack.webapi.chat.postMessage",
-				"com.slack.webapi.chat.scheduleMessage",
-				"com.slack.webapi.chat.update",
-			},
+			AcceptedEventTypes:  o.AcceptedEventTypes(),
 		}, nil
 	case "SolaceTarget":
 		return EventAttributes{}, nil
