@@ -14,8 +14,8 @@ require (
 	github.com/cloudevents/sdk-go/v2 v2.13.0
 	github.com/docker/docker v23.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/spf13/cobra v1.7.0
 	github.com/jroimartin/gocui v0.5.0
+	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.2
 	github.com/triggermesh/brokers v1.2.1
 	github.com/triggermesh/triggermesh v1.24.4
@@ -47,7 +47,7 @@ require (
 	contrib.go.opencensus.io/exporter/ocagent v0.7.1-0.20200907061046-05415f1de66d // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0 // indirect
 	contrib.go.opencensus.io/exporter/zipkin v0.1.2 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.3.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.4.0 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.22 // indirect
 	github.com/Azure/go-autorest/autorest/azure/cli v0.4.5 // indirect
