@@ -206,6 +206,9 @@ func InitializeAndGetStatus(ctx context.Context, object unstructured.Unstructure
 		if err != nil {
 			return nil, err
 		}
+		if err := tmgcpstorage.EnsureNotificationConfig(ctx, stCli, topic); err != nil {
+			return nil, err
+		}
 		return map[string]interface{}{"subscription": o.Status.Subscription.String()}, tmgcpstorage.EnsureNotificationConfig(ctx, stCli, topic)
 	case "GoogleCloudSourceRepositoriesSource":
 		var o *sourcesv1alpha1.GoogleCloudSourceRepositoriesSource
