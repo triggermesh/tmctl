@@ -63,7 +63,7 @@ func (h *keybindingHandler) Create(g *gocui.Gui) error {
 	}
 
 	// save and exit
-	if err := g.SetKeybinding("", gocui.KeyCtrlSpace, gocui.ModNone, popTransformationNameView); err != nil {
+	if err := g.SetKeybinding("", gocui.KeyCtrlB, gocui.ModNone, popTransformationNameView); err != nil {
 		return err
 	}
 	if err := g.SetKeybinding("transformationName", gocui.KeyEnter, gocui.ModNone, h.saveAndExit); err != nil {

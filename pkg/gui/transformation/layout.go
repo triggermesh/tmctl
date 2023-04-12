@@ -56,7 +56,6 @@ func (l *layout) draw(g *gocui.Gui) error {
 
 	help := genericViewOrPanic(g, "Help", "help", maxX/2+1, int(0.8*float32(maxY))+1, maxX-1, maxY-1)
 	help.Clear()
-	fmt.Fprintln(help, "---")
 	fmt.Fprintln(help, "Ctrl+S - Event Sources list")
 	fmt.Fprintln(help, "Ctrl+T - Event Targets list")
 	fmt.Fprintln(help, "Ctrl+E - Transformation editor")
@@ -65,7 +64,7 @@ func (l *layout) draw(g *gocui.Gui) error {
 	fmt.Fprintln(help, "Ctrl+R - Reset the transformation")
 	fmt.Fprintln(help, "---")
 	fmt.Fprintln(help, "Ctrl+C - Exit the wizard")
-	fmt.Fprintln(help, "Ctrl+Space - Create the transformation")
+	fmt.Fprintln(help, "Ctrl+B - Create the transformation")
 	return nil
 }
 
