@@ -22,7 +22,7 @@ tmctl import -f manifest.yaml
 ### Options inherited from parent commands
 
 ```
-      --version string   TriggerMesh components version. (default "v1.24.0")
+      --version string   TriggerMesh components version. (default "v1.24.4")
 ```
 
 ### SEE ALSO
