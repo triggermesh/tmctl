@@ -115,6 +115,11 @@ func (o *CliOptions) transformation(name, target, file string, eventSourcesFilte
 		targetComponent = t
 	}
 
+	var expectedEventTypes []string
+	if consumer, ok := targetComponent.(triggermesh.Consumer); ok {
+		expectedEventTypes, _ = consumer.ConsumedEventTypes()
+	}
+
 	et, err := o.translateEventSource(eventSourcesFilter)
 	if err != nil {
 		return err
@@ -151,15 +156,37 @@ func (o *CliOptions) transformation(name, target, file string, eventSourcesFilte
 	t := transformation.New(name, "transformation", o.Config.Context, o.Config.Triggermesh.ComponentsVersion, crd, spec)
 
 	transformationEventType := fmt.Sprintf("%s.output", t.GetName())
-	if et, _ := t.(triggermesh.Producer).GetEventTypes(); len(et) == 0 {
+	if len(expectedEventTypes) > 0 {
+		transformationEventType = expectedEventTypes[0]
+	}
+
+	producedEventTypes, _ := t.(triggermesh.Producer).GetEventTypes()
+	if len(producedEventTypes) == 0 {
 		if err := t.(triggermesh.Producer).SetEventAttributes(map[string]string{
 			"type": transformationEventType,
 		}); err != nil {
 			return fmt.Errorf("setting event type: %w", err)
 		}
 	} else {
-		transformationEventType = et[0]
+		transformationEventType = producedEventTypes[0]
 	}
+
+	eventTypesMatch := false
+	if len(expectedEventTypes) == 0 {
+		eventTypesMatch = true
+	}
+	for _, eet := range expectedEventTypes {
+		if eet == transformationEventType {
+			eventTypesMatch = true
+			break
+		}
+	}
+
+	if targetComponent != nil && !eventTypesMatch {
+		log.Printf(`WARNING! The transformation produces events of %q type, while target %q expectes %s. The target adapter may not work in this configuration.`,
+			transformationEventType, targetComponent.GetName(), strings.Join(expectedEventTypes, ","))
+	}
+
 	log.Println("Updating manifest")
 	restart, err := o.Manifest.Add(t)
 	if err != nil {

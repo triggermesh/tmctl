@@ -320,18 +320,33 @@ func (t *Transformation) getContextTransformationValue(key string) []string {
 		return []string{}
 	}
 	for _, op := range contextTransformation.([]interface{}) {
-		if opp, ok := op.(map[string]interface{}); ok {
-			if opp["operation"] == "add" {
-				if p, ok := opp["paths"].([]interface{}); ok {
-					for _, pp := range p {
-						if pm, ok := pp.(map[string]interface{}); ok {
-							if pm["key"] == key {
-								return []string{pm["value"].(string)}
-							}
-						}
-					}
-				}
+		spec, ok := op.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if spec["operation"] != "add" {
+			continue
+		}
+		paths, ok := spec["paths"].([]interface{})
+		if !ok {
+			continue
+		}
+		for _, path := range paths {
+			pm, ok := path.(map[string]interface{})
+			if !ok {
+				continue
 			}
+			if pm["key"] != key {
+				continue
+			}
+			val, ok := pm["value"]
+			if !ok {
+				continue
+			}
+			if val == nil {
+				continue
+			}
+			return []string{val.(string)}
 		}
 	}
 	return []string{}
