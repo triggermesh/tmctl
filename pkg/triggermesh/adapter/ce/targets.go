@@ -148,7 +148,15 @@ func targets(object unstructured.Unstructured) (EventAttributes, error) {
 			AcceptedEventTypes:  o.AcceptedEventTypes(),
 		}, nil
 	case "HTTPTarget":
-		return EventAttributes{}, nil
+		var o *targetsv1alpha1.HTTPTarget
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return EventAttributes{}, err
+		}
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+			AcceptedEventTypes:  o.AcceptedEventTypes(),
+		}, nil
 	case "IBMMQTarget":
 		var o *targetsv1alpha1.IBMMQTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
