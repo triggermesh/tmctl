@@ -27,12 +27,14 @@ import (
 	"time"
 
 	"github.com/jroimartin/gocui"
+	"sigs.k8s.io/yaml"
 
 	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/manifest"
 	"github.com/triggermesh/tmctl/pkg/triggermesh"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/components/service"
+	"github.com/triggermesh/tmctl/pkg/triggermesh/components/transformation"
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
@@ -47,6 +49,10 @@ type meta struct {
 }
 
 type registryCache map[string][]byte
+type transformationObject struct {
+	name string
+	spec string
+}
 
 func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config.Config) (string, string, string, io.Reader, error) {
 	componentsList, err := parseComponents(manifest, config, crds)
@@ -54,12 +60,12 @@ func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config
 		return "", "", "", nil, fmt.Errorf("manifest read error: %w", err)
 	}
 
-	cache := make(registryCache)
+	schemaCache := make(registryCache)
 
-	if err := preloadRegistryData(componentsList.sources, config.SchemaRegistry, cache); err != nil {
+	if err := preloadRegistryData(componentsList.sources, config.SchemaRegistry, schemaCache); err != nil {
 		return "", "", "", nil, fmt.Errorf("registry error: %w", err)
 	}
-	if err := preloadRegistryData(componentsList.targets, config.SchemaRegistry, cache); err != nil {
+	if err := preloadRegistryData(componentsList.targets, config.SchemaRegistry, schemaCache); err != nil {
 		return "", "", "", nil, fmt.Errorf("registry error: %w", err)
 	}
 
@@ -120,7 +126,8 @@ func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config
 		return "", "", "", nil, err
 	}
 
-	go ProcessKeystrokes(g, keybindingHandler.signals, cache)
+	existingTransformations := transformations(manifest)
+	go ProcessKeystrokes(g, keybindingHandler.signals, schemaCache, existingTransformations)
 
 	select {
 	case err := <-errC:
@@ -131,17 +138,22 @@ func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config
 			return "", "", "", nil, err
 		}
 		g.Close()
-		s := map[string]interface{}{
+
+		if transformation := existingTransformation(sourceEventType, targetComponent, existingTransformations); transformation.name != "" {
+			name = transformation.name
+		}
+
+		transformationSpec := map[string]interface{}{
 			"data": spec,
 		}
 		if targetEventType != "" {
-			s["context"] = json.RawMessage("[{\"operation\":\"add\",\"paths\":[{\"key\":\"type\",\"value\":\"" + targetEventType + "\"}]}]")
+			transformationSpec["context"] = json.RawMessage("[{\"operation\":\"add\",\"paths\":[{\"key\":\"type\",\"value\":\"" + targetEventType + "\"}]}]")
 		}
-		b := new(bytes.Buffer)
-		if err := json.NewEncoder(b).Encode(s); err != nil {
+		specBuffer := new(bytes.Buffer)
+		if err := json.NewEncoder(specBuffer).Encode(transformationSpec); err != nil {
 			return "", "", "", nil, err
 		}
-		return name, sourceEventType, targetComponent, b, err
+		return name, sourceEventType, targetComponent, specBuffer, err
 	}
 }
 
@@ -239,8 +251,7 @@ func readLayout(l *layout) (string, string, string, string, error) {
 	default:
 		targetComponent = strings.TrimRight(targetSelectedLine, ":")
 	}
-	spec := l.transformation.Buffer()
-	return sourceEventType, targetComponent, targetEventType, spec, nil
+	return sourceEventType, targetComponent, targetEventType, l.transformation.Buffer(), nil
 }
 
 func preloadRegistryData(componentsList map[string]meta, registryUrl string, cache map[string][]byte) error {
@@ -272,4 +283,28 @@ func preloadRegistryData(componentsList map[string]meta, registryUrl string, cac
 		}
 	}
 	return nil
+}
+
+func transformations(manifest *manifest.Manifest) map[string]transformationObject {
+	transformations := make(map[string]transformationObject)
+	for _, object := range manifest.Objects {
+		if object.Kind != "Transformation" {
+			continue
+		}
+		tContext, set := object.Metadata.Labels[transformation.TransformationContextLabel]
+		if !set {
+			continue
+		}
+		for _, tc := range strings.Split(tContext, ",") {
+			data, err := yaml.Marshal(object.Spec["data"])
+			if err != nil {
+				continue
+			}
+			transformations[tc] = transformationObject{
+				spec: string(data),
+				name: object.Metadata.Name,
+			}
+		}
+	}
+	return transformations
 }

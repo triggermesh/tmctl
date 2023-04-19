@@ -69,8 +69,9 @@ https://github.com/triggermesh/triggermesh/tree/main/config/samples/bumblebee`
 func (o *CliOptions) newTransformationCmd() *cobra.Command {
 	var name, target, file string
 	var eventSourcesFilter, eventTypesFilter []string
+	var wizard bool
 	transformationCmd := &cobra.Command{
-		Use:   "transformation [--target <name>][--source <name>...][--eventTypes <type>...][--from <path>]",
+		Use:   "transformation [--target <name>][--source <name>...][--eventTypes <type>...][--from <path>][--wizard]",
 		Short: "Create TriggerMesh transformation. More information at https://docs.triggermesh.io/transformation/jsontransformation/",
 		Example: `tmctl create transformation <<EOF
   data:
@@ -79,10 +80,9 @@ func (o *CliOptions) newTransformationCmd() *cobra.Command {
     - key: new-field
       value: hello from Transformation!
 EOF`,
-		ValidArgs: []string{"--name", "--target", "--source", "--eventTypes", "--from"},
+		ValidArgs: []string{"--name", "--target", "--source", "--eventTypes", "--from", "--wizard"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			switch {
-			case o.Config.SchemaRegistry != "":
+			if wizard {
 				name, sourceEventType, target, spec, err := transformationgui.Create(o.CRD, o.Manifest, o.Config)
 				if err == gocui.ErrQuit {
 					return nil
@@ -91,7 +91,8 @@ EOF`,
 					return fmt.Errorf("transformation wizard error: %w", err)
 				}
 				return o.transformation(name, target, spec, []string{}, []string{sourceEventType})
-			case file != "":
+			}
+			if file != "" {
 				data, err := os.ReadFile(file)
 				if err != nil {
 					return fmt.Errorf("file %q read: %w", file, err)
@@ -112,6 +113,8 @@ EOF`,
 	transformationCmd.Flags().StringSliceVar(&eventSourcesFilter, "source", []string{}, "Sources component names")
 	transformationCmd.Flags().StringSliceVar(&eventTypesFilter, "eventTypes", []string{}, "Event types filter")
 
+	transformationCmd.Flags().BoolVar(&wizard, "wizard", false, "Experimental transformation wizard")
+
 	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("name", cobra.NoFileCompletions))
 	cobra.CheckErr(transformationCmd.RegisterFlagCompletionFunc("source", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListSources(o.Manifest), cobra.ShellCompDirectiveNoFileComp
@@ -127,8 +130,11 @@ EOF`,
 
 func (o *CliOptions) transformation(name, target string, specReader io.Reader, eventSourcesFilter, eventTypesFilter []string) error {
 	ctx := context.Background()
+	targetLabel := ""
+
 	var targetComponent triggermesh.Component
 	if target != "" {
+		targetLabel = target
 		t, err := o.lookupTarget(ctx, target)
 		if err != nil {
 			return err
@@ -174,13 +180,13 @@ func (o *CliOptions) transformation(name, target string, specReader io.Reader, e
 		return fmt.Errorf("CRD for kind \"transformation\" not found")
 	}
 
-	t := transformation.New(name, "transformation", o.Config.Context, o.Config.Triggermesh.ComponentsVersion, crd, spec)
+	t := transformation.New(name, "transformation", o.Config.Context,
+		o.Config.Triggermesh.ComponentsVersion, crd, spec)
 
 	transformationEventType := fmt.Sprintf("%s.output", t.GetName())
 	if len(expectedEventTypes) > 0 {
 		transformationEventType = expectedEventTypes[0]
 	}
-
 	producedEventTypes, _ := t.(triggermesh.Producer).GetEventTypes()
 	if len(producedEventTypes) == 0 {
 		if err := t.(triggermesh.Producer).SetEventAttributes(map[string]string{
@@ -190,6 +196,7 @@ func (o *CliOptions) transformation(name, target string, specReader io.Reader, e
 		}
 	} else {
 		transformationEventType = producedEventTypes[0]
+		targetLabel = producedEventTypes[0]
 	}
 
 	eventTypesMatch := false
@@ -207,6 +214,8 @@ func (o *CliOptions) transformation(name, target string, specReader io.Reader, e
 		log.Printf(`WARNING! The transformation produces events of %q type, while target %q expectes %s. The target adapter may not work in this configuration.`,
 			transformationEventType, targetComponent.GetName(), strings.Join(expectedEventTypes, ","))
 	}
+
+	t.(*transformation.Transformation).SetLabel(transformation.TransformationContextLabel, transformationContexts(targetLabel, eventTypesFilter))
 
 	log.Println("Updating manifest")
 	restart, err := o.Manifest.Add(t)
@@ -311,4 +320,16 @@ func (o *CliOptions) lookupTarget(ctx context.Context, target string) (triggerme
 		return nil, fmt.Errorf("%q is not an event consumer", target)
 	}
 	return targetObject, nil
+}
+
+func transformationContexts(target string, sourceEventTypes []string) string {
+	contexts := []string{}
+	for _, et := range sourceEventTypes {
+		c := et
+		if target != "" {
+			c = fmt.Sprintf("%s-%s", et, target)
+		}
+		contexts = append(contexts, c)
+	}
+	return strings.Join(contexts, ",")
 }

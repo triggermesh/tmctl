@@ -92,10 +92,6 @@ func (h *keybindingHandler) Create(g *gocui.Gui) error {
 	if err := g.SetKeybinding("sources", gocui.KeyArrowRight, gocui.ModNone, h.sourceCursorRight); err != nil {
 		return err
 	}
-	// press Enter
-	// if err := g.SetKeybinding("sources", gocui.KeyEnter, gocui.ModNone, h.nextView); err != nil {
-	// return err
-	// }
 	// switch back to sources
 	if err := g.SetKeybinding("sourceEvent", gocui.KeyArrowLeft, gocui.ModNone, h.sourceEventCursorLeft); err != nil {
 		return err
@@ -180,11 +176,12 @@ func (h *keybindingHandler) switchToTransformation(g *gocui.Gui, v *gocui.View) 
 	if v.Name() == "transformation" {
 		return nil
 	}
-	if _, err := g.SetCurrentView("transformation"); err != nil {
+	v.Highlight = false
+	newV, err := g.SetCurrentView("transformation")
+	if err != nil {
 		return err
 	}
-	v.Highlight = false
-	return nil
+	return newV.SetCursor(0, 0)
 }
 
 func (h *keybindingHandler) sourceCursorRight(g *gocui.Gui, v *gocui.View) error {
@@ -291,6 +288,11 @@ func (h *keybindingHandler) cursorDownTargets(g *gocui.Gui, v *gocui.View) error
 	dy := cy + 1
 	if l, err := v.Line(dy); err != nil || l == "" {
 		return nil
+	} else if strings.HasSuffix(l, ":") {
+		if err := v.SetCursor(cx, dy); err != nil {
+			return err
+		}
+		return h.cursorDownTargets(g, v)
 	}
 	if err := v.SetCursor(cx, dy); err != nil {
 		if err := v.SetOrigin(ox, oy+1); err != nil {
@@ -306,6 +308,11 @@ func (h *keybindingHandler) cursorUpTargets(g *gocui.Gui, v *gocui.View) error {
 	dy := cy - 1
 	if l, err := v.Line(dy); err != nil || l == "" {
 		return nil
+	} else if strings.HasSuffix(l, ":") {
+		if err := v.SetCursor(cx, dy); err != nil {
+			return err
+		}
+		return h.cursorUpTargets(g, v)
 	}
 	if err := v.SetCursor(cx, dy); err != nil && oy > 0 {
 		if err := v.SetOrigin(ox, oy-1); err != nil {

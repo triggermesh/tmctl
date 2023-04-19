@@ -23,7 +23,7 @@ type configOverride func(*Config) bool
 var overrides = []configOverride{
 	brokerImageReplacement(),
 	dockerTimeoutAppend(),
-	// schemaRegistryAppend(),
+	schemaRegistryAppend(),
 }
 
 func (c *Config) applyOverrides() error {
@@ -71,12 +71,12 @@ func dockerTimeoutAppend() configOverride {
 	}
 }
 
-// func schemaRegistryAppend() configOverride {
-// 	return func(c *Config) bool {
-// 		if c.SchemaRegistry != "" {
-// 			return false
-// 		}
-// 		c.SchemaRegistry = defaultSchemaRegistryURL
-// 		return true
-// 	}
-// }
+func schemaRegistryAppend() configOverride {
+	return func(c *Config) bool {
+		if c.SchemaRegistry != "" {
+			return false
+		}
+		c.SchemaRegistry = defaultSchemaRegistryURL
+		return true
+	}
+}

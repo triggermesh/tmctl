@@ -39,6 +39,8 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/pkg"
 )
 
+const TransformationContextLabel = "triggermesh.io/transformation-context"
+
 var (
 	_ triggermesh.Component  = (*Transformation)(nil)
 	_ triggermesh.Consumer   = (*Transformation)(nil)
@@ -53,7 +55,8 @@ type Transformation struct {
 	Broker  string
 	Version string
 
-	spec map[string]interface{}
+	spec   map[string]interface{}
+	labels map[string]string
 }
 
 func (t *Transformation) asUnstructured() (unstructured.Unstructured, error) {
@@ -68,9 +71,7 @@ func (t *Transformation) getMeta() kubernetes.Metadata {
 	return kubernetes.Metadata{
 		Name:      t.GetName(),
 		Namespace: triggermesh.Namespace,
-		Labels: map[string]string{
-			triggermesh.ContextLabel: t.Broker,
-		},
+		Labels:    t.labels,
 	}
 }
 
@@ -309,6 +310,9 @@ func New(name, kind, broker, version string, crd crd.CRD, spec map[string]interf
 		Version: version,
 
 		spec: spec,
+		labels: map[string]string{
+			triggermesh.ContextLabel: broker,
+		},
 	}
 }
 
@@ -350,4 +354,8 @@ func (t *Transformation) getContextTransformationValue(key string) []string {
 		}
 	}
 	return []string{}
+}
+
+func (t *Transformation) SetLabel(key, value string) {
+	t.labels[key] = value
 }

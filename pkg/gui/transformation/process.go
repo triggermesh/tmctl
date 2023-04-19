@@ -26,9 +26,10 @@ import (
 	"github.com/jroimartin/gocui"
 )
 
-func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache) {
+func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache, transformations map[string]transformationObject) {
 	nesting := make([]string, 10) // maximum level of objects netsing in the event
-	currentEventType := ""
+	selectedSource := ""
+	selectedTarget := ""
 
 	for s := range signals {
 		switch s.origin {
@@ -36,15 +37,14 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache) {
 			outputView, _ := g.View("sourceEvent")
 			outputView.Clear()
 
-			eventType := strings.TrimLeft(s.line, " -")
-			fmt.Fprintln(outputView, string(cache[eventType]))
+			line := strings.TrimLeft(s.line, " -")
+			fmt.Fprintln(outputView, string(cache[line]))
 
-			if currentEventType == "" {
-				currentEventType = eventType
-			} else if currentEventType != eventType {
-				currentEventType = eventType
-				transformationView, _ := g.View("transformation")
-				transformationView.Clear()
+			transformationView, _ := g.View("transformation")
+			transformationView.Clear()
+			selectedSource = line
+			if transformation := existingTransformation(selectedSource, selectedTarget, transformations); transformation.spec != "" {
+				fmt.Fprintln(transformationView, transformation.spec)
 			}
 		case "targets":
 			outputView, _ := g.View("targetEvent")
@@ -54,6 +54,13 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache) {
 				fmt.Fprintln(outputView, string(sample))
 			} else {
 				fmt.Fprintln(outputView, string("Component accepts arbitrary event format"))
+			}
+
+			transformationView, _ := g.View("transformation")
+			transformationView.Clear()
+			selectedTarget = line
+			if transformation := existingTransformation(selectedSource, selectedTarget, transformations); transformation.spec != "" {
+				fmt.Fprintln(transformationView, transformation.spec)
 			}
 		case "sourceEvent":
 			switch s.line {
@@ -247,4 +254,15 @@ func rearrange(transformations []v1alpha1.Transform) []v1alpha1.Transform {
 	transformations = append(transformations, append(add, shift...)...)
 
 	return transformations
+}
+
+func existingTransformation(source, target string, transformations map[string]transformationObject) transformationObject {
+	transformationLabel := source
+	if target != "" {
+		transformationLabel = source + "-" + target
+	}
+	if t, exists := transformations[transformationLabel]; exists {
+		return t
+	}
+	return transformationObject{}
 }
