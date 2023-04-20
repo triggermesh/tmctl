@@ -56,15 +56,12 @@ func (l *layout) draw(g *gocui.Gui) error {
 
 	help := genericViewOrPanic(g, "Help", "help", maxX/2+1, int(0.8*float32(maxY))+1, maxX-1, maxY-1)
 	help.Clear()
-	fmt.Fprintln(help, "Ctrl+S - Event Sources list")
-	fmt.Fprintln(help, "Ctrl+T - Event Targets list")
-	fmt.Fprintln(help, "Ctrl+E - Transformation editor")
-	fmt.Fprintln(help, "---")
-	fmt.Fprintln(help, "Ctrl+W - Wipe event")
+	fmt.Fprintln(help, "Ctrl+W - Add wipe event operation")
 	fmt.Fprintln(help, "Ctrl+R - Reset the transformation")
 	fmt.Fprintln(help, "---")
-	fmt.Fprintln(help, "Ctrl+C - Exit the wizard")
 	fmt.Fprintln(help, "Ctrl+B - Create the transformation")
+	fmt.Fprintln(help, "Ctrl+X - Close popup window")
+	fmt.Fprintln(help, "Ctrl+C - Exit the wizard")
 	return nil
 }
 
@@ -109,37 +106,4 @@ func genericViewOrPanic(g *gocui.Gui, title, name string, x1, y1, x2, y2 int) *g
 		v.Wrap = true
 	}
 	return v
-}
-
-func popOperationsView(g *gocui.Gui, v *gocui.View) error {
-	maxX, maxY := g.Size()
-	ops := genericViewOrPanic(g, "Operation", "transformationOperation", maxX/2-30, maxY/2-5, maxX/2+30, maxY/2+1)
-	fmt.Fprintf(ops, "-add\n-delete\n-shift\n-store\n-parse\n")
-	if _, err := g.SetCurrentView(ops.Name()); err != nil {
-		return err
-	}
-	ops.Highlight = true
-	ops.SelBgColor = gocui.ColorGreen
-	return nil
-}
-
-func popInputValueView(path string, g *gocui.Gui) (*gocui.View, error) {
-	maxX, maxY := g.Size()
-	val := genericViewOrPanic(g, "input", "operationValue", maxX/2-35, maxY/2-1, maxX/2+35, maxY/2+1)
-	fmt.Fprintf(val, "%s: ", path)
-	val.Editable = true
-	if err := val.SetCursor(len(path)+2, 0); err != nil {
-		return nil, err
-	}
-	return g.SetCurrentView(val.Name())
-}
-
-func popTransformationNameView(g *gocui.Gui, v *gocui.View) error {
-	maxX, maxY := g.Size()
-	nameView := genericViewOrPanic(g, "Name (optional):", "transformationName", maxX/2-30, maxY/2-1, maxX/2+30, maxY/2+1)
-	nameView.Editable = true
-	if _, err := g.SetCurrentView(nameView.Name()); err != nil {
-		return err
-	}
-	return nil
 }

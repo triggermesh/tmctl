@@ -17,6 +17,7 @@ limitations under the License.
 package transformation
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/jroimartin/gocui"
@@ -63,18 +64,15 @@ func (h *keybindingHandler) Create(g *gocui.Gui) error {
 	}
 
 	// save and exit
-	if err := g.SetKeybinding("", gocui.KeyCtrlB, gocui.ModNone, popTransformationNameView); err != nil {
-		return err
-	}
-	if err := g.SetKeybinding("transformationName", gocui.KeyEnter, gocui.ModNone, h.saveAndExit); err != nil {
+	if err := g.SetKeybinding("", gocui.KeyCtrlB, gocui.ModNone, h.popTransformationNameView); err != nil {
 		return err
 	}
 
 	// Transformation hotkeys
-	if err := g.SetKeybinding("", gocui.KeyCtrlW, gocui.ModNone, h.wipeData); err != nil {
+	if err := g.SetKeybinding("sourceEvent", gocui.KeyCtrlW, gocui.ModNone, h.wipeData); err != nil {
 		return err
 	}
-	if err := g.SetKeybinding("", gocui.KeyCtrlR, gocui.ModNone, h.resetTransformation); err != nil {
+	if err := g.SetKeybinding("sourceEvent", gocui.KeyCtrlR, gocui.ModNone, h.resetTransformation); err != nil {
 		return err
 	}
 
@@ -105,23 +103,7 @@ func (h *keybindingHandler) Create(g *gocui.Gui) error {
 		return err
 	}
 	// operation popup
-	if err := g.SetKeybinding("sourceEvent", gocui.KeyEnter, gocui.ModNone, popOperationsView); err != nil {
-		return err
-	}
-	// operation cancel
-	if err := g.SetKeybinding("transformationOperation", gocui.KeyEsc, gocui.ModNone, h.cancelOperationView); err != nil {
-		return err
-	}
-	// select operations
-	if err := g.SetKeybinding("transformationOperation", gocui.KeyArrowUp, gocui.ModNone, h.cursorUp); err != nil {
-		return err
-	}
-	// select operations
-	if err := g.SetKeybinding("transformationOperation", gocui.KeyArrowDown, gocui.ModNone, h.cursorDown); err != nil {
-		return err
-	}
-	// select operations
-	if err := g.SetKeybinding("transformationOperation", gocui.KeyEnter, gocui.ModNone, h.selectOperation); err != nil {
+	if err := g.SetKeybinding("sourceEvent", gocui.KeyEnter, gocui.ModNone, h.popOperationsView); err != nil {
 		return err
 	}
 
@@ -140,6 +122,15 @@ func (h *keybindingHandler) saveAndExit(g *gocui.Gui, v *gocui.View) error {
 	h.createAndExit <- strings.TrimSpace(v.Buffer())
 	g.DeleteKeybindings(v.Name())
 	return g.DeleteView(v.Name())
+}
+
+func cancelSaveAndExit(g *gocui.Gui, v *gocui.View) error {
+	g.DeleteKeybindings(v.Name())
+	if err := g.DeleteView(v.Name()); err != nil {
+		return err
+	}
+	_, err := g.SetCurrentView("sourceEvent")
+	return err
 }
 
 func (h *keybindingHandler) selectOperation(g *gocui.Gui, v *gocui.View) error {
@@ -214,7 +205,7 @@ func (h *keybindingHandler) sourceEventCursorLeft(g *gocui.Gui, v *gocui.View) e
 	return h.sendSignal(g)
 }
 
-func (h *keybindingHandler) cursorDown(g *gocui.Gui, v *gocui.View) error {
+func cursorDown(g *gocui.Gui, v *gocui.View) error {
 	ox, oy := v.Origin()
 	cx, cy := v.Cursor()
 	if l, err := v.Line(cy + 1); err != nil || l == "" {
@@ -228,7 +219,7 @@ func (h *keybindingHandler) cursorDown(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
-func (h *keybindingHandler) cursorUp(g *gocui.Gui, v *gocui.View) error {
+func cursorUp(g *gocui.Gui, v *gocui.View) error {
 	ox, oy := v.Origin()
 	cx, cy := v.Cursor()
 	if l, err := v.Line(cy - 1); err != nil || l == "" {
@@ -373,14 +364,13 @@ func (h *keybindingHandler) cursorUpEventSample(g *gocui.Gui, v *gocui.View) err
 	return h.sendSignal(g)
 }
 
-func (h *keybindingHandler) cancelOperationView(g *gocui.Gui, v *gocui.View) error {
-	if err := g.DeleteView("transformationOperation"); err != nil {
+func deleteOperationView(g *gocui.Gui, v *gocui.View) error {
+	g.DeleteKeybindings(v.Name())
+	if err := g.DeleteView(v.Name()); err != nil {
 		return err
 	}
-	if _, err := g.SetCurrentView("sourceEvent"); err != nil {
-		return err
-	}
-	return nil
+	_, err := g.SetCurrentView("sourceEvent")
+	return err
 }
 
 func (h *keybindingHandler) sendSignal(g *gocui.Gui) error {
@@ -412,4 +402,56 @@ func (h *keybindingHandler) resetTransformation(g *gocui.Gui, v *gocui.View) err
 	t, _ := g.View("transformation")
 	t.Clear()
 	return nil
+}
+
+func (h *keybindingHandler) popOperationsView(g *gocui.Gui, v *gocui.View) error {
+	maxX, maxY := g.Size()
+	ops := genericViewOrPanic(g, "Operation", "transformationOperation", maxX/2-30, maxY/2-5, maxX/2+30, maxY/2+1)
+	fmt.Fprintf(ops, "-add\n-delete\n-shift\n-store\n-parse\n")
+	ops.Highlight = true
+
+	// operation cancel
+	if err := g.SetKeybinding(ops.Name(), gocui.KeyCtrlX, gocui.ModNone, deleteOperationView); err != nil {
+		return err
+	}
+	// select operations
+	if err := g.SetKeybinding(ops.Name(), gocui.KeyArrowUp, gocui.ModNone, cursorUp); err != nil {
+		return err
+	}
+	// select operations
+	if err := g.SetKeybinding(ops.Name(), gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
+		return err
+	}
+	// select operations
+	if err := g.SetKeybinding(ops.Name(), gocui.KeyEnter, gocui.ModNone, h.selectOperation); err != nil {
+		return err
+	}
+	_, err := g.SetCurrentView(ops.Name())
+	return err
+}
+
+func (h *keybindingHandler) popTransformationNameView(g *gocui.Gui, v *gocui.View) error {
+	maxX, maxY := g.Size()
+	nameView := genericViewOrPanic(g, "Name (optional, for new objects):", "transformationName", maxX/2-30, maxY/2-1, maxX/2+30, maxY/2+1)
+	nameView.Editable = true
+
+	if err := g.SetKeybinding(nameView.Name(), gocui.KeyEnter, gocui.ModNone, h.saveAndExit); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding(nameView.Name(), gocui.KeyCtrlX, gocui.ModNone, cancelSaveAndExit); err != nil {
+		return err
+	}
+	_, err := g.SetCurrentView(nameView.Name())
+	return err
+}
+
+func popInputValueView(path string, g *gocui.Gui) (*gocui.View, error) {
+	maxX, maxY := g.Size()
+	val := genericViewOrPanic(g, "input", "operationValue", maxX/2-35, maxY/2-1, maxX/2+35, maxY/2+1)
+	fmt.Fprintf(val, "%s: ", path)
+	val.Editable = true
+	if err := val.SetCursor(len(path)+2, 0); err != nil {
+		return nil, err
+	}
+	return g.SetCurrentView(val.Name())
 }

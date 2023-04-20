@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/triggermesh/triggermesh/pkg/apis/flow/v1alpha1"
+	"github.com/jroimartin/gocui"
 	"sigs.k8s.io/yaml"
 
-	"github.com/jroimartin/gocui"
+	"github.com/triggermesh/triggermesh/pkg/apis/flow/v1alpha1"
 )
 
 func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache, transformations map[string]transformationObject) {
@@ -104,6 +104,9 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache, t
 
 			transformations = updateTransformations(transformations, operation, key, value)
 			transformations = rearrange(transformations)
+			if len(transformations) == 0 {
+				continue
+			}
 
 			output, err := yaml.Marshal(transformations)
 			if err != nil {
@@ -130,16 +133,31 @@ func readOperation(operation, path string, g *gocui.Gui) (string, string, error)
 		g.Update(func(g *gocui.Gui) error { return nil })
 		if err := g.SetKeybinding(inputView.Name(), gocui.KeyEnter, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
 			value := v.Buffer()
-			if err := g.DeleteView(inputView.Name()); err != nil {
+			if err := g.DeleteView(v.Name()); err != nil {
 				return err
 			}
-			g.DeleteKeybindings(inputView.Name())
+			g.DeleteKeybindings(v.Name())
 			inputValue <- value
 			return nil
 		}); err != nil {
 			return "", "", err
 		}
+		if err := g.SetKeybinding(inputView.Name(), gocui.KeyCtrlX, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
+			defer close(inputValue)
+			if err := g.DeleteView("operationValue"); err != nil {
+				return err
+			}
+			g.DeleteKeybindings("operationValue")
+			_, err := g.SetCurrentView("transformationOperation")
+			return err
+		}); err != nil {
+			return "", "", err
+		}
+
 		input := <-inputValue
+		if input == "" {
+			return "", "", nil
+		}
 
 		path = "."
 		value = strings.TrimSpace(input)
@@ -148,6 +166,7 @@ func readOperation(operation, path string, g *gocui.Gui) (string, string, error)
 			value = strings.TrimSpace(inputs[1])
 		}
 	}
+	g.DeleteKeybindings("transformationOperation")
 	_ = g.DeleteView("transformationOperation")
 	_, _ = g.SetCurrentView("sourceEvent")
 	return path, value, nil
@@ -220,6 +239,10 @@ func rearrange(transformations []v1alpha1.Transform) []v1alpha1.Transform {
 	wipeData := false
 
 	for _, transformation := range transformations {
+		transformation = sanitize(transformation)
+		if transformation.Paths == nil {
+			continue
+		}
 		switch transformation.Operation {
 		case "parse":
 			parse = append(parse, transformation)
@@ -265,4 +288,39 @@ func existingTransformation(source, target string, transformations map[string]tr
 		return t
 	}
 	return transformationObject{}
+}
+
+func sanitize(transformation v1alpha1.Transform) v1alpha1.Transform {
+	result := v1alpha1.Transform{}
+	result.Operation = transformation.Operation
+
+	for _, path := range transformation.Paths {
+		switch transformation.Operation {
+		case "delete", "parse":
+		case "add", "store":
+			if path.Value == "" || path.Key == "" {
+				continue
+			}
+		case "shift":
+			pair := strings.Split(path.Key, ":")
+			if len(pair) != 2 || pair[0] == "" || pair[1] == "" {
+				continue
+			}
+		}
+		if i := index(path.Key, result.Paths); i > -1 {
+			result.Paths[i] = path
+			continue
+		}
+		result.Paths = append(result.Paths, path)
+	}
+	return result
+}
+
+func index(key string, paths []v1alpha1.Path) int {
+	for i, j := range paths {
+		if j.Key == key {
+			return i
+		}
+	}
+	return -1
 }
