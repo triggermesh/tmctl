@@ -18,7 +18,7 @@ require (
 	github.com/stretchr/testify v1.8.2
 	github.com/triggermesh/brokers v1.2.0
 	github.com/triggermesh/triggermesh v1.24.4
-	github.com/triggermesh/triggermesh-core v1.2.0
+	github.com/triggermesh/triggermesh-core v1.2.1
 	google.golang.org/api v0.110.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.26.1
