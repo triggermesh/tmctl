@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/billing v1.13.0
 	cloud.google.com/go/logging v1.7.0
 	cloud.google.com/go/pubsub v1.30.0
-	cloud.google.com/go/storage v1.29.0
+	cloud.google.com/go/storage v1.30.1
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.28
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12
