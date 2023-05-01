@@ -10,7 +10,7 @@ require (
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.28
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12
-	github.com/aws/aws-sdk-go v1.44.248
+	github.com/aws/aws-sdk-go v1.44.253
 	github.com/cloudevents/sdk-go/v2 v2.13.0
 	github.com/docker/docker v23.0.1+incompatible
 	github.com/docker/go-connections v0.4.0
