@@ -16,7 +16,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.2
-	github.com/triggermesh/brokers v1.2.0
+	github.com/triggermesh/brokers v1.2.1
 	github.com/triggermesh/triggermesh v1.24.4
 	github.com/triggermesh/triggermesh-core v1.2.1
 	google.golang.org/api v0.114.0
