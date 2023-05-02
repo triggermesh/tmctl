@@ -35,6 +35,7 @@ import (
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
 
+// Import creates the integration from provided YAML manifest.
 func Import(from string, config *cliconfig.Config, crd map[string]crd.CRD) error {
 	m, err := getManifest(from)
 	if err != nil {
