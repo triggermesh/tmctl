@@ -26,6 +26,11 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/apis/flow/v1alpha1"
 )
 
+type input struct {
+	key   string
+	value string
+}
+
 func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache, transformations map[string]transformationObject) {
 	nesting := make([]string, 10) // maximum level of objects netsing in the event
 	selectedSource := ""
@@ -34,10 +39,13 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache, t
 	for s := range signals {
 		switch s.origin {
 		case "sources":
+			line := strings.TrimLeft(s.line, " -")
+			if selectedSource == line {
+				continue
+			}
 			outputView, _ := g.View("sourceEvent")
 			outputView.Clear()
 
-			line := strings.TrimLeft(s.line, " -")
 			fmt.Fprintln(outputView, string(cache[line]))
 
 			transformationView, _ := g.View("transformation")
@@ -47,9 +55,12 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache, t
 				fmt.Fprintln(transformationView, transformation.spec)
 			}
 		case "targets":
+			line := strings.TrimLeft(s.line, " -")
+			if selectedTarget == line {
+				continue
+			}
 			outputView, _ := g.View("targetEvent")
 			outputView.Clear()
-			line := strings.TrimLeft(s.line, " -")
 			if sample, exists := cache[line]; exists {
 				fmt.Fprintln(outputView, string(sample))
 			} else {
@@ -124,51 +135,27 @@ func readOperation(operation, path string, g *gocui.Gui) (string, string, error)
 	value := ""
 	switch operation {
 	case "delete", "parse":
+		g.DeleteKeybindings("transformationOperation")
+		_ = g.DeleteView("transformationOperation")
+		_, _ = g.SetCurrentView("sourceEvent")
 	case "add", "store", "shift":
-		inputValue := make(chan string)
-		inputView, err := popInputValueView(path, g)
-		if err != nil {
+		inputValue := make(chan *input)
+		if err := popInputValueView(path, inputValue, g); err != nil {
 			return "", "", err
 		}
 		g.Update(func(g *gocui.Gui) error { return nil })
-		if err := g.SetKeybinding(inputView.Name(), gocui.KeyEnter, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
-			value := v.Buffer()
-			if err := g.DeleteView(v.Name()); err != nil {
-				return err
-			}
-			g.DeleteKeybindings(v.Name())
-			inputValue <- value
-			return nil
-		}); err != nil {
-			return "", "", err
-		}
-		if err := g.SetKeybinding(inputView.Name(), gocui.KeyCtrlX, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
-			defer close(inputValue)
-			if err := g.DeleteView("operationValue"); err != nil {
-				return err
-			}
-			g.DeleteKeybindings("operationValue")
-			_, err := g.SetCurrentView("transformationOperation")
-			return err
-		}); err != nil {
-			return "", "", err
-		}
 
-		input := <-inputValue
-		if input == "" {
+		in := <-inputValue
+		if in == nil {
 			return "", "", nil
 		}
 
 		path = "."
-		value = strings.TrimSpace(input)
-		if inputs := strings.Split(input, ":"); len(inputs) == 2 {
-			path = strings.TrimSpace(inputs[0])
-			value = strings.TrimSpace(inputs[1])
+		value = in.value
+		if in.key != "" {
+			path = in.key
 		}
 	}
-	g.DeleteKeybindings("transformationOperation")
-	_ = g.DeleteView("transformationOperation")
-	_, _ = g.SetCurrentView("sourceEvent")
 	return path, value, nil
 }
 

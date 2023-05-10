@@ -56,12 +56,8 @@ func (l *layout) draw(g *gocui.Gui) error {
 
 	help := genericViewOrPanic(g, "Help", "help", maxX/2+1, int(0.8*float32(maxY))+1, maxX-1, maxY-1)
 	help.Clear()
-	fmt.Fprintln(help, "Ctrl+W - Add wipe event operation")
-	fmt.Fprintln(help, "Ctrl+R - Reset the transformation")
-	fmt.Fprintln(help, "---")
-	fmt.Fprintln(help, "Ctrl+B - Create the transformation")
-	fmt.Fprintln(help, "Ctrl+X - Close popup window")
-	fmt.Fprintln(help, "Ctrl+C - Exit the wizard")
+	fmt.Fprintln(help, "Ctrl+W - Add wipe event operation\t\t\tCtrl+C - Close active window")
+	fmt.Fprintln(help, "Ctrl+R - Reset the transformation\t\t\tCtrl+S - Save and exit")
 	return nil
 }
 
@@ -71,8 +67,9 @@ func sourcesView(g *gocui.Gui, x1, y1, x2, y2 int) (*gocui.View, error) {
 		if err != gocui.ErrUnknownView {
 			return nil, err
 		}
-		sources.Title = "Source (Ctrl+S)"
+		sources.Title = "Source (Ctrl+F)"
 		sources.Highlight = true
+		sources.Wrap = true
 		sources.SelBgColor = gocui.ColorGreen
 		fmt.Fprintln(sources, "*")
 		if _, err := g.SetCurrentView("sources"); err != nil {
@@ -90,6 +87,7 @@ func targetsView(g *gocui.Gui, x1, y1, x2, y2 int) (*gocui.View, error) {
 		}
 		targets.Title = "Target (Ctrl+T)"
 		targets.SelBgColor = gocui.ColorGreen
+		targets.Wrap = true
 		fmt.Fprintln(targets, "*")
 	}
 	return targets, nil
