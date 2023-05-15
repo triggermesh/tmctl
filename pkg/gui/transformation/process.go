@@ -68,9 +68,9 @@ func ProcessKeystrokes(g *gocui.Gui, signals chan signal, cache registryCache, t
 			}
 
 			transformationView, _ := g.View("transformation")
-			transformationView.Clear()
 			selectedTarget = line
 			if transformation := existingTransformation(selectedSource, selectedTarget, transformations); transformation.spec != "" {
+				transformationView.Clear()
 				fmt.Fprintln(transformationView, transformation.spec)
 			}
 		case "sourceEvent":

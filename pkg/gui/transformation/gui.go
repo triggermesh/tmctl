@@ -129,31 +129,41 @@ func Create(crds map[string]crd.CRD, manifest *manifest.Manifest, config *config
 	existingTransformations := transformations(manifest)
 	go ProcessKeystrokes(g, keybindingHandler.signals, schemaCache, existingTransformations)
 
-	select {
-	case err := <-errC:
-		return "", "", "", nil, err
-	case name := <-keybindingHandler.createAndExit:
-		sourceEventType, targetComponent, targetEventType, spec, err := readLayout(layout)
-		if err != nil {
+	for {
+		select {
+		case err := <-errC:
 			return "", "", "", nil, err
-		}
-		g.Close()
+		case name := <-keybindingHandler.createAndExit:
+			sourceEventType, targetComponent, targetEventType, spec, err := readLayout(layout)
+			if err != nil {
+				return "", "", "", nil, err
+			}
 
-		if transformation := existingTransformation(sourceEventType, targetComponent, existingTransformations); transformation.name != "" {
-			name = transformation.name
-		}
+			if targetComponent == "" && targetEventType == "" {
+				if err := popTargetWarningView(g); err != nil {
+					return "", "", "", nil, err
+				}
+				continue
+			}
 
-		transformationSpec := map[string]interface{}{
-			"data": spec,
+			g.Close()
+
+			if transformation := existingTransformation(sourceEventType, targetComponent, existingTransformations); transformation.name != "" {
+				name = transformation.name
+			}
+
+			transformationSpec := map[string]interface{}{
+				"data": spec,
+			}
+			if targetEventType != "" {
+				transformationSpec["context"] = json.RawMessage("[{\"operation\":\"add\",\"paths\":[{\"key\":\"type\",\"value\":\"" + targetEventType + "\"}]}]")
+			}
+			specBuffer := new(bytes.Buffer)
+			if err := json.NewEncoder(specBuffer).Encode(transformationSpec); err != nil {
+				return "", "", "", nil, err
+			}
+			return name, sourceEventType, targetComponent, specBuffer, err
 		}
-		if targetEventType != "" {
-			transformationSpec["context"] = json.RawMessage("[{\"operation\":\"add\",\"paths\":[{\"key\":\"type\",\"value\":\"" + targetEventType + "\"}]}]")
-		}
-		specBuffer := new(bytes.Buffer)
-		if err := json.NewEncoder(specBuffer).Encode(transformationSpec); err != nil {
-			return "", "", "", nil, err
-		}
-		return name, sourceEventType, targetComponent, specBuffer, err
 	}
 }
 

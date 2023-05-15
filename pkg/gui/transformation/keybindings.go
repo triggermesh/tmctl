@@ -131,6 +131,12 @@ func closeWindow(g *gocui.Gui, v *gocui.View) error {
 		_, err = g.SetCurrentView("sourceEvent")
 	case "operationValue":
 		_, err = g.SetCurrentView("transformationOperation")
+	case "targetWarning":
+		t, err := g.SetCurrentView("targets")
+		if err != nil {
+			return err
+		}
+		t.Highlight = true
 	default:
 		return gocui.ErrQuit
 	}
@@ -434,6 +440,8 @@ func (h *keybindingHandler) popTransformationNameView(g *gocui.Gui, v *gocui.Vie
 	nameView := genericViewOrPanic(g, "Name (optional, for new objects):", "transformationName", maxX/2-30, maxY/2-1, maxX/2+30, maxY/2+1)
 	nameView.Editable = true
 
+	v.Highlight = false
+
 	if err := g.SetKeybinding(nameView.Name(), gocui.KeyEnter, gocui.ModNone, h.saveAndExit); err != nil {
 		return err
 	}
@@ -486,4 +494,18 @@ func popInputValueView(path string, inputValue chan *input, g *gocui.Gui) error 
 	}
 	_, err := g.SetCurrentView(v.Name())
 	return err
+}
+
+func popTargetWarningView(g *gocui.Gui) error {
+	maxX, maxY := g.Size()
+	warningView := genericViewOrPanic(g, "Warning", "targetWarning", maxX/2-30, maxY/2-2, maxX/2+30, maxY/2+2)
+
+	fmt.Fprintf(warningView, "\n\nPlease select the target")
+	fmt.Fprintf(warningView, "\n%55s", "Ok")
+	_ = warningView.SetCursor(53, 2)
+
+	if _, err := g.SetCurrentView(warningView.Name()); err != nil {
+		return err
+	}
+	return g.SetKeybinding(warningView.Name(), gocui.KeyEnter, gocui.ModNone, closeWindow)
 }
