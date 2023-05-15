@@ -40,8 +40,7 @@ const (
 	APIVersion = "serving.knative.dev/v1"
 	Kind       = "Service"
 
-	RoleLabel    = "triggermesh.io/role"
-	ContextLabel = "triggermesh.io/context"
+	RoleLabel = "triggermesh.io/role"
 )
 
 var (
@@ -90,8 +89,8 @@ func (s *Service) AsK8sObject() (kubernetes.Object, error) {
 			Name:      s.Name,
 			Namespace: triggermesh.Namespace,
 			Labels: map[string]string{
-				ContextLabel: s.Broker,
-				RoleLabel:    string(s.role),
+				triggermesh.ContextLabel: s.Broker,
+				RoleLabel:                string(s.role),
 			},
 		},
 		Spec: kserviceSpec(s.Image, manifestParams),
