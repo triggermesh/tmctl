@@ -83,6 +83,16 @@ func targets(object unstructured.Unstructured) (EventAttributes, error) {
 			ProducedEventSource: o.AsEventSource(),
 			AcceptedEventTypes:  o.AcceptedEventTypes(),
 		}, nil
+	case "AzureServiceBusTarget":
+		var o *targetsv1alpha1.AzureServiceBusTarget
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return EventAttributes{}, err
+		}
+		return EventAttributes{
+			ProducedEventTypes:  o.GetEventTypes(),
+			ProducedEventSource: o.AsEventSource(),
+			AcceptedEventTypes:  o.AcceptedEventTypes(),
+		}, nil
 	case "CloudEventsTarget":
 		return EventAttributes{}, nil
 	case "ConfluentTarget":

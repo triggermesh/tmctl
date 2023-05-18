@@ -34,6 +34,7 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/awssnstarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/awssqstarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/azureeventhubstarget"
+	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/azureservicebustarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/cloudeventstarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/datadogtarget"
 	"github.com/triggermesh/triggermesh/pkg/targets/reconciler/elasticsearchtarget"
@@ -115,6 +116,12 @@ func targets(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return azureeventhubstarget.MakeAppEnv(o), nil
+	case "AzureServiceBusTarget":
+		var o *targetsv1alpha1.AzureServiceBusTarget
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return nil, err
+		}
+		return azureservicebustarget.MakeAppEnv(o), nil
 	case "CloudEventsTarget":
 		var o *targetsv1alpha1.CloudEventsTarget
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
