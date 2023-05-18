@@ -19,15 +19,12 @@ package delete
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/docker/docker/client"
 	"github.com/spf13/cobra"
 
 	"github.com/triggermesh/tmctl/cmd/brokers"
-	"github.com/triggermesh/tmctl/pkg/completion"
 	"github.com/triggermesh/tmctl/pkg/config"
 	"github.com/triggermesh/tmctl/pkg/docker"
 	"github.com/triggermesh/tmctl/pkg/kubernetes"
@@ -45,60 +42,33 @@ type CliOptions struct {
 	CRD      map[string]crd.CRD
 }
 
-func NewCmd(config *config.Config, manifest *manifest.Manifest, crd map[string]crd.CRD) *cobra.Command {
+func NewCmd(config *config.Config, manifest *manifest.Manifest, crds map[string]crd.CRD) *cobra.Command {
 	o := &CliOptions{
-		CRD:      crd,
+		CRD:      crds,
 		Config:   config,
 		Manifest: manifest,
 	}
-	var broker string
 	deleteCmd := &cobra.Command{
-		Use:   "delete <component_name_1, component_name_2...> [--broker <name>]",
-		Short: "Delete components by names",
-		Example: `tmctl delete foo-httptarget, foo-awss3source
-tmctl delete --broker foo`,
-		ValidArgsFunction: o.deleteCompletion,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if broker != "" {
-				return o.deleteBroker(broker)
+		Use:   "delete <kind> <name>",
+		Short: "Delete TriggerMesh component",
+		// CompletionOptions: cobra.CompletionOptions{DisableDescriptions: true},
+		Args: cobra.MinimumNArgs(1),
+		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
+			cobra.CheckErr(docker.CheckDaemon())
+			if cmd.Name() != "broker" {
+				cobra.CheckErr(o.Manifest.Read())
 			}
-			if len(args) == 0 {
-				return fmt.Errorf("expected at least 1 component name, got 0")
-			}
-			cobra.CheckErr(o.Manifest.Read())
-			return o.deleteComponents(args, false)
 		},
 	}
-	deleteCmd.Flags().StringVar(&broker, "broker", "", "Delete the broker")
-	cobra.CheckErr(deleteCmd.RegisterFlagCompletionFunc("broker", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		list, err := brokers.List(o.Config.ConfigHome, "")
-		if err != nil {
-			return []string{}, cobra.ShellCompDirectiveNoFileComp
-		}
-		return list, cobra.ShellCompDirectiveNoFileComp
-	}))
+	deleteCmd.AddCommand(o.deleteBrokerCmd())
+	deleteCmd.AddCommand(o.deleteSourceCmd())
+	deleteCmd.AddCommand(o.deleteTargetCmd())
+	deleteCmd.AddCommand(o.deleteTransformationCmd())
+	deleteCmd.AddCommand(o.deleteTriggerCmd())
 	return deleteCmd
 }
 
-func (o *CliOptions) deleteBroker(broker string) error {
-	oo := *o
-	oo.Config.Context = broker
-	oo.Manifest = manifest.New(filepath.Join(oo.Config.ConfigHome, broker, triggermesh.ManifestFile))
-	cobra.CheckErr(oo.Manifest.Read())
-
-	if err := oo.deleteComponents([]string{}, true); err != nil {
-		return fmt.Errorf("deleting component: %w", err)
-	}
-	if err := os.RemoveAll(filepath.Join(oo.Config.ConfigHome, broker)); err != nil {
-		return fmt.Errorf("delete broker %q: %v", broker, err)
-	}
-	if broker == o.Config.Context {
-		return o.switchContext()
-	}
-	return nil
-}
-
-func (o *CliOptions) deleteComponents(names []string, deleteBroker bool) error {
+func (o *CliOptions) deleteBrokerComponents(names []string, deleteBroker bool) error {
 	ctx := context.Background()
 	client, err := docker.NewClient()
 	if err != nil {
@@ -231,12 +201,4 @@ func (o *CliOptions) switchContext() error {
 	}
 	o.Config.Context = context
 	return o.Config.Save()
-}
-
-func (o *CliOptions) deleteCompletion(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-	if len(args) == 0 {
-		return append(completion.ListAll(o.Manifest), "--broker"),
-			cobra.ShellCompDirectiveNoFileComp
-	}
-	return nil, cobra.ShellCompDirectiveNoFileComp
 }

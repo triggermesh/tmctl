@@ -61,6 +61,26 @@ func ListTargets(m *manifest.Manifest) []string {
 	return list
 }
 
+func ListObjectsByAPI(api string, m *manifest.Manifest) []string {
+	var list []string
+	for _, object := range m.Objects {
+		if object.APIVersion == api {
+			list = append(list, object.Metadata.Name)
+		}
+	}
+	return list
+}
+
+func ListObjectsByKind(kind string, m *manifest.Manifest) []string {
+	var list []string
+	for _, object := range m.Objects {
+		if object.Kind == kind {
+			list = append(list, object.Metadata.Name)
+		}
+	}
+	return list
+}
+
 func ListAll(m *manifest.Manifest) []string {
 	var list []string
 	for _, object := range m.Objects {

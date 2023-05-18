@@ -124,7 +124,7 @@ validate_start() {
 cleanup() {
     echo "Cleaning up test environment"
     kill -INT $WATCH_PID
-    $TMCTL delete --broker e2e-test
+    $TMCTL delete broker e2e-test
 
     BROKERS="`$TMCTL brokers`"
     if [ ! -z "$BROKERS" ]; then
