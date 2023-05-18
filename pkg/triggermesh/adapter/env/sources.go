@@ -53,6 +53,7 @@ import (
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/httppollersource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/ibmmqsource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/kafkasource"
+	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/mongodbsource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/ocimetricssource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/salesforcesource"
 	"github.com/triggermesh/triggermesh/pkg/sources/reconciler/slacksource"
@@ -230,6 +231,12 @@ func sources(object unstructured.Unstructured) ([]corev1.EnvVar, error) {
 			return nil, err
 		}
 		return kafkasource.MakeAppEnv(o), nil
+	case "MongoDBSource":
+		var o *sourcesv1alpha1.MongoDBSource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
+			return nil, err
+		}
+		return mongodbsource.MakeAppEnv(o), nil
 	case "OCIMetricsSource":
 		var o *sourcesv1alpha1.OCIMetricsSource
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &o); err != nil {
