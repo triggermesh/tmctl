@@ -19,10 +19,16 @@ package kubernetes
 import (
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/triggermesh/tmctl/pkg/triggermesh/crd"
 )
+
+const deploymentLabel = "app.kubernetes.io/name"
 
 type Object struct {
 	APIVersion string                 `json:"apiVersion" yaml:"apiVersion"`
@@ -99,6 +105,74 @@ func CreateUnstructured(crd crd.CRD, metadata Metadata, spec, status map[string]
 		return unstructured.Unstructured{}, fmt.Errorf("object status: %w", err)
 	}
 	return u, nil
+}
+
+func CreateDeployment(name, image string, envs []corev1.EnvVar) appsv1.Deployment {
+	return appsv1.Deployment{
+		TypeMeta: v1.TypeMeta{
+			APIVersion: "apps/v1",
+			Kind:       "Deployment",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name: name,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &v1.LabelSelector{
+				MatchLabels: map[string]string{
+					deploymentLabel: name,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{
+						deploymentLabel: name,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "adapter",
+							Image: image,
+							Env:   envs,
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "adapter",
+									Protocol:      corev1.ProtocolTCP,
+									ContainerPort: 8080,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func CreateService(name string) interface{} {
+	return corev1.Service{
+		TypeMeta: v1.TypeMeta{
+			Kind:       "Service",
+			APIVersion: "v1",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name: name,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Protocol: corev1.ProtocolTCP,
+					Port:     8080,
+					TargetPort: intstr.IntOrString{
+						StrVal: "adapter",
+					},
+				},
+			},
+			Selector: map[string]string{
+				deploymentLabel: name,
+			},
+		},
+	}
 }
 
 func getObjectCRD(crdObject crd.CRD) (*crd.Schema, string, error) {
