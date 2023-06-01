@@ -157,6 +157,36 @@ func (t *Transformation) AsDigitalOceanObject(additionalEnvs map[string]string) 
 	}, nil
 }
 
+func (t *Transformation) AsKubernetesDeployment(additionalEnvs map[string]string) (interface{}, error) {
+	o, err := t.asUnstructured()
+	if err != nil {
+		return nil, fmt.Errorf("creating object: %w", err)
+	}
+	image := adapter.Image(o, t.Version)
+
+	adapterEnv, err := env.Build(o)
+	if err != nil {
+		return nil, fmt.Errorf("adapter environment: %w", err)
+	}
+
+	envs := []corev1.EnvVar{}
+	for _, v := range adapterEnv {
+		if v.ValueFrom != nil && additionalEnvs != nil {
+			if secret, ok := additionalEnvs[v.ValueFrom.SecretKeyRef.Key]; ok {
+				envs = append(envs, corev1.EnvVar{Name: v.Name, Value: string(secret)})
+				delete(additionalEnvs, v.ValueFrom.SecretKeyRef.Key)
+			}
+		} else {
+			envs = append(envs, v)
+		}
+	}
+	for k, v := range additionalEnvs {
+		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
+	}
+
+	return kubernetes.CreateDeployment(t.Name, image, envs), nil
+}
+
 func (t *Transformation) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {
 	o, err := t.asUnstructured()
 	if err != nil {

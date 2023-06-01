@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/digitalocean/godo"
@@ -121,6 +122,17 @@ func (b *Broker) AsDigitalOceanObject(additionalEnvs map[string]string) (interfa
 		InstanceCount:    1,
 		InstanceSizeSlug: "professional-xs",
 	}, nil
+}
+
+func (b *Broker) AsKubernetesDeployment(additionalEnvs map[string]string) (interface{}, error) {
+	var envs []corev1.EnvVar
+	for k, v := range additionalEnvs {
+		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
+	}
+
+	deployment := kubernetes.CreateDeployment(b.Name, b.image, envs)
+	deployment.Spec.Template.Spec.Containers[0].Command = b.entrypoint
+	return deployment, nil
 }
 
 func (b *Broker) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {

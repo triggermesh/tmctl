@@ -82,6 +82,38 @@ func (s *Source) AsK8sObject() (kubernetes.Object, error) {
 	return kubernetes.CreateObject(s.CRD, s.getMeta(), spec)
 }
 
+func (s *Source) AsKubernetesDeployment(additionalEnvs map[string]string) (interface{}, error) {
+	o, err := s.asUnstructured()
+	if err != nil {
+		return nil, fmt.Errorf("creating object: %w", err)
+	}
+	image := adapter.Image(o, s.Version)
+
+	adapterEnv, err := env.Build(o)
+	if err != nil {
+		return nil, fmt.Errorf("adapter environment: %w", err)
+	}
+
+	adapterEnv = append(adapterEnv, corev1.EnvVar{Name: "K_SINK", Value: fmt.Sprintf("http://%s:8080", s.Broker)})
+
+	envs := []corev1.EnvVar{}
+	for _, v := range adapterEnv {
+		if v.ValueFrom != nil && additionalEnvs != nil {
+			if secret, ok := additionalEnvs[v.ValueFrom.SecretKeyRef.Key]; ok {
+				envs = append(envs, corev1.EnvVar{Name: v.Name, Value: string(secret)})
+				delete(additionalEnvs, v.ValueFrom.SecretKeyRef.Key)
+			}
+		} else {
+			envs = append(envs, v)
+		}
+	}
+	for k, v := range additionalEnvs {
+		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
+	}
+
+	return kubernetes.CreateDeployment(s.Name, image, envs), nil
+}
+
 func (s *Source) AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error) {
 	o, err := s.asUnstructured()
 	if err != nil {

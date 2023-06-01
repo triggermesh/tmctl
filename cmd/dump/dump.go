@@ -40,10 +40,11 @@ import (
 )
 
 const (
-	platformKubernetes    = "kubernetes"
-	platformKnative       = "knative"
-	platformDockerCompose = "docker-compose"
-	platformDigitalOcean  = "digitalocean"
+	platformKubernetes        = "kubernetes"
+	platformKubernetesGeneric = "kubernetes-generic"
+	platformKnative           = "knative"
+	platformDockerCompose     = "docker-compose"
+	platformDigitalOcean      = "digitalocean"
 )
 
 type doOptions struct {
@@ -96,10 +97,11 @@ func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD)
 
 	cobra.CheckErr(dumpCmd.RegisterFlagCompletionFunc("platform", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return []string{
-			"kubernetes",
-			"knative",
-			"docker-compose",
-			"digitalocean",
+			platformKubernetes,
+			platformKubernetesGeneric,
+			platformKnative,
+			platformDockerCompose,
+			platformDigitalOcean,
 		}, cobra.ShellCompDirectiveNoFileComp
 	}))
 	cobra.CheckErr(dumpCmd.RegisterFlagCompletionFunc("output", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
@@ -198,6 +200,30 @@ func (o *CliOptions) dump(do *doOptions) error {
 				return fmt.Errorf("unable to export component %q to %q: %v", component.GetName(), o.Platform, err)
 			}
 			output.(map[string]interface{})["services"].(map[string]interface{})[component.GetName()] = platformObject
+		case platformKubernetesGeneric:
+			if component.GetKind() == tmbroker.BrokerKind {
+				config, err := o.getStaticBrokerConfig()
+				if err != nil {
+					return fmt.Errorf("broker static config: %w", err)
+				}
+				additionalEnv["BROKER_CONFIG"] = string(config)
+			}
+			exportable, ok := component.(triggermesh.Exportable)
+			if !ok {
+				continue
+			}
+			deployment, err := exportable.AsKubernetesDeployment(additionalEnv)
+			if err != nil {
+				return fmt.Errorf("unable to export component %q to %q: %v", component.GetName(), o.Platform, err)
+			}
+
+			svc := kubernetes.CreateService(object.Metadata.Name)
+
+			if output == nil {
+				output = []interface{}{deployment, svc}
+				continue
+			}
+			output = append(output.([]interface{}), deployment, svc)
 		case platformKnative:
 			object.Metadata.Namespace = ""
 			if output == nil {
@@ -252,7 +278,7 @@ func (o *CliOptions) getStaticBrokerConfig() ([]byte, error) {
 					switch o.Platform {
 					case platformDigitalOcean:
 						return fmt.Sprintf("${%s.PRIVATE_URL}", trigger.Target.Ref.Name)
-					case platformDockerCompose:
+					case platformDockerCompose, platformKubernetesGeneric:
 						return fmt.Sprintf("http://%s:8080", trigger.Target.Ref.Name)
 					}
 					return ""

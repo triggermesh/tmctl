@@ -147,6 +147,14 @@ func (s *Service) AsDigitalOceanObject(additionalEnvs map[string]string) (interf
 	}, nil
 }
 
+func (s *Service) AsKubernetesDeployment(additionalEnvs map[string]string) (interface{}, error) {
+	envs := []corev1.EnvVar{}
+	for k, v := range additionalEnvs {
+		envs = append(envs, corev1.EnvVar{Name: k, Value: v})
+	}
+	return kubernetes.CreateDeployment(s.Name, s.Image, envs), nil
+}
+
 func (s *Service) asContainer(additionalEnvs map[string]string) (*docker.Container, error) {
 	u, err := s.asUnstructured()
 	if err != nil {

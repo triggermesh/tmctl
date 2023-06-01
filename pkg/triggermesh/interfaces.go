@@ -77,4 +77,5 @@ type Reconcilable interface {
 type Exportable interface {
 	AsDockerComposeObject(additionalEnvs map[string]string) (interface{}, error)
 	AsDigitalOceanObject(additionalEnvs map[string]string) (interface{}, error)
+	AsKubernetesDeployment(additionalEnvs map[string]string) (interface{}, error)
 }
