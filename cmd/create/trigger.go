@@ -41,6 +41,9 @@ func (o *CliOptions) newTriggerCmd() *cobra.Command {
 		Example:   "tmctl create trigger --target sockeye --source foo-httppollersource",
 		ValidArgs: []string{"--target", "--name", "--source", "--eventTypes"},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return fmt.Errorf("unexpected argument(s): %v", args)
+			}
 			return o.trigger(name, rawFilter, eventSourcesFilter, eventTypesFilter, target)
 		},
 	}
