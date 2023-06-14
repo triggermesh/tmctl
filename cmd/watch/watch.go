@@ -22,10 +22,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -72,6 +74,7 @@ func NewCmd(config *config.Config) *cobra.Command {
 func (o *CliOptions) watch() error {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	defer close(c)
 
 	ctx := context.Background()
 
@@ -99,6 +102,8 @@ func (o *CliOptions) watch() error {
 	log.Println("Watching...")
 	go listenBroker(brokerLogs, c)
 	go listenEvents(eventDisplayLogs, c)
+	go checkConnectivity(w.Destination, c)
+
 	<-c
 	log.Println("Cleaning up")
 	return nil
@@ -139,6 +144,24 @@ func readLogs(output io.ReadCloser, done chan os.Signal, handler func([]byte)) {
 				log = log[8:]
 			}
 			handler(log)
+		}
+	}
+}
+
+func checkConnectivity(destination string, done chan os.Signal) {
+	port := strings.TrimPrefix(destination, "http://host.docker.internal")
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			if _, err := net.Dial("tcp", "localhost"+port); err != nil {
+				log.Printf("Wiretap container is unreachable: %v", err)
+				done <- syscall.SIGTERM
+				return
+			}
 		}
 	}
 }
