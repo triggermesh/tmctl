@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -50,24 +51,42 @@ func NewCmd(config *config.Config, manifest *manifest.Manifest, crd map[string]c
 		Config:   config,
 		Manifest: manifest,
 	}
-	var eventType, target string
+	var eventType, target, file string
 	sendCmd := &cobra.Command{
-		Use:     "send-event [--eventType <type>][--target <name>] <data>",
+		Use:     "send-event [--eventType <type>][--target <name>][--file <filename>] <data>",
 		Short:   "Send CloudEvent to the target",
 		Example: "tmctl send-event '{\"hello\":\"world\"}'",
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-			return []string{"--target", "--eventType"}, cobra.ShellCompDirectiveNoFileComp
+			return []string{"--target", "--eventType", "--file"}, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cobra.CheckErr(o.Manifest.Read())
 			if target == "" {
 				target = o.Config.Context
 			}
+
+			if file != "" {
+				events, err := readEventsFromFile(file)
+				if err != nil {
+					return fmt.Errorf("reading events from file: %w", err)
+				}
+
+				for _, event := range events {
+					err := o.send(eventType, target, event)
+					if err != nil {
+						fmt.Printf("Failed to send event: %v\n", err)
+					}
+				}
+
+				return nil
+			}
+
 			return o.send(eventType, target, strings.Join(args, " "))
 		},
 	}
 	sendCmd.Flags().StringVar(&target, "target", "", "Component to send the event to. Default is the broker")
 	sendCmd.Flags().StringVar(&eventType, "eventType", defaultEventType, "CloudEvent Type attribute")
+	sendCmd.Flags().StringVarP(&file, "file", "f", "", "File containing a list of events")
 
 	cobra.CheckErr(sendCmd.RegisterFlagCompletionFunc("eventType", func(cmd *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return completion.ListFilteredEventTypes(o.Config.Context, o.Config.ConfigHome, o.Manifest), cobra.ShellCompDirectiveNoFileComp
@@ -118,4 +137,25 @@ func (o *CliOptions) send(eventType, target, data string) error {
 	}
 	fmt.Printf("\nResponse: %s\n", response)
 	return nil
+}
+
+func readEventsFromFile(file string) ([]string, error) {
+	var rawEvents []json.RawMessage
+
+	fileData, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("reading file: %w", err)
+	}
+
+	err = json.Unmarshal(fileData, &rawEvents)
+	if err != nil {
+		return nil, fmt.Errorf("parsing events from file: %w", err)
+	}
+
+	events := make([]string, len(rawEvents))
+	for i, rawEvent := range rawEvents {
+		events[i] = string(rawEvent)
+	}
+
+	return events, nil
 }
