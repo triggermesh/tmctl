@@ -21,7 +21,7 @@ tmctl delete target foo
 ### Options inherited from parent commands
 
 ```
-      --version string   TriggerMesh components version. (default "v1.25.0")
+      --version string   TriggerMesh components version. (default "v1.25.1")
 ```
 
 ### SEE ALSO

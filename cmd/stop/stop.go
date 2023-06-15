@@ -72,6 +72,11 @@ func (o *CliOptions) stop() error {
 			continue
 		}
 		if object.Kind == tmbroker.BrokerKind {
+			wiretapContainerName := object.Metadata.Name + "-wiretap"
+			if err := docker.ForceStop(ctx, wiretapContainerName, client); err != nil {
+				log.Printf("Stopping %q: %v", wiretapContainerName, err)
+			}
+
 			object.Metadata.Name += "-broker"
 		}
 		log.Printf("Stopping %s\n", object.Metadata.Name)
