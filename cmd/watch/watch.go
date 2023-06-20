@@ -38,9 +38,6 @@ import (
 
 type CliOptions struct {
 	Config *config.Config
-
-	EventTypes string
-	Source     string
 }
 
 type brokerLog struct {
@@ -67,7 +64,6 @@ func NewCmd(config *config.Config) *cobra.Command {
 			return o.watch()
 		},
 	}
-	watchCmd.Flags().StringVarP(&o.EventTypes, "eventTypes", "e", "", "Filter events based on type attribute")
 	return watchCmd
 }
 
@@ -92,7 +88,7 @@ func (o *CliOptions) watch() error {
 	if err != nil {
 		return fmt.Errorf("create container: %w", err)
 	}
-	if err := w.CreateTrigger(strings.Split(o.EventTypes, ",")); err != nil {
+	if err := w.CreateTrigger(); err != nil {
 		return fmt.Errorf("create trigger: %w", err)
 	}
 	brokerLogs, err := w.BrokerLogs(ctx, o.Config.Triggermesh.Broker)

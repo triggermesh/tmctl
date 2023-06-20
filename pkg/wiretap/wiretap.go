@@ -82,7 +82,7 @@ func (w *Wiretap) CreateAdapter(ctx context.Context) (io.ReadCloser, error) {
 	return c.Logs(ctx, w.client, time.Now().Add(2*time.Second), true)
 }
 
-func (w *Wiretap) CreateTrigger(eventTypes []string) error {
+func (w *Wiretap) CreateTrigger() error {
 	url, err := apis.ParseURL(w.Destination)
 	if err != nil {
 		return fmt.Errorf("wiretap URL: %w", err)
