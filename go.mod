@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/pubsub v1.30.0
 	cloud.google.com/go/storage v1.30.1
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.11.28
+	github.com/Azure/go-autorest/autorest v0.11.29
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12
 	github.com/aws/aws-sdk-go v1.44.289
 	github.com/cloudevents/sdk-go/v2 v2.14.0
