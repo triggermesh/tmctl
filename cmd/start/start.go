@@ -42,6 +42,7 @@ type CliOptions struct {
 }
 
 func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD) *cobra.Command {
+	var version string
 	o := &CliOptions{
 		CRD:      crd,
 		Config:   config,
@@ -64,19 +65,22 @@ func NewCmd(config *config.Config, m *manifest.Manifest, crd map[string]crd.CRD)
 					triggermesh.ManifestFile))
 			}
 			cobra.CheckErr(o.Manifest.Read())
-			return o.start()
+			return o.start(version)
 		},
 	}
 	startCmd.Flags().BoolVar(&o.Restart, "restart", false, "Restart components")
+	startCmd.Flags().StringVar(&version, "version", o.Config.Triggermesh.Broker.Version, "TriggerMesh broker version.")
+
 	return startCmd
 }
 
-func (o *CliOptions) start() error {
+func (o *CliOptions) start(version string) error {
 	ctx := context.Background()
 	var brokerPort string
 	// start eventing first
 	for _, object := range o.Manifest.Objects {
 		if object.Kind == tmbroker.BrokerKind {
+			o.Config.Triggermesh.Broker.Version = version
 			b, err := tmbroker.New(object.Metadata.Name, o.Config.Triggermesh.Broker)
 			if err != nil {
 				return fmt.Errorf("creating broker object: %w", err)
