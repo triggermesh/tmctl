@@ -16,7 +16,7 @@ tmctl create broker foo
 
 ```
   -h, --help             help for broker
-      --version string   TriggerMesh broker version. (default "v1.3.0")
+      --version string   TriggerMesh broker version. (default "v1.4.0")
 ```
 
 ### SEE ALSO
