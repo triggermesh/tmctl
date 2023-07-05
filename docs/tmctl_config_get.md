@@ -15,7 +15,7 @@ tmctl config get [key] [flags]
 ### Options inherited from parent commands
 
 ```
-      --version string   TriggerMesh components version. (default "v1.25.1")
+      --version string   TriggerMesh components version. (default "v1.26.0")
 ```
 
 ### SEE ALSO
