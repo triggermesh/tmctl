@@ -15,6 +15,7 @@ tmctl config set <key> <value> [flags]
 ### Options inherited from parent commands
 
 ```
+      --broker string    Optional broker name.
       --version string   TriggerMesh components version. (default "v1.26.0")
 ```
 
